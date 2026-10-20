@@ -1,0 +1,54 @@
+/* Login Page styling */
+.login-card {
+    border-radius: 16px;
+    overflow: hidden;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
+    border: none;
+}
+.welcome-side {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    padding: 3rem 2.5rem;
+}
+.form-side {
+    background-color: #ffffff;
+    padding: 3rem 2.5rem;
+}
+/* Clean line-style input inputs */
+.input-line {
+    border: none;
+    border-bottom: 2px solid #e2e8f0;
+    border-radius: 0;
+    padding-left: 0;
+    padding-right: 0;
+    background: transparent;
+}
+.input-line:focus {
+    box-shadow: none;
+    border-color: #667eea;
+    background: transparent;
+}
+.btn-login-gradient {
+    background: linear-gradient(135deg, #4276e6 0%, #42a9e4 100%);
+    border: none;
+    color: white;
+    font-weight: 600;
+    border-radius: 30px;
+    padding: 0.6rem 2.5rem;
+    box-shadow: 0 4px 15px rgba(59, 178, 184, 0.4);
+}
+.btn-login-gradient:hover {
+    opacity: 0.95;
+    color: white;
+}
+
+/* Custom Navbar Color + Footer Color)*/
+.custom-navbar {
+    background-color: #415da0 !important; /* Dark slate/navy */
+}
+.custom-footer {
+    background-color: #415da0 !important;
+}
