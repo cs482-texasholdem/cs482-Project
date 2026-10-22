@@ -35,3 +35,4 @@ app.get('/logout', UserCont.logout);
 app.get('/deluser/:id', UserCont.deleteOne); // deletes user 
 
 exports.app = app;
+
