@@ -1,7 +1,21 @@
-const app = require("./app");
+require('dotenv').config();
+const { app } = require('./app');
+const db = require('./model/DbConnection');
 
-const PORT = 3000;
+const PORT = process.env.PORT || 3000;
 
-app.listen(PORT, () => {
-    console.log(`Server is running on http://localhost:${PORT}`);
-});
+async function startServer() {
+    try {
+        // Connect to MongoDB Atlas
+        await db.connect();
+        console.log('Database connection initialized.');
+
+        app.listen(PORT, () => {
+            console.log(`Server is running live on port ${PORT}`);
+        });
+    } catch (error) {
+        console.error('Failed to start server due to database error:', error);
+    }
+}
+
+startServer();
