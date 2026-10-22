@@ -13,6 +13,4 @@ function cardToText(cardNumber) {
 }
 
 //allows for Jest to run code by exporting function cardToText
-if (typeof module !== "undefined") {
-  module.exports = { cardToText };
-}
+module.exports = { cardToText };
