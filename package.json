@@ -1,0 +1,25 @@
+{
+  "name": "cs482-project",
+  "version": "1.0.0",
+  "description": "Welcome to our CS482 project for our highness Eric, the wonderful world of Texas Holdem :D\r We hope you enjoy this scrumcious game ;D  It is NO way complete\r xoxo the devs. Alejandro, Gigi, Bonita, Camila",
+  "main": "app.js",
+  "directories": {
+    "doc": "docs"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "node server.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/cs482-texasholdem/cs482-Project.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/cs482-texasholdem/cs482-Project/issues"
+  },
+  "homepage": "https://github.com/cs482-texasholdem/cs482-Project#readme"
+}
