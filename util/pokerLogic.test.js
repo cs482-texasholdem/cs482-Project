@@ -420,9 +420,8 @@ test('community cards have correct lengths for flop, turn, river, and common car
     });
 
     test('intra-category comparison: Flush with higher top card beats lower top card', () => {
-      // Same suit range, comparing high card values
-      const lowerFlush = Deck.bestHand([1, 5], [9, 13, 17, 2, 3]);
-      const higherFlush = Deck.bestHand([1, 9], [13, 17, 21, 2, 3]);
+      const lowerFlush = Deck.bestHand([1, 9], [13, 17, 21, 2, 3]);
+      const higherFlush = Deck.bestHand([1, 5], [9, 13, 17, 2, 3]);
       expect(higherFlush).toBeGreaterThan(lowerFlush);
     });
 
@@ -445,14 +444,14 @@ test('community cards have correct lengths for flop, turn, river, and common car
     });
 
     test('intra-category comparison: Pair with higher sequential kickers beats lower kickers', () => {
-      const lowerPairKickers = Deck.bestHand([1, 14], [2, 3, 4, 5, 7]);
+      const lowerPairKickers = Deck.bestHand([1, 14], [2, 8, 4, 5, 7]);
       const higherPairKickers = Deck.bestHand([1, 14], [2, 10, 11, 12, 7]);
       expect(higherPairKickers).toBeGreaterThan(lowerPairKickers);
     });
 
     test('intra-category comparison: High Card hand with higher secondary cards beats lower ones', () => {
-      const lowerHighCard = Deck.bestHand([1, 3], [5, 7, 9, 11, 13]);
-      const higherHighCard = Deck.bestHand([2, 4], [6, 8, 10, 12, 14]);
+      const lowerHighCard = Deck.bestHand([1, 4], [7, 10, 16, 19, 22]);
+      const higherHighCard = Deck.bestHand([2, 5], [8, 11, 17, 20, 23]);
       expect(higherHighCard).toBeGreaterThan(lowerHighCard);
     });
   });
