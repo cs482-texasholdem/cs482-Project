@@ -145,9 +145,9 @@ class Deck {
     const uniqueRanks = [...new Set(ranks)];
     
     // Check for Wheel Straight (A-2-3-4-5)
-    if (uniqueRanks.includes(12) && uniqueRanks.includes(0) && uniqueRanks.includes(1) && uniqueRanks.includes(2) && uniqueRanks.includes(3)) {
+    if ([12, 0, 1, 2, 3].every(rank => ranks.includes(rank))) {
       return [3, 2, 1, 0, -1]; // 5, 4, 3, 2, Ace (low)
-    }
+    } 
     
     return uniqueRanks.slice(0, 5);
   }
@@ -276,10 +276,15 @@ class Deck {
     const cards = Deck.#getParsedCards(hand, commonCards);
     const uniqueRanks = [...new Set(cards.map(c => c.rank))].sort((a, b) => b - a);
 
-    const checkRanks = [...uniqueRanks];
-    if (uniqueRanks.includes(12)) {
-      checkRanks.push(-1);
+    // Check for an Ace-low straight (A-2-3-4-5)
+    if ([12, 0, 1, 2, 3].every(rank => uniqueRanks.includes(rank))) {
+      return true;
     }
+
+    // Check for normal straights
+    uniqueRanks.sort((a, b) => b - a);
+
+    const checkRanks = [...uniqueRanks];
 
     let consecutive = 1;
     for (let i = 0; i < checkRanks.length - 1; i++) {
