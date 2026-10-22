@@ -7,7 +7,8 @@
     "doc": "docs"
   },
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
+    "test": "jest",
+    "coverage": "jest --coverage",
     "start": "node server.js"
   },
   "repository": {
@@ -23,6 +24,7 @@
   },
   "homepage": "https://github.com/cs482-texasholdem/cs482-Project#readme",
   "devDependencies": {
+    "jest": "^29.7.0",
     "supertest": "^7.3.1"
   },
   "dependencies": {
