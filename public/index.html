@@ -1,11 +1,11 @@
 <!DOCTYPE html>
 <!-- 
     Author: Bonita Rodrigues
-    Texas Hold'em Application - Landing Page
+    Texas Hold'em - Game Lobby Homepage
 -->
 <html>
     <head>
-        <title>Texas Hold'em - Home</title>
+        <title>Texas Hold'em - Lobby</title>
         
         <!-- Bootstrap Library -->
         <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css" rel="stylesheet" />
@@ -13,25 +13,32 @@
         <!-- Bootstrap Icons -->
         <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.13.1/font/bootstrap-icons.min.css">        
         
-        <!-- Your Shared External Stylesheet -->
+        <!-- Custom External Stylesheet -->
         <link rel="stylesheet" href="style.css">
     </head>
 
     <body class="bg-light">
+
         <!-- Header / Jumbotron -->
         <div class="p-4 bg-primary text-white text-center"> 
-          <h1>Texas Hold'em Poker <span class="bi bi-suit-spade-fill"></span></h1>
+            <h1>Texas Hold'em Poker <span class="bi bi-suit-spade-fill"></span></h1>
+            <p class="lead mb-0">Select an active table and take your seat at the high-stakes table.</p>
         </div>
 
         <!-- Navbar -->
         <nav class="navbar navbar-expand-sm custom-navbar" data-bs-theme="dark"> 
             <div class="container-fluid">
-                <ul class="navbar-nav">
+                <ul class="navbar-nav me-auto">
                     <li class="nav-item">
-                        <a class="nav-link active" href="landing.html"><span class="bi-house-fill"></span> Home</a>
+                        <a class="nav-link active" href="landing.html"><span class="bi-house-fill"></span> Lobby</a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" href="index.html"><span class="bi-box-arrow-in-right"></span> Login</a>
+                        <a class="nav-link" href="admin.html"><span class="bi-shield-lock-fill"></span> Admin Console</a>
+                    </li>
+                </ul>
+                <ul class="navbar-nav">
+                    <li class="nav-item">
+                        <a class="nav-link" href="index.html"><span class="bi-box-arrow-right"></span> Logout</a>
                     </li>
                 </ul>
             </div>
@@ -39,11 +46,131 @@
         
         <br/>
 
-        
+        <!-- Main Lobby Container -->
+        <div class="container mt-4 mb-5">
+            <div class="row mb-4">
+                <div class="col">
+                    <h2>Active Poker Lobbies</h2>
+                    <p class="text-muted">Choose from available rooms below or join a quick-match table.</p>
+                </div>
+            </div>
 
-        <!-- Footer (Matching custom style) -->
+            <!-- Lobby Table Cards Grid -->
+            <div class="row g-4" id="lobbyTableContainer">
+                
+                <!-- Table Card 1: Beginner Lounge -->
+                <div class="col-md-4">
+                    <div class="card shadow-sm border-0 h-100">
+                        <div class="card-body d-flex flex-column">
+                            <div class="d-flex justify-content-between align-items-center mb-3">
+                                <h5 class="card-title fw-bold mb-0">Beginner Lounge</h5>
+                                <span class="badge bg-success">Active</span>
+                            </div>
+                            <p class="text-muted small mb-3">Perfect for casual play and practicing your hand strategies.</p>
+                            <ul class="list-unstyled small mb-4">
+                                <li class="mb-1"><i class="bi bi-cash-coin text-primary me-2"></i> Blinds: $1 / $2</li>
+                                <li class="mb-1"><i class="bi bi-people-fill text-primary me-2"></i> Players: 4 / 9</li>
+                                <li><i class="bi bi-shield-check text-primary me-2"></i> Min Buy-in: $100</li>
+                            </ul>
+                            <button class="mt-auto btn btn-outline-primary w-100" onclick="openJoinSidebar('Beginner Lounge', '$1 / $2', '$100')">
+                                <i class="bi bi-box-arrow-in-right"></i> Join Table
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Table Card 2: High Rollers Arena -->
+                <div class="col-md-4">
+                    <div class="card shadow-sm border-0 h-100">
+                        <div class="card-body d-flex flex-column">
+                            <div class="d-flex justify-content-between align-items-center mb-3">
+                                <h5 class="card-title fw-bold mb-0">Intermediate Lounge</h5>
+                                <span class="badge bg-danger">High Stakes</span>
+                            </div>
+                            <p class="text-muted small mb-3">For experienced players ready to risk big for massive rewards.</p>
+                            <ul class="list-unstyled small mb-4">
+                                <li class="mb-1"><i class="bi bi-cash-coin text-primary me-2"></i> Blinds: $25 / $50</li>
+                                <li class="mb-1"><i class="bi bi-people-fill text-primary me-2"></i> Players: 7 / 9</li>
+                                <li><i class="bi bi-shield-check text-primary me-2"></i> Min Buy-in: $2,500</li>
+                            </ul>
+                            <button class="mt-auto btn btn-outline-primary w-100" onclick="openJoinSidebar('Intermediate Lounge', '$25 / $50', '$2,500')">
+                                <i class="bi bi-box-arrow-in-right"></i> Join Table
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Table Card 3: Speed Poker Table -->
+                <div class="col-md-4">
+                    <div class="card shadow-sm border-0 h-100">
+                        <div class="card-body d-flex flex-column">
+                            <div class="d-flex justify-content-between align-items-center mb-3">
+                                <h5 class="card-title fw-bold mb-0">Advanced Lounge</h5>
+                                <span class="badge bg-warning text-dark">Fast Paced</span>
+                            </div>
+                            <p class="text-muted small mb-3">Lightning-fast timer per turn. Quick decisions only!</p>
+                            <ul class="list-unstyled small mb-4">
+                                <li class="mb-1"><i class="bi bi-cash-coin text-primary me-2"></i> Blinds: $5 / $10</li>
+                                <li class="mb-1"><i class="bi bi-people-fill text-primary me-2"></i> Players: 8 / 9</li>
+                                <li><i class="bi bi-shield-check text-primary me-2"></i> Min Buy-in: $500</li>
+                            </ul>
+                            <button class="mt-auto btn btn-outline-primary w-100" onclick="openJoinSidebar('Advanced Lounge', '$5 / $10', '$500')">
+                                <i class="bi bi-box-arrow-in-right"></i> Join Table
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+
+        <!-- Pop-Up Sidebar (Bootstrap Offcanvas) -->
+        <div class="offcanvas offcanvas-end" tabindex="-1" id="joinGameSidebar" aria-labelledby="joinGameSidebarLabel">
+            <div class="offcanvas-header bg-primary text-white">
+                <h5 class="offcanvas-title" id="joinGameSidebarLabel"><i class="bi bi-suit-spade-fill"></i> Table Seating</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+            </div>
+            <div class="offcanvas-body d-flex flex-column">
+                <form id="joinTableForm" action="tableDisplay.html" method="GET">
+                    <div class="mb-3">
+                        <label class="form-label text-muted small">Selected Table</label>
+                        <input type="text" class="form-control fw-bold" id="sidebarTableName" readonly>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label text-muted small">Table Blinds</label>
+                        <input type="text" class="form-control" id="sidebarTableBlinds" readonly>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label text-muted small">Minimum Buy-in Required</label>
+                        <input type="text" class="form-control" id="sidebarTableMinBuyin" readonly>
+                    </div>
+                    <div class="mb-3">
+                        <label for="buyInAmount" class="form-label">Your Buy-in Amount ($)</label>
+                        <input type="number" class="form-control" id="buyInAmount" name="buyInAmount" value="1000" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="seatPreference" class="form-label">Preferred Seat Position</label>
+                        <select class="form-select" id="seatPreference" name="seat">
+                            <option value="random">Auto-Assign (Random Open Seat)</option>
+                            <option value="1">Seat 1 (Dealer)</option>
+                            <option value="2">Seat 2</option>
+                            <option value="3">Seat 3</option>
+                            <option value="4">Seat 4</option>
+                        </select>
+                    </div>
+                    <div class="mt-auto pt-3">
+                        <button type="submit" class="btn btn-primary w-100 py-2 fw-semibold">Take Your Seat & Play</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Footer -->
         <div class="mt-5 p-4 custom-footer text-white text-center">
             <p>Powerpuff Girls Inc. -- CS Department</p>
         </div>
+
+        <!-- External Landing Script -->
+        <script src="index.js"></script>
     </body>
 </html>
