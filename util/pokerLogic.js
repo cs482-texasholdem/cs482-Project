@@ -28,6 +28,11 @@ class Deck {
         const turnIndex = 2 * totalPlayers + 5;
         return this.deck[turnIndex];
     }
+
+    showRiver(totalPlayers) {
+        const riverIndex = 2 * totalPlayers + 7;
+        return this.deck[riverIndex];
+    }
 }
 
 module.exports = Deck;
