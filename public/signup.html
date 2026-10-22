@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<!-- 
+    Author: Bonita Rodrigues
+    Signup Page for New Texas Hold'em Users
+-->
+<html>
+    <head>
+        <title>Texas Hold'em - Create Account</title>
+        
+        <!-- Bootstrap Library -->
+        <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css" rel="stylesheet" />
+        <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.bundle.min.js"></script>
+        <!-- Bootstrap Icons -->
+        <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.13.1/font/bootstrap-icons.min.css">        
+        
+        <!-- Custom External Stylesheet -->
+        <link rel="stylesheet" href="style.css">
+    </head>
+
+    <body class="bg-light">
+
+        <!-- Header / Jumbotron -->
+        <div class="p-4 bg-primary text-white text-center"> 
+          <h1>Texas Hold'em Poker <span class="bi bi-suit-spade-fill"></span></h1>
+        </div>
+
+        <!-- Navbar -->
+        <nav class="navbar navbar-expand-sm custom-navbar" data-bs-theme="dark"> 
+            <div class="container-fluid">
+                <ul class="navbar-nav">
+                    <li class="nav-item">
+                        <a class="nav-link" href="index.html"><span class="bi-house-fill"></span> Home</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link active" href="login.html"><span class="bi-box-arrow-in-right"></span> Login</a>
+                    </li>
+                </ul>
+            </div>
+        </nav>
+        
+        <br/>
+
+        <!-- Main Content Container -->
+        <div class="container mt-4 mb-5">
+            <div class="row justify-content-center">
+                <div class="col-12 col-lg-10">
+
+                    <!-- Split Signup Card -->
+                    <div class="card login-card">
+                        <div class="row g-0">
+                            
+                            <!-- Left Welcome Banner (Purple Gradient Side) -->
+                            <div class="col-md-6 welcome-side">
+                                <h1 class="display-4 fw-bold mb-3">Join The Table.</h1>
+                                <p class="lead opacity-90">
+                                    Create your account, receive your initial chip stack, and test your skills at the high-stakes Texas Hold'em table.
+                                </p>
+                            </div>
+
+                            <!-- Right Form Area -->
+                            <div class="col-md-6 form-side">
+                                <h2 class="fw-bold mb-1">Create Account</h2>
+                                <p class="text-muted small mb-4">
+                                    Already have an account? <a href="login.html" class="text-decoration-none fw-semibold">Login Here</a>
+                                </p>
+
+                                <form class="was-validated" method="post" action="user" id="signupForm">
+                                    <!-- Username / Email Input -->
+                                    <div class="mb-4">
+                                        <label for="txt_login" class="form-label text-muted small mb-1">username / email</label>
+                                        <input class="form-control input-line" type="text" name="txt_login" id="txt_login" placeholder="Enter username or email" required />
+                                    </div>
+
+                                    <!-- Password Input -->
+                                    <div class="mb-4">
+                                        <label for="txt_pass" class="form-label text-muted small mb-1">password</label>
+                                        <input class="form-control input-line" type="password" name="txt_pass" id="txt_pass" placeholder="••••••••" minlength="6" required />
+                                    </div>
+
+                                    <!-- Confirm Password Input -->
+                                    <div class="mb-4">
+                                        <label for="txt_pass_confirm" class="form-label text-muted small mb-1">confirm password</label>
+                                        <input class="form-control input-line" type="password" id="txt_pass_confirm" placeholder="••••••••" minlength="6" required />
+                                    </div>
+
+                                    <!-- Action Buttons -->
+                                    <div class="d-flex justify-content-between align-items-center pt-2">
+                                        <button type="reset" class="btn btn-link text-muted text-decoration-none px-0">Clear</button>
+                                        <button type="submit" class="btn btn-login-gradient">Sign Up</button>
+                                    </div>
+                                </form>
+
+                                <!-- Error & Validation Display Area -->
+                                <div class="mt-3" id="msg-display"></div>
+                            </div>
+
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <div class="mt-5 p-4 custom-footer text-white text-center">
+            <p>Power Puff Girls Inc. -- CS Department</p>
+        </div>
+
+        <!-- Client-side Password Match Verification -->
+        <script type="text/javascript">
+            const form = document.getElementById('signupForm');
+            const pass = document.getElementById('txt_pass');
+            const confirmPass = document.getElementById('txt_pass_confirm');
+            const msgDisplay = document.getElementById('msg-display');
+
+            form.addEventListener('submit', function(e) {
+                if (pass.value !== confirmPass.value) {
+                    e.preventDefault(); // Stop form submission
+                    msgDisplay.innerHTML = `
+                        <div class="alert alert-warning alert-dismissible fade show mt-3 mb-0">
+                            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                            <strong>Notice!</strong> Passwords do not match.
+                        </div>
+                    `;
+                }
+            });
+        </script>
+    </body>
+</html>
