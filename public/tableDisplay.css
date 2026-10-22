@@ -151,17 +151,30 @@ main {
     border-color: var(--disconnected);
 }
 
+.community-cards,
 .player-cards {
-    color: var(--electric-cyan);
-    letter-spacing: 5px;
-    font-size: 20px;
-}
-
-.community-cards {
     display: flex;
-    flex-wrap: wrap;
     justify-content: center;
     gap: 10px;
+    flex-wrap: wrap;
+    margin: 20px 0;
+}
+
+.playing-card {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    width: 85px;
+    min-height: 110px;
+    padding: 8px;
+    box-sizing: border-box;
+    background: white;
+    color: #222;
+    border: 1px solid #ccc;
+    border-radius: 8px;
+    font-size: 13px;
+    text-align: center;
+    box-shadow: 0 2px 5px #0002;
 }
 
 .card {

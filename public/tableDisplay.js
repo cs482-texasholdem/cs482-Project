@@ -141,3 +141,39 @@ document.getElementById("chat-form").addEventListener(
     "submit",
     handleChatSubmit
 );
+
+async function loadTestCards() {
+    try {
+        const response = await fetch("/api/test-cards");
+
+        if (!response.ok) {
+            throw new Error("Failed to load cards");
+        }
+
+        const game = await response.json();
+
+        renderCards("player-cards", game.playerHands[0]);
+        renderCards("community-cards", game.communityCards);
+    } catch (error) {
+        console.error("Error loading cards:", error);
+    }
+}
+
+function renderCards(containerId, cards) {
+    const container = document.getElementById(containerId);
+    container.innerHTML = "";
+
+    cards.forEach(cardText => {
+        const card = document.createElement("div");
+        card.className = "card";
+
+        if (cardText.includes("♥") || cardText.includes("♦")) {
+            card.classList.add("red-suit");
+        }
+
+        card.textContent = cardText;
+        container.appendChild(card);
+    });
+}
+
+loadTestCards();

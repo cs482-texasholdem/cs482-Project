@@ -39,9 +39,13 @@ app.get('/loggeduser', UserCont.loggedUser);
 app.get('/logout', UserCont.logout); 
 app.get('/deluser/:id', UserCont.deleteOne); 
 
-// Table Actions
-const {joinTable, leaveTable} = require("./controller/tableController");
+
+ // Table Actions
+const {joinTable, leaveTable, dealTestHand} = require("./controller/tableController");
 app.post("/api/tables/:tableId/join", joinTable);
 app.post("/api/tables/:tableId/leave", leaveTable);
+// Temporary route to test pokerLogic
+app.get("/api/test-cards", dealTestHand);
+
 
 exports.app = app;
