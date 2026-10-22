@@ -23,6 +23,11 @@ class Deck {
         const flopStart = burnIndex + 1;
         return this.deck.slice(flopStart, flopStart + 3);
     }
+
+    showTurn(totalPlayers) {
+        const turnIndex = 2 * totalPlayers + 5;
+        return this.deck[turnIndex];
+    }
 }
 
 module.exports = Deck;
