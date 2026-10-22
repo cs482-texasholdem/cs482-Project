@@ -1,9 +1,19 @@
+/**
+ * Represents a standard 52-card deck with built-in poker dealing 
+ * and hand evaluation capabilities.
+ */
 class Deck {
+  /**
+   * Initializes a new Deck with cards 1 through 52 and automatically shuffles them.
+   */
   constructor() {
     this.deck = Array.from({ length: 52 }, (_, i) => i + 1);
     this.shuffleCards();
   }
 
+  /**
+   * Sorts the deck and performs a randomized Fisher-Yates shuffle.
+   */
   shuffleCards() {
     this.deck.sort((a, b) => a - b);
     for (let i = this.deck.length - 1; i > 0; i--) {
@@ -12,28 +22,54 @@ class Deck {
     }
   }
 
+  /**
+   * Deals two hole cards to a specific player given the total player count.
+   * @param {number} playerIndex - Zero-based index of the player.
+   * @param {number} totalPlayers - Total number of players at the table.
+   * @returns {number[]} Array containing the two hole cards.
+   */
   hand(playerIndex, totalPlayers) {
     const card1 = this.deck[playerIndex];
     const card2 = this.deck[playerIndex + totalPlayers];
     return [card1, card2];
   }
 
+  /**
+   * Deals the three community cards (flop) after burning a card.
+   * @param {number} totalPlayers - Total number of players at the table.
+   * @returns {number[]} Array of three flop cards.
+   */
   showFlop(totalPlayers) {
     const burnIndex = 2 * totalPlayers;
     const flopStart = burnIndex + 1;
     return this.deck.slice(flopStart, flopStart + 3);
   }
 
+  /**
+   * Deals the fourth community card (turn) after burning a card.
+   * @param {number} totalPlayers - Total number of players at the table.
+   * @returns {number} The turn card.
+   */
   showTurn(totalPlayers) {
     const turnIndex = 2 * totalPlayers + 5;
     return this.deck[turnIndex];
   }
 
+  /**
+   * Deals the fifth community card (river) after burning a card.
+   * @param {number} totalPlayers - Total number of players at the table.
+   * @returns {number} The river card.
+   */
   showRiver(totalPlayers) {
     const riverIndex = 2 * totalPlayers + 7;
     return this.deck[riverIndex];
   }
 
+  /**
+   * Retrieves all five community cards in order (flop, turn, river).
+   * @param {number} totalPlayers - Total number of players at the table.
+   * @returns {number[]} Array of all five community cards.
+   */
   commonCards(totalPlayers) {
     const flop = this.showFlop(totalPlayers);
     const turn = this.showTurn(totalPlayers);
@@ -42,6 +78,13 @@ class Deck {
   }
 
   // --- Internal Helper Methods for Hand Evaluation ---
+  
+  /**
+   * Parses a numeric card identifier (1-52) into its rank and suit.
+   * @private
+   * @param {number} card - Numeric card identifier.
+   * @returns {{rank: number, suit: number}} Parsed card object.
+   */
   static #parseCard(card) {
     return {
       rank: (card - 1) % 13, // 0 (Two) to 12 (Ace)
@@ -49,11 +92,24 @@ class Deck {
     };
   }
 
+  /**
+   * Parses a combined set of hole cards and community cards.
+   * @private
+   * @param {number[]} hand - Player's hole cards.
+   * @param {number[]} commonCards - Table community cards.
+   * @returns {Object[]} Array of parsed card objects.
+   */
   static #getParsedCards(hand, commonCards) {
-    const allCards = [...hand, commonCards].flat();
+    const allCards = [...hand, ...commonCards];
     return allCards.map(c => Deck.#parseCard(c));
   }
 
+  /**
+   * Counts occurrences of each rank across parsed cards.
+   * @private
+   * @param {Object[]} parsedCards - Array of parsed card objects.
+   * @returns {Object} Map of rank frequencies.
+   */
   static #getRankCounts(parsedCards) {
     const counts = {};
     for (const card of parsedCards) {
@@ -62,6 +118,13 @@ class Deck {
     return counts;
   }
 
+  /**
+   * Generates all k-sized combinations from an array.
+   * @private
+   * @param {any[]} arr - Source array.
+   * @param {number} k - Size of each combination.
+   * @returns {any[][]} Array of combinations.
+   */
   static #getCombinations(arr, k) {
     if (k === 0) return [[]];
     if (arr.length === 0) return [];
@@ -71,6 +134,12 @@ class Deck {
     return [...withHead, ...withoutHead];
   }
 
+  /**
+   * Extracts unique sorted ranks for a straight combination.
+   * @private
+   * @param {number[]} combo - 5-card combination array.
+   * @returns {number[]} Sorted rank values.
+   */
   static #getStraightRanks(combo) {
     const ranks = combo.map(c => (c - 1) % 13).sort((a, b) => b - a);
     const uniqueRanks = [...new Set(ranks)];
@@ -83,6 +152,13 @@ class Deck {
     return uniqueRanks.slice(0, 5);
   }
 
+  /**
+   * Extracts and sorts ranks based on group frequencies (e.g., pairs, trips).
+   * @private
+   * @param {number[]} combo - 5-card combination array.
+   * @param {number[]} pattern - Expected group pattern.
+   * @returns {number[]} Sorted group ranks.
+   */
   static #getGroupRanks(combo, pattern) {
     const counts = Deck.#getRankCounts(Deck.#getParsedCards(combo, []));
     const sortedEntries = Object.entries(counts)
@@ -98,6 +174,12 @@ class Deck {
     return resultRanks.slice(0, 5);
   }
 
+  /**
+   * Evaluates a 5-card hand combination and returns its numerical score.
+   * @private
+   * @param {number[]} combo - 5-card combination array.
+   * @returns {number} Calculated hand score.
+   */
   static #evaluate5CardHand(combo) {
     let category = 0;
     let sortedRanks = combo.map(c => (c - 1) % 13).sort((a, b) => b - a);
@@ -143,6 +225,12 @@ class Deck {
 
   // --- Static Hand Evaluation Methods ---
 
+  /**
+   * Determines the highest possible score from a player's hand and common cards.
+   * @param {number[]} hand - Player's hole cards.
+   * @param {number[]} commonCards - Table community cards.
+   * @returns {number} Maximum score achieved.
+   */
   static bestHand(hand, commonCards) {
     const allCards = [...hand, ...commonCards];
     const combinations = Deck.#getCombinations(allCards, 5);
@@ -157,6 +245,12 @@ class Deck {
     return maxScore;
   }
 
+  /**
+   * Checks if a flush is present.
+   * @param {number[]} hand - Player's hole cards.
+   * @param {number[]} commonCards - Table community cards.
+   * @returns {number[]|boolean} Sorted ranks if flush exists, false otherwise.
+   */
   static checkFlush(hand, commonCards) {
     const cards = Deck.#getParsedCards(hand, commonCards);
     const suitCounts = [0, 0, 0, 0];
@@ -172,6 +266,12 @@ class Deck {
       .sort((a, b) => b - a);
   }
 
+  /**
+   * Checks if a straight is present.
+   * @param {number[]} hand - Player's hole cards.
+   * @param {number[]} commonCards - Table community cards.
+   * @returns {boolean} True if a straight exists, false otherwise.
+   */
   static checkStraight(hand, commonCards) {
     const cards = Deck.#getParsedCards(hand, commonCards);
     const uniqueRanks = [...new Set(cards.map(c => c.rank))].sort((a, b) => b - a);
@@ -195,6 +295,12 @@ class Deck {
     return false;
   }
 
+  /**
+   * Checks if a straight flush is present.
+   * @param {number[]} hand - Player's hole cards.
+   * @param {number[]} commonCards - Table community cards.
+   * @returns {boolean} True if a straight flush exists, false otherwise.
+   */
   static checkStraightFlush(hand, commonCards) {
     const cards = Deck.#getParsedCards(hand, commonCards);
     for (let suit = 0; suit < 4; suit++) {
@@ -208,6 +314,12 @@ class Deck {
     return false;
   }
 
+  /**
+   * Checks if a royal flush is present.
+   * @param {number[]} hand - Player's hole cards.
+   * @param {number[]} commonCards - Table community cards.
+   * @returns {boolean} True if a royal flush exists, false otherwise.
+   */
   static checkRoyalFlush(hand, commonCards) {
     const cards = Deck.#getParsedCards(hand, commonCards);
     for (let suit = 0; suit < 4; suit++) {
@@ -225,12 +337,24 @@ class Deck {
     return false;
   }
 
+  /**
+   * Checks if four of a kind is present.
+   * @param {number[]} hand - Player's hole cards.
+   * @param {number[]} commonCards - Table community cards.
+   * @returns {boolean} True if four of a kind exists, false otherwise.
+   */
   static check4Kind(hand, commonCards) {
     const cards = Deck.#getParsedCards(hand, commonCards);
     const counts = Deck.#getRankCounts(cards);
     return Object.values(counts).includes(4);
   }
 
+  /**
+   * Checks if a full house is present.
+   * @param {number[]} hand - Player's hole cards.
+   * @param {number[]} commonCards - Table community cards.
+   * @returns {boolean} True if a full house exists, false otherwise.
+   */
   static checkFullHouse(hand, commonCards) {
     const cards = Deck.#getParsedCards(hand, commonCards);
     const counts = Deck.#getRankCounts(cards);
@@ -240,12 +364,24 @@ class Deck {
     return hasThree && hasPair;
   }
 
+  /**
+   * Checks if three of a kind is present.
+   * @param {number[]} hand - Player's hole cards.
+   * @param {number[]} commonCards - Table community cards.
+   * @returns {boolean} True if three of a kind exists, false otherwise.
+   */
   static check3Kind(hand, commonCards) {
     const cards = Deck.#getParsedCards(hand, commonCards);
     const counts = Deck.#getRankCounts(cards);
     return Object.values(counts).includes(3) && !Deck.checkFullHouse(hand, commonCards);
   }
 
+  /**
+   * Checks if two pair is present.
+   * @param {number[]} hand - Player's hole cards.
+   * @param {number[]} commonCards - Table community cards.
+   * @returns {boolean} True if two pair exists, false otherwise.
+   */
   static checkTwoPair(hand, commonCards) {
     const cards = Deck.#getParsedCards(hand, commonCards);
     const counts = Deck.#getRankCounts(cards);
@@ -253,6 +389,12 @@ class Deck {
     return pairs.length >= 2;
   }
 
+  /**
+   * Checks if a single pair is present.
+   * @param {number[]} hand - Player's hole cards.
+   * @param {number[]} commonCards - Table community cards.
+   * @returns {boolean} True if a single pair exists, false otherwise.
+   */
   static checkPair(hand, commonCards) {
     const cards = Deck.#getParsedCards(hand, commonCards);
     const counts = Deck.#getRankCounts(cards);
