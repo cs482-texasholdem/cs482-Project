@@ -1,24 +1,34 @@
-const ActiveTable = require("../model/ActiveTable");
+/**
+ * Table Controller
+ * Handles API requests for joining and leaving poker tables.
+ * @module tableController
+ */
 
-// Temporary tables stored in memory.
-const tables = new Map();
+const ActiveTable = require("../model/activeTable");
 
-tables.set("table1", new ActiveTable("table1", "beginner"));
-tables.set("table2", new ActiveTable("table2", "intermediate"));
-tables.set("table3", new ActiveTable("table3", "advanced"));
+// Stores active tables in memory.
+const tables = new Map([
+    ["table1", new ActiveTable("table1", "beginner")],
+    ["table2", new ActiveTable("table2", "intermediate")],
+    ["table3", new ActiveTable("table3", "advanced")]
+]);
 
+/**
+ * Handles a request to join a poker table.
+ * @param {Object} req - Express request object.
+ * @param {Object} res - Express response object.
+ * @returns {Object} HTTP response containing the result of the request.
+ */
 function joinTable(req, res) {
-    const tableId = req.params.tableId;
+    const { tableId } = req.params;
     const playerId = req.body.playerId;
 
-    // Check whether a player ID was provided.
-    if (!playerId) {
+    if (typeof playerId !== "string" || !playerId.trim()) {
         return res.status(400).json({
             error: "Player ID is required."
         });
     }
 
-    // Find the requested table.
     const table = tables.get(tableId);
 
     if (!table) {
@@ -27,16 +37,15 @@ function joinTable(req, res) {
         });
     }
 
-    // Try to add the player.
-    const joined = table.addPlayer(playerId);
+    const id = playerId.trim();
 
-    if (!joined) {
-        if (table.players.includes(playerId)) {
-            return res.status(409).json({
-                error: "Player has already joined this table."
-            });
-        }
+    if (table.hasPlayer(id)) {
+        return res.status(409).json({
+            error: "Player has already joined this table."
+        });
+    }
 
+    if (!table.addPlayer(id)) {
         return res.status(409).json({
             error: "Table is full."
         });
@@ -46,9 +55,47 @@ function joinTable(req, res) {
         message: "Successfully joined the table.",
         tableId: table.tableId,
         skillLevel: table.skillLevel,
-        playerCount: table.players.length,
+        playerCount: table.getPlayerCount(),
         maxPlayers: table.maxPlayers
     });
 }
 
-module.exports = { joinTable };
+/**
+ * Handles a request to leave a poker table.
+ * @param {Object} req - Express request object.
+ * @param {Object} res - Express response object.
+ * @returns {Object} HTTP response containing the result of the request.
+ */
+function leaveTable(req, res) {
+    const { tableId } = req.params;
+    const playerId = req.body.playerId;
+
+    if (typeof playerId !== "string" || !playerId.trim()) {
+        return res.status(400).json({
+            error: "Player ID is required."
+        });
+    }
+
+    const table = tables.get(tableId);
+
+    if (!table) {
+        return res.status(404).json({
+            error: "Table not found."
+        });
+    }
+
+    if (!table.removePlayer(playerId.trim())) {
+        return res.status(404).json({
+            error: "Player is not in this table."
+        });
+    }
+
+    return res.status(200).json({
+        message: "Successfully left the table.",
+        tableId: table.tableId,
+        playerCount: table.getPlayerCount(),
+        maxPlayers: table.maxPlayers
+    });
+}
+
+module.exports = { joinTable, leaveTable };

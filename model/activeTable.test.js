@@ -1,4 +1,4 @@
-const ActiveTable = require("../model/ActiveTable");
+const ActiveTable = require("../model/activeTable");
 
 describe("ActiveTable", () => {
     let table;
@@ -74,5 +74,24 @@ describe("ActiveTable", () => {
         const customTable = new ActiveTable("table2", "advanced", 60);
 
         expect(customTable.timeLimit).toBe(60);
+    });
+
+    test("checks whether a player is at the table", () => {
+        table.addPlayer("player1");
+
+        expect(table.hasPlayer("player1")).toBe(true);
+        expect(table.hasPlayer("player2")).toBe(false);
+    });
+
+    test("returns the current player count", () => {
+        table.addPlayer("player1");
+        table.addPlayer("player2");
+
+        expect(table.getPlayerCount()).toBe(2);
+    });
+
+    test("rejects an invalid time limit", () => {
+        expect(() => new ActiveTable("table2", "beginner", 0))
+            .toThrow("Time limit must be a positive integer.");
     });
 });

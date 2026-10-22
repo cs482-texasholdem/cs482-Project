@@ -1,6 +1,5 @@
-
 const request = require("supertest");
-const app = require("../app");
+const { app } = require("../app");
 
 describe("Join Table API", () => {
     test("joins an existing table successfully", async () => {
@@ -47,5 +46,52 @@ describe("Join Table API", () => {
 
         expect(response.status).toBe(400);
         expect(response.body.error).toBe("Player ID is required.");
+    });
+});
+
+describe("Leave Table API", () => {
+    test("allows a player to leave a table successfully", async () => {
+        await request(app)
+            .post("/api/tables/table1/join")
+            .send({ playerId: "leavingPlayer" });
+
+        const response = await request(app)
+            .post("/api/tables/table1/leave")
+            .send({ playerId: "leavingPlayer" });
+
+        expect(response.status).toBe(200);
+        expect(response.body.message).toBe(
+            "Successfully left the table."
+        );
+        expect(response.body.tableId).toBe("table1");
+    });
+
+    test("rejects leaving a table that does not exist", async () => {
+        const response = await request(app)
+            .post("/api/tables/table99/leave")
+            .send({ playerId: "testPlayer" });
+
+        expect(response.status).toBe(404);
+        expect(response.body.error).toBe("Table not found.");
+    });
+
+    test("rejects a request without a player ID", async () => {
+        const response = await request(app)
+            .post("/api/tables/table1/leave")
+            .send({});
+
+        expect(response.status).toBe(400);
+        expect(response.body.error).toBe("Player ID is required.");
+    });
+
+    test("rejects a player who is not at the table", async () => {
+        const response = await request(app)
+            .post("/api/tables/table1/leave")
+            .send({ playerId: "notJoinedPlayer" });
+
+        expect(response.status).toBe(404);
+        expect(response.body.error).toBe(
+            "Player is not in this table."
+        );
     });
 });
