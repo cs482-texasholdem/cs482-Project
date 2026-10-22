@@ -108,20 +108,7 @@
         </div>
 
         <!-- Dynamic JS Script for URL error parameters -->
-        <script type="text/javascript">
-            const params = new URLSearchParams(window.location.search);    
-            let error = params.get('error');
-            let msg = null;
-            if(error === '1'){
-                msg = `
-                    <div class="alert alert-danger alert-dismissible fade show mt-3 mb-0">
-                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-                        <strong>Error!</strong> Incorrect Username or Password.
-                    </div>
-                `;
-                document.getElementById("msg-display").innerHTML = msg;
-            } 
-        </script>
+        <script src="login.js"></script>
     </body>
 
 </html>

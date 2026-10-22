@@ -19,7 +19,7 @@ exports.deleteOne = async function(req, res){
     
     if(exports.adminCheck(req)){ 
         await dao.del(id);
-        res.redirect('admin.html');
+        res.redirect('/admin.html');
     } else {
         res.status(403);
         res.end();
@@ -38,24 +38,31 @@ exports.postCreateOrUpdate = async function(req, res){
         userData.permission = 2; // Default to common user permission
     }
 
-    if(req.body.txt_id){
+    // Capture points/chips if provided
+    if(req.body.txt_points) {
+        userData.points = parseInt(req.body.txt_points); // or userData.chips depending on your schema
+    }
+
+    // Check for ID (supporting txt_id, id, or _id)
+    let userId = req.body.txt_id || req.body.id;
+
+    if(userId){
         // --- UPDATE USER ---
-        console.log('Update user');
+        console.log('Update user ID:', userId);
         
         // Safety check: only update password if a new one was actually typed in
         if(req.body.txt_pass && req.body.txt_pass.trim() !== "") {
             userData.password = passUtil.hashPassword(req.body.txt_pass);
         } else {
             // Fetch existing user to retain their current hashed password
-            let existingUser = await dao.read(req.body.txt_id);
+            let existingUser = await dao.read(userId);
             if(existingUser) {
                 userData.password = existingUser.password;
             }
         }
 
-        await dao.update(req.body.txt_id, userData); 
+        await dao.update(userId, userData); 
     }
-
     else {
         // --- INSERT NEW USER ---
         if(req.body.txt_pass) {
@@ -65,10 +72,36 @@ exports.postCreateOrUpdate = async function(req, res){
     }
 
     if(exports.adminCheck(req) === true)
-        res.redirect("admin.html");
+        res.redirect("/admin.html");
     else 
         res.redirect('index.html');
 }
+
+
+exports.register = async function(req, res){
+    try {
+        let userData = {};
+        userData.login = req.body.txt_login;
+        userData.permission = 2; // New signups are always standard players
+        userData.points = 1000; // Starting chip stack
+
+        if(req.body.txt_pass) {
+            userData.password = passUtil.hashPassword(req.body.txt_pass);
+        }
+
+        // Save new user to MongoDB Atlas
+        await dao.create(userData);
+
+        // Automatically log them in or redirect them straight to home
+        req.session.user = userData.login;
+        req.session.permission = 2;
+
+        res.redirect('/index.html');
+    } catch (error) {
+        console.error("Error during user registration:", error);
+        res.redirect('/signup.html');
+    }
+};
 
 
 exports.login = async function(req, res){

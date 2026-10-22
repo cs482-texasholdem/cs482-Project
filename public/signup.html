@@ -64,7 +64,7 @@
                                     Already have an account? <a href="login.html" class="text-decoration-none fw-semibold">Login Here</a>
                                 </p>
 
-                                <form class="was-validated" method="post" action="user" id="signupForm">
+                                <form class="was-validated" method="post" action="register" id="signupForm">
                                     <!-- Username / Email Input -->
                                     <div class="mb-4">
                                         <label for="txt_login" class="form-label text-muted small mb-1">username / email</label>
@@ -106,23 +106,6 @@
         </div>
 
         <!-- Client-side Password Match Verification -->
-        <script type="text/javascript">
-            const form = document.getElementById('signupForm');
-            const pass = document.getElementById('txt_pass');
-            const confirmPass = document.getElementById('txt_pass_confirm');
-            const msgDisplay = document.getElementById('msg-display');
-
-            form.addEventListener('submit', function(e) {
-                if (pass.value !== confirmPass.value) {
-                    e.preventDefault(); // Stop form submission
-                    msgDisplay.innerHTML = `
-                        <div class="alert alert-warning alert-dismissible fade show mt-3 mb-0">
-                            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-                            <strong>Notice!</strong> Passwords do not match.
-                        </div>
-                    `;
-                }
-            });
-        </script>
+        <script src="signup.js"></script>
     </body>
 </html>

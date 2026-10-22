@@ -34,6 +34,7 @@ app.use(express.static('public'));
 const UserCont = require("./controller/UserController"); 
 app.post('/user', UserCont.postCreateOrUpdate);
 app.get('/user', UserCont.getAll);
+app.post('/register', UserCont.register);
 app.post('/loginuser', UserCont.login);
 app.get('/loggeduser', UserCont.loggedUser);
 app.get('/logout', UserCont.logout); 
