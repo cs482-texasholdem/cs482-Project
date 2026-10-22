@@ -1,5 +1,4 @@
 //Author: Camila Cosme
-
 function cardToText(cardNumber) {
   const suits = ["♥", "♦", "♣", "♠"];
   const ranks = ["A", "2", "3", "4", "5", "6", "7",
@@ -9,4 +8,8 @@ function cardToText(cardNumber) {
   const rankIndex = (cardNumber - 1) % 13;
 
   return ranks[rankIndex] + suits[suitIndex];
+}
+
+if (typeof module !== "undefined") {
+  module.exports = { cardToText };
 }

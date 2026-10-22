@@ -1,7 +1,7 @@
 {
   "name": "cs482-project",
   "version": "1.0.0",
-  "description": "",
+  "description": "Welcome to our CS482 project for our highness Eric, the wonderful world of Texas Holdem :D\r We hope you enjoy this scrumcious game ;D  It is NO way complete\r xoxo the devs. Alejandro, Gigi, Bonita, Camila",
   "main": "app.js",
   "directories": {
     "doc": "docs"
