@@ -5,6 +5,8 @@
  */
 
 const ActiveTable = require("../model/activeTable");
+const Deck = require("../util/pokerLogic");
+const { cardToText } = require("../public/pokerDisplay");
 
 // Stores active tables in memory.
 const tables = new Map([
@@ -98,4 +100,28 @@ function leaveTable(req, res) {
     });
 }
 
-module.exports = { joinTable, leaveTable };
+/**
+ * Temporarily tests dealing cards and converting them to readable names.
+ */
+function dealTestHand(req, res) {
+    const deck = new Deck();
+    const totalPlayers = 2;
+
+    const playerHands = [
+        deck.hand(0, totalPlayers),
+        deck.hand(1, totalPlayers)
+    ];
+
+    const communityCards = deck.commonCards(totalPlayers);
+
+    return res.status(200).json({
+        playerHands: playerHands.map(hand =>
+            hand.map(card => cardToText(card))
+        ),
+        communityCards: communityCards.map(card =>
+            cardToText(card)
+        )
+    });
+}
+
+module.exports = { joinTable, leaveTable, dealTestHand };

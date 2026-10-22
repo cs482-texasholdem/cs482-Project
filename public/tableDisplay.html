@@ -668,7 +668,7 @@
                         <strong id="total-pot">600</strong>
                     </div>
 
-                    <div class="community-cards" id="community-cards"
+                    <div class="community-cards" id="community-cards" 
                         aria-label="Community cards">
                     </div>
 
@@ -723,10 +723,7 @@
                     <p>Your Bet: <strong id="your-bet">0</strong></p>
                 </div>
 
-                <div class="player-hand" aria-label="Your two cards">
-                    <div class="card">Q<span class="suit">♠</span></div>
-                    <div class="card red-suit">J<span class="suit">♥</span></div>
-                </div>
+                <div id="player-cards" class="player-hand" aria-label="Your two cards"></div>
             </section>
 
             <!-- Betting scale and round action buttons at the bottom -->
@@ -804,6 +801,45 @@
         const betScale = document.getElementById("bet-scale");
         const raiseAmount = document.getElementById("raise-amount");
         const tableMessage = document.getElementById("table-message");
+        
+        // Load test cards from the backend.
+        async function loadTestCards() {
+            try {
+                const response = await fetch("/api/test-cards");
+
+                if (!response.ok) {
+                    throw new Error("Failed to load test cards.");
+                }
+
+                const game = await response.json();
+
+                renderCards("player-cards", game.playerHands[0]);
+                renderCards("community-cards", game.communityCards);
+            } catch (error) {
+                console.error("Error loading cards:", error);
+                tableMessage.textContent = "Could not load cards.";
+            }
+        }
+
+        // Display the cards inside an HTML container.
+        function renderCards(containerId, cards) {
+            const container = document.getElementById(containerId);
+            container.innerHTML = "";
+
+            cards.forEach((cardText) => {
+                const card = document.createElement("div");
+                card.className = "card";
+
+                if (cardText.includes("♥") || cardText.includes("♦")) {
+                    card.classList.add("red-suit");
+                }
+
+                card.textContent = cardText;
+                container.appendChild(card);
+            });
+        }
+
+        loadTestCards();
 
         betScale.addEventListener("input", () => {
             raiseAmount.value = betScale.value;
