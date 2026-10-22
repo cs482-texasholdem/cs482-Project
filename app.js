@@ -22,7 +22,7 @@ app.use(session({
     })
 }));
 
-app.use(express.static('public_html'));
+app.use(express.static('public'));
 
 // User Actions
 const UserCont = require("./controller/UserController"); 
