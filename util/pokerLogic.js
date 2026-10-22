@@ -17,6 +17,12 @@ class Deck {
         const card2 = this.deck[playerIndex + totalPlayers];
         return [card1, card2];
     }
+
+    showFlop(totalPlayers) {
+        const burnIndex = 2 * totalPlayers;
+        const flopStart = burnIndex + 1;
+        return this.deck.slice(flopStart, flopStart + 3);
+    }
 }
 
 module.exports = Deck;
