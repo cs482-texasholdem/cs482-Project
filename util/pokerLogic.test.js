@@ -393,5 +393,67 @@ test('community cards have correct lengths for flop, turn, river, and common car
 
       expect(score1).toBe(score2);
     });
+
+    test('intra-category comparison: higher Straight Flush beats lower Straight Flush', () => {
+      // 6-high straight flush vs 9-high straight flush
+      const lowerStraightFlush = Deck.bestHand([1, 2], [3, 4, 5, 20, 25]);
+      const higherStraightFlush = Deck.bestHand([4, 5], [6, 7, 8, 20, 25]);
+      expect(higherStraightFlush).toBeGreaterThan(lowerStraightFlush);
+    });
+
+    test('intra-category comparison: Four of a Kind with higher quad rank beats lower quad rank', () => {
+      const lowerQuads = Deck.bestHand([2, 15], [28, 41, 5, 6, 7]); // Fours
+      const higherQuads = Deck.bestHand([3, 16], [29, 42, 5, 6, 7]); // Fives
+      expect(higherQuads).toBeGreaterThan(lowerQuads);
+    });
+
+    test('intra-category comparison: Four of a Kind with same quads but higher kicker beats lower kicker', () => {
+      const lowKickerQuads = Deck.bestHand([1, 14], [27, 40, 2, 3, 5]); // Kicker 2
+      const highKickerQuads = Deck.bestHand([1, 14], [27, 40, 2, 3, 12]); // Kicker 9
+      expect(highKickerQuads).toBeGreaterThan(lowKickerQuads);
+    });
+
+    test('intra-category comparison: Full House with higher trips component beats lower trips component', () => {
+      const lowerFullHouse = Deck.bestHand([1, 14], [27, 2, 15, 3, 4]); // Aces full of twos
+      const higherFullHouse = Deck.bestHand([2, 15], [28, 1, 14, 3, 4]); // Twos full of aces
+      expect(higherFullHouse).toBeGreaterThan(lowerFullHouse);
+    });
+
+    test('intra-category comparison: Flush with higher top card beats lower top card', () => {
+      // Same suit range, comparing high card values
+      const lowerFlush = Deck.bestHand([1, 5], [9, 13, 17, 2, 3]);
+      const higherFlush = Deck.bestHand([1, 9], [13, 17, 21, 2, 3]);
+      expect(higherFlush).toBeGreaterThan(lowerFlush);
+    });
+
+    test('intra-category comparison: higher Straight beats lower Straight', () => {
+      const lowerStraight = Deck.bestHand([1, 5], [6, 7, 8, 20, 22]); // 5-high straight
+      const higherStraight = Deck.bestHand([5, 9], [10, 11, 12, 20, 22]); // 9-high straight
+      expect(higherStraight).toBeGreaterThan(lowerStraight);
+    });
+
+    test('intra-category comparison: Three of a Kind with stronger kickers beats weaker kickers', () => {
+      const weakKickers = Deck.bestHand([1, 14], [27, 5, 6, 7, 9]);
+      const strongKickers = Deck.bestHand([1, 14], [27, 10, 11, 7, 9]);
+      expect(strongKickers).toBeGreaterThan(weakKickers);
+    });
+
+    test('intra-category comparison: Two Pair with higher second pair beats lower second pair', () => {
+      const lowerTwoPair = Deck.bestHand([1, 14], [2, 15, 6, 7, 9]); // Aces and Twos
+      const higherTwoPair = Deck.bestHand([1, 14], [3, 16, 6, 7, 9]); // Aces and Threes
+      expect(higherTwoPair).toBeGreaterThan(lowerTwoPair);
+    });
+
+    test('intra-category comparison: Pair with higher sequential kickers beats lower kickers', () => {
+      const lowerPairKickers = Deck.bestHand([1, 14], [2, 3, 4, 5, 7]);
+      const higherPairKickers = Deck.bestHand([1, 14], [2, 10, 11, 12, 7]);
+      expect(higherPairKickers).toBeGreaterThan(lowerPairKickers);
+    });
+
+    test('intra-category comparison: High Card hand with higher secondary cards beats lower ones', () => {
+      const lowerHighCard = Deck.bestHand([1, 3], [5, 7, 9, 11, 13]);
+      const higherHighCard = Deck.bestHand([2, 4], [6, 8, 10, 12, 14]);
+      expect(higherHighCard).toBeGreaterThan(lowerHighCard);
+    });
   });
 });
