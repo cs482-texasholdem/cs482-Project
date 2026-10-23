@@ -6,7 +6,6 @@
 
 const ActiveTable = require("../model/activeTable");
 const Deck = require("../util/pokerLogic");
-const { cardToText } = require("../public/pokerDisplay");
 
 // Stores active tables in memory.
 const tables = new Map([
@@ -116,10 +115,10 @@ function dealTestHand(req, res) {
 
     return res.status(200).json({
         playerHands: playerHands.map(hand =>
-            hand.map(card => cardToText(card))
+            hand.map(card => Deck.cardToText(card))
         ),
         communityCards: communityCards.map(card =>
-            cardToText(card)
+            Deck.cardToText(card)
         )
     });
 }
