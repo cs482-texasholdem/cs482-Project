@@ -6,7 +6,7 @@
     border: none;
 }
 .welcome-side {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    background: linear-gradient(135deg, #5587f1 0%, #3b47f0 100%);
     color: white;
     display: flex;
     flex-direction: column;
@@ -51,4 +51,103 @@
 }
 .custom-footer {
     background-color: #507fec !important;
+}
+
+/* Custom Blue Theme Poker Jumbotron */
+.custom-jumbotron {
+    background: linear-gradient(135deg, #0f172a 0%, #1e40af 50%, #172554 100%);
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.4);
+}
+
+body {
+    background: linear-gradient(135deg, #334155 0%, #2563eb 50%, #1e3a8a 100%);
+    background-attachment: fixed;
+    color: #f8fafc;
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    min-height: 100vh;
+    display: flex;          /* Enables Flexbox layout for the page */
+    flex-direction: column; /* Stacks items vertically */
+    margin: 0;
+}
+
+/* Sticky Footer Fix: Pushes footer to the bottom automatically */
+footer {
+    margin-top: auto;
+}
+
+/* Container allowing floating cards to spill out visibly */
+.auth-container {
+    position: relative;
+    z-index: 1;
+}
+
+/* Base Neon Card Style with High Contrast Glow */
+.falling-card {
+    position: absolute;
+    width: 170px;
+    height: 250px;
+    border: 2px solid #38bdf8;
+    border-radius: 14px;
+    background: rgba(15, 23, 42, 0.85); /* Dark solid base for strong contrast */
+    box-shadow: 0 0 25px rgba(56, 189, 248, 0.7), 
+                0 0 50px rgba(37, 99, 235, 0.5),
+                inset 0 0 15px rgba(56, 189, 248, 0.3);
+    pointer-events: none;
+    z-index: 0; /* Behind the login form, but positioned far enough out to be seen */
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    color: #38bdf8;
+    text-shadow: 0 0 12px #38bdf8, 0 0 25px #2563eb;
+    transition: transform 0.3s ease-in-out;
+}
+
+.falling-card .card-rank {
+    position: absolute;
+    top: 10px;
+    left: 14px;
+    font-size: 1.8rem;
+    font-weight: 800;
+    line-height: 1;
+    text-align: center;
+}
+
+.falling-card .card-rank i {
+    display: block;
+    font-size: 1.2rem;
+}
+
+.falling-card .center-suit {
+    font-size: 5.5rem;
+    color: #e0f2fe; /* Bright icy white core for high-contrast glow */
+    text-shadow: 0 0 15px #38bdf8, 0 0 35px #2563eb;
+}
+
+/* Falling Card 1: Floating Ace of Spades on the Left */
+.card-left-ace {
+    top: 10%;
+    left: -110px; /* Pushes card out to the left side */
+    transform: rotate(-18deg) scale(1.05);
+}
+
+/* Falling Card 2: Floating King of Diamonds on the Right */
+.card-right-king {
+    top: 15%;
+    right: -100px; /* Pushes card out to the right side */
+    transform: rotate(22deg) scale(1.1);
+}
+
+/* Falling Card 3: Small Floating Jack lower down on the Left */
+.card-left-jack {
+    bottom: -30px;
+    left: -70px;
+    transform: rotate(-35deg) scale(0.85);
+    opacity: 0.8;
+}
+
+/* Ensure the login card stays above the falling background cards */
+.login-card-wrapper {
+    position: relative;
+    z-index: 2;
 }

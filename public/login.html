@@ -23,11 +23,12 @@
         <link rel="stylesheet" href="style.css">
     </head>
 
-    <body class="bg-light">
+    <body>
 
         <!-- Header / Jumbotron -->
-        <div class="p-4 bg-primary text-white text-center"> 
-          <h1>Texas Hold'em Poker <span class="bi bi-suit-spade-fill"></span></h1>
+        <div class="p-5 custom-jumbotron text-white text-center">
+            <h1 class="display-5 fw-bold">Texas Hold'em Poker <span class="bi bi-suit-spade-fill"></span></h1>
+            <p class="lead text-light opacity-75 mb-0">High Stakes & Strategic Play</p>
         </div>
 
         <!-- Navbar -->
@@ -44,7 +45,37 @@
         <br/>
 
         <!-- Main Content Container -->
-        <div class="container mt-4 mb-5">
+        <div class="container my-5 auth-container">
+            <!-- Floating Glowing Cards in the Background -->
+            <div class="d-none d-lg-block">
+                <!-- Ace of Spades (Left) -->
+                <div class="falling-card card-left-ace">
+                    <div class="card-rank">
+                        A
+                        <i class="bi bi-suit-spade-fill"></i>
+                    </div>
+                    <i class="bi bi-suit-spade-fill center-suit"></i>
+                </div>
+
+                <!-- King of Diamonds (Right) -->
+                <div class="falling-card card-right-king">
+                    <div class="card-rank">
+                        K
+                        <i class="bi bi-suit-diamond-fill"></i>
+                    </div>
+                    <i class="bi bi-suit-diamond-fill center-suit"></i>
+                </div>
+
+                <!-- Jack of Hearts (Lower Left) -->
+                <div class="falling-card card-left-jack">
+                    <div class="card-rank">
+                        J
+                        <i class="bi bi-suit-heart-fill"></i>
+                    </div>
+                    <i class="bi bi-suit-heart-fill center-suit"></i>
+                </div>
+            </div>
+            
             <div class="row justify-content-center">
                 <div class="col-12 col-lg-10">
 
