@@ -1,8 +1,14 @@
-<!DOCTYPE html>
-<!-- 
-    Author: Bonita Rodrigues
-    Login Page for Users and Admin
+<!--
+  ============================================================================
+  File Name: login.html
+  Author: Bonita Rodrigues
+  Purpose: User authentication and login interface for the Texas Hold'em web 
+           application. Collects credentials, submits them securely to the 
+           backend login controller, and displays error messaging upon failure.
+  ============================================================================
 -->
+  
+<!DOCTYPE html>
 <html>
     <head>
         <title>Texas Hold'em - Login</title>
@@ -62,6 +68,7 @@
                                 </p>
 
                                 <form class="was-validated" method="post" action="loginuser">
+
                                     <!-- Username Input -->
                                     <div class="mb-4">
                                         <label for="txt_login" class="form-label text-muted small mb-1">user name</label>
@@ -71,7 +78,7 @@
                                     <!-- Password Input -->
                                     <div class="mb-4">
                                         <label for="txt_pass" class="form-label text-muted small mb-1">password</label>
-                                        <input class="form-control input-line" type="password" name="txt_pass" id="txt_pass" placeholder="••••••••" minlength="6" required />
+                                        <input class="form-control input-line" type="password" name="txt_pass" id="txt_pass" placeholder="enter password" minlength="6" required />
                                     </div>
 
                                     <!-- Remember Me & Forgot Password -->
