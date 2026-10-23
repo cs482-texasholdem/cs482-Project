@@ -1,9 +1,16 @@
-// ==========================================
-// Lobby Homepage Script (index.js)
-// ==========================================
+/**
+ * ============================================================================
+ * File Name: index.js
+ * Author: Bonita Rodrigues
+ * Purpose: Frontend controller script for the Poker Lobby homepage. Manages 
+ *          Bootstrap offcanvas sidebar components and dynamic table join 
+ *          interactions, including buy-in parsing and minimum threshold validation.
+ * ============================================================================
+ */
 
 let joinSidebar;
 
+// Initialize layout components once the DOM is fully loaded
 document.addEventListener("DOMContentLoaded", function() {
     // Initialize the Bootstrap Offcanvas sidebar component
     const sidebarElement = document.getElementById('joinGameSidebar');
@@ -12,7 +19,15 @@ document.addEventListener("DOMContentLoaded", function() {
     }
 });
 
-// Function triggered when clicking "Join Table" on any lobby card
+
+/**
+ * Populates and opens the slide-out table join sidebar when a user clicks 
+ * "Join Table" on any lobby card. Parses numeric buy-in thresholds.
+ * 
+ * @param {string} tableName - The name or identifier of the poker table
+ * @param {string} blinds - The small/big blind stakes string (e.g., "$10/$20")
+ * @param {string} minBuyin - The minimum chip buy-in requirement string
+ */
 function openJoinSidebar(tableName, blinds, minBuyin) {
     document.getElementById('sidebarTableName').value = tableName;
     document.getElementById('sidebarTableBlinds').value = blinds;

@@ -1,9 +1,16 @@
-<!DOCTYPE html>
-<!-- 
-    Author: Bonita Rodrigues
-    Texas Hold'em - Game Lobby Homepage
+<!--
+  ============================================================================
+  File Name: index.html
+  Author: Bonita Rodrigues
+  Purpose: Main lobby homepage interface for the Texas Hold'em web application.
+           Displays active poker tables, table stakes, chip counts, and integrates 
+           with offcanvas sidebar controls for seamless game entry and buy-ins.
+  ============================================================================
 -->
+  
+<!DOCTYPE html>
 <html>
+
     <head>
         <title>Texas Hold'em - Lobby</title>
         
@@ -126,28 +133,40 @@
 
         <!-- Pop-Up Sidebar (Bootstrap Offcanvas) -->
         <div class="offcanvas offcanvas-end" tabindex="-1" id="joinGameSidebar" aria-labelledby="joinGameSidebarLabel">
+            
             <div class="offcanvas-header bg-primary text-white">
                 <h5 class="offcanvas-title" id="joinGameSidebarLabel"><i class="bi bi-suit-spade-fill"></i> Table Seating</h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="offcanvas" aria-label="Close"></button>
             </div>
+            
             <div class="offcanvas-body d-flex flex-column">
                 <form id="joinTableForm" action="tableDisplay.html" method="GET">
+                    
+                    <!-- The Table Level you selected -->
                     <div class="mb-3">
                         <label class="form-label text-muted small">Selected Table</label>
                         <input type="text" class="form-control fw-bold" id="sidebarTableName" readonly>
                     </div>
+                    
+                    <!-- The Table Blinds -->
                     <div class="mb-3">
                         <label class="form-label text-muted small">Table Blinds</label>
                         <input type="text" class="form-control" id="sidebarTableBlinds" readonly>
                     </div>
+                    
+                    <!-- The Minimum Buy-in Required -->
                     <div class="mb-3">
                         <label class="form-label text-muted small">Minimum Buy-in Required</label>
                         <input type="text" class="form-control" id="sidebarTableMinBuyin" readonly>
                     </div>
+                    
+                    <!-- The Buy-in Amount -->
                     <div class="mb-3">
                         <label for="buyInAmount" class="form-label">Your Buy-in Amount ($)</label>
                         <input type="number" class="form-control" id="buyInAmount" name="buyInAmount" value="1000" required>
                     </div>
+                    
+                    <!-- The Preferred Seat Position -->
                     <div class="mb-3">
                         <label for="seatPreference" class="form-label">Preferred Seat Position</label>
                         <select class="form-select" id="seatPreference" name="seat">
@@ -158,6 +177,8 @@
                             <option value="4">Seat 4</option>
                         </select>
                     </div>
+
+                    <!-- The Submit Button -->
                     <div class="mt-auto pt-3">
                         <button type="submit" class="btn btn-primary w-100 py-2 fw-semibold">Take Your Seat & Play</button>
                     </div>
@@ -170,7 +191,7 @@
             <p>Powerpuff Girls Inc. -- CS Department</p>
         </div>
 
-        <!-- External Landing Script -->
+        <!-- External Index Script -->
         <script src="index.js"></script>
     </body>
 </html>
