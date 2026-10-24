@@ -125,6 +125,8 @@ function dealTestHand(req, res) {
         });
     }
 
+    table.assignBlinds();
+
     const deck = new Deck();
     const totalPlayers = table.players.length;
     
@@ -137,6 +139,8 @@ function dealTestHand(req, res) {
 
     return res.status(200).json({
         dealerIndex: table.dealerIndex,
+        smallBlindIndex: table.smallBlindIndex,
+        bigBlindIndex: table.bigBlindIndex,
         playerHands: playerHands.map(hand =>
             hand.map(card => Deck.cardToText(card))
         ),

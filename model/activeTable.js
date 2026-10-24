@@ -23,6 +23,8 @@ class ActiveTable {
         this.maxPlayers = 10;
         this.players = [];
         this.dealerIndex = null;
+        this.smallBlindIndex = null;
+        this.bigBlindIndex = null;
 
     }
 
@@ -86,14 +88,24 @@ class ActiveTable {
         this.players.splice(index, 1);
         return true;
     }
-/*
-    assignBlinds() {
-        // Determine which players have the small and big blinds.
-        return true; //temporary 
-    }
-*/
 
-    //NOTE: On the front end, the players need to be situated going left
+    assignBlinds() {
+        if (this.players.length < 2 || this.dealerIndex === null) {
+            return false;
+        }
+        if (this.players.length === 2) { //special case )(with two players, the dealer is also the small blind)
+             this.smallBlindIndex = this.dealerIndex;
+        } 
+        else { // With three or more players, use the player after the dealer.
+            this.smallBlindIndex = (this.dealerIndex + 1) % this.players.length;
+        }
+
+        this.bigBlindIndex = (this.smallBlindIndex + 1) % this.players.length;
+        
+        return true;
+     }
+
+
     /**
      * Rotates dealer chip around the table 
      * @returns {boolean} True if the player was removed; otherwise, false.

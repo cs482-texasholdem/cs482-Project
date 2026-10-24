@@ -123,6 +123,43 @@ describe("ActiveTable", () => {
         table.rotateDealer();
         expect(table.dealerIndex).toBe(0);
     });
-    
 
+    test("returns false with no players", () => {
+        table.dealerIndex = 0;
+        expect(table.assignBlinds()).toBe(false);
+    });
+
+    test("returns false with one player", () => {
+        table.addPlayer("player1");
+        table.dealerIndex = 0;
+        expect(table.assignBlinds()).toBe(false);
+    });
+
+    test("returns false when no dealer is assigned", () => {
+        table.addPlayer("player1");
+        table.addPlayer("player2");
+        table.dealerIndex = null;
+        expect(table.assignBlinds()).toBe(false);
+    });
+
+    test("with two players, the dealer is also the small blind", () => {
+        table.addPlayer("player1");
+        table.addPlayer("player2");
+        table.dealerIndex = 1;
+
+        expect(table.assignBlinds()).toBe(true);
+        expect(table.smallBlindIndex).toBe(table.dealerIndex);
+        expect(table.bigBlindIndex).toBe(0);
+    });
+
+    test("Assign blinds with more than 2 players", () => {
+        table.addPlayer("player1");
+        table.addPlayer("player2");
+        table.addPlayer("player3");
+        table.dealerIndex = 1;
+
+        expect(table.assignBlinds()).toBe(true);
+        expect(table.smallBlindIndex).toBe(2);
+        expect(table.bigBlindIndex).toBe(0);
+    });
 });

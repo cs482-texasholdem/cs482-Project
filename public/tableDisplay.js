@@ -80,6 +80,32 @@ function displayDealer(dealerIndex) {
     }
 }
 
+function displayBlinds(smallBlindIndex, bigBlindIndex) {
+    // Remove the previous blind markers.
+    document.querySelectorAll(".blind-marker").forEach((marker) => {
+        marker.remove();
+    });
+
+    const seats = document.querySelectorAll(".player-seat");
+
+    const smallBlindSeat = seats[smallBlindIndex];
+    const bigBlindSeat = seats[bigBlindIndex];
+
+    if (smallBlindSeat) {
+        const marker = document.createElement("span");
+        marker.classList.add("blind-marker");
+        marker.textContent = " (SB)";
+        smallBlindSeat.appendChild(marker);
+    }
+
+    if (bigBlindSeat) {
+        const marker = document.createElement("span");
+        marker.classList.add("blind-marker");
+        marker.textContent = " (BB)";
+        bigBlindSeat.appendChild(marker);
+    }
+}
+
 // Display the sample players when the page loads.
 //displayPlayers();
 //displayDealer(0);
@@ -179,6 +205,7 @@ async function loadTestCards() {
         renderCards("player-cards", game.playerHands[0]);
         renderCards("community-cards", game.communityCards);
         displayDealer(game.dealerIndex);
+        displayBlinds(game.smallBlindIndex, game.bigBlindIndex);
     } catch (error) {
         console.error("Error loading cards:", error);
     }
