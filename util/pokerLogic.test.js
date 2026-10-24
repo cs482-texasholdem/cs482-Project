@@ -39,11 +39,33 @@ describe('Deck Class & Poker Hand Evaluator', () => {
       expect(playerHand[0]).toBe(deck.deck[0]);
       expect(playerHand[1]).toBe(deck.deck[4]);
     });
+
+    test('cardToText correctly maps card numbers to text representations', () => {
+      // Hearts (Suit 0: 1 - 13)
+      expect(Deck.cardToText(1)).toBe('2♥');
+      expect(Deck.cardToText(13)).toBe('A♥');
+
+      // Diamonds (Suit 1: 14 - 26)
+      expect(Deck.cardToText(14)).toBe('2♦');
+      expect(Deck.cardToText(26)).toBe('A♦');
+
+      // Clubs (Suit 2: 27 - 39)
+      expect(Deck.cardToText(27)).toBe('2♣');
+      expect(Deck.cardToText(39)).toBe('A♣');
+
+      // Spades (Suit 3: 40 - 52)
+      expect(Deck.cardToText(40)).toBe('2♠');
+      expect(Deck.cardToText(52)).toBe('A♠');
+
+      // Random middle checks
+      expect(Deck.cardToText(8)).toBe('9♥'); // (8-1)%13 = 7 -> '9', Math.floor(7/13) = 0 -> '♥'
+      expect(Deck.cardToText(49)).toBe('J♠'); // (49-1)%13 = 11 -> 'K', Math.floor(48/13) = 3 -> '♠'
+    });
   });
 
   describe('Community Card Methods - Robust Validation', () => {
     
-test('community cards have correct lengths for flop, turn, river, and common cards', () => {
+    test('community cards have correct lengths for flop, turn, river, and common cards', () => {
       const totalPlayers = 4;
       const deck = new Deck();
 
@@ -112,11 +134,7 @@ test('community cards have correct lengths for flop, turn, river, and common car
 
   describe('Poker Hand Checkers (Static Methods)', () => {
 
-    // Note: Adjust mock card arrays below based on your exact c % 13 and c // 4 mapping.
-    // These examples use generic placeholder arrays to test boolean return states.
-
     test('checkRoyalFlush', () => {
-      // Mocked hand and common cards representing a Royal Flush
       const validHand = [1, 2]; 
       const validCommon = [9, 10, 11, 12, 13]; 
       expect(Deck.checkRoyalFlush(validHand, validCommon)).toBeTruthy();
@@ -137,7 +155,7 @@ test('community cards have correct lengths for flop, turn, river, and common car
     });
 
     test('check4Kind', () => {
-      const validHand = [1, 14]; // Quad equivalents depending on modulo
+      const validHand = [1, 14]; 
       const validCommon = [27, 40, 2, 3, 4];
       expect(Deck.check4Kind(validHand, validCommon)).toBeTruthy();
 
@@ -157,7 +175,6 @@ test('community cards have correct lengths for flop, turn, river, and common car
     });
 
     test('checkFlush', () => {
-      // Same suit example (e.g., all same suit range)
       const validHand = [1, 18];
       const validCommon = [9, 13, 17, 2, 3];
       expect(Deck.checkFlush(validHand, validCommon)).toBeTruthy();
@@ -266,20 +283,17 @@ test('community cards have correct lengths for flop, turn, river, and common car
     });
 
     test('edge case: Wheel Straight (Ace-low straight: A-2-3-4-5) is evaluated correctly', () => {
-      // Assuming your card math supports the Ace-low straight wrap-around
-      const wheelHand = [1, 2]; // e.g., Ace and 2
-      const wheelCommon = [3, 4, 5, 20, 25]; // 3, 4, 5 + random cards
+      const wheelHand = [1, 2]; 
+      const wheelCommon = [3, 4, 5, 20, 25]; 
 
       const wheelScore = Deck.bestHand(wheelHand, wheelCommon);
       const randomLowHandScore = Deck.bestHand([1, 12], [2, 20, 25, 30, 35]);
 
       expect(typeof wheelScore).toBe('number');
-      // A straight should score higher than a random high-card / weak hand
       expect(wheelScore).toBeGreaterThan(randomLowHandScore);
     });
 
     test('tie: Royal Flush (Board plays / identical ranking suits)', () => {
-      // Community cards contain the entire Royal Flush, so any player hand ties
       const common = [9, 10, 11, 12, 13];
       const player1Hand = [1, 2];
       const player2Hand = [3, 4];
@@ -291,10 +305,10 @@ test('community cards have correct lengths for flop, turn, river, and common car
     });
 
     test('tie: Straight Flush (Equivalent straight flush values)', () => {
-      const commonBoard = [5, 6, 7, 8, 9]; // All suit 1 (5//4=1, 6//4=1, etc.)
+      const commonBoard = [5, 6, 7, 8, 9]; 
       
-      const player1Hand = [1, 2]; // Lower cards that don't improve the board straight flush
-      const player2Hand = [3, 4]; // Lower cards that don't improve the board straight flush
+      const player1Hand = [1, 2]; 
+      const player2Hand = [3, 4]; 
 
       const score1 = Deck.bestHand(player1Hand, commonBoard);
       const score2 = Deck.bestHand(player2Hand, commonBoard);
@@ -303,7 +317,7 @@ test('community cards have correct lengths for flop, turn, river, and common car
     });
 
     test('tie: Four of a Kind (Same quad rank, identical kickers)', () => {
-      const common = [27, 40, 2, 3, 5]; // Quad components on board + kickers
+      const common = [27, 40, 2, 3, 5]; 
       const player1Hand = [1, 14];
       const player2Hand = [1, 14];
 
@@ -315,7 +329,7 @@ test('community cards have correct lengths for flop, turn, river, and common car
 
     test('tie: Full House (Identical trips and pair combination)', () => {
       const common = [2, 15, 3, 4, 6];
-      const player1Hand = [1, 14]; // Makes full house with board
+      const player1Hand = [1, 14]; 
       const player2Hand = [1, 14];
 
       const score1 = Deck.bestHand(player1Hand, common);
@@ -325,7 +339,6 @@ test('community cards have correct lengths for flop, turn, river, and common car
     });
 
     test('tie: Flush (Same suit category distribution / identical top flush values)', () => {
-      // Cards sharing the same suit range
       const common = [9, 13, 17, 2, 3];
       const player1Hand = [1, 5];
       const player2Hand = [1, 5];
@@ -381,10 +394,8 @@ test('community cards have correct lengths for flop, turn, river, and common car
     });
 
     test('tie: High Card (Board plays completely; both players play the board high cards)', () => {
-      // Board has high cards (e.g., values 9, 10, 11, 12, 13)
       const common = [9, 10, 11, 12, 13]; 
       
-      // Both players hold cards lower than the lowest board card (9)
       const player1Hand = [2, 3]; 
       const player2Hand = [4, 5]; 
 
@@ -395,27 +406,26 @@ test('community cards have correct lengths for flop, turn, river, and common car
     });
 
     test('intra-category comparison: higher Straight Flush beats lower Straight Flush', () => {
-      // 6-high straight flush vs 9-high straight flush
       const lowerStraightFlush = Deck.bestHand([1, 2], [3, 4, 5, 20, 25]);
       const higherStraightFlush = Deck.bestHand([4, 5], [6, 7, 8, 20, 25]);
       expect(higherStraightFlush).toBeGreaterThan(lowerStraightFlush);
     });
 
     test('intra-category comparison: Four of a Kind with higher quad rank beats lower quad rank', () => {
-      const lowerQuads = Deck.bestHand([2, 15], [28, 41, 5, 6, 7]); // Fours
-      const higherQuads = Deck.bestHand([3, 16], [29, 42, 5, 6, 7]); // Fives
+      const lowerQuads = Deck.bestHand([2, 15], [28, 41, 5, 6, 7]); 
+      const higherQuads = Deck.bestHand([3, 16], [29, 42, 5, 6, 7]); 
       expect(higherQuads).toBeGreaterThan(lowerQuads);
     });
 
     test('intra-category comparison: Four of a Kind with same quads but higher kicker beats lower kicker', () => {
-      const lowKickerQuads = Deck.bestHand([1, 14], [27, 40, 2, 3, 5]); // Kicker 2
-      const highKickerQuads = Deck.bestHand([1, 14], [27, 40, 2, 3, 12]); // Kicker 9
+      const lowKickerQuads = Deck.bestHand([1, 14], [27, 40, 2, 3, 5]); 
+      const highKickerQuads = Deck.bestHand([1, 14], [27, 40, 2, 3, 12]); 
       expect(highKickerQuads).toBeGreaterThan(lowKickerQuads);
     });
 
     test('intra-category comparison: Full House with higher trips component beats lower trips component', () => {
-      const lowerFullHouse = Deck.bestHand([1, 14], [27, 2, 15, 3, 4]); // Aces full of twos
-      const higherFullHouse = Deck.bestHand([2, 15], [28, 1, 14, 3, 4]); // Twos full of aces
+      const lowerFullHouse = Deck.bestHand([1, 14], [27, 2, 15, 3, 4]); 
+      const higherFullHouse = Deck.bestHand([2, 15], [28, 1, 14, 3, 4]); 
       expect(higherFullHouse).toBeGreaterThan(lowerFullHouse);
     });
 
@@ -426,8 +436,8 @@ test('community cards have correct lengths for flop, turn, river, and common car
     });
 
     test('intra-category comparison: higher Straight beats lower Straight', () => {
-      const lowerStraight = Deck.bestHand([1, 5], [6, 7, 8, 20, 22]); // 5-high straight
-      const higherStraight = Deck.bestHand([5, 9], [10, 11, 12, 20, 22]); // 9-high straight
+      const lowerStraight = Deck.bestHand([1, 5], [6, 7, 8, 20, 22]); 
+      const higherStraight = Deck.bestHand([5, 9], [10, 11, 12, 20, 22]); 
       expect(higherStraight).toBeGreaterThan(lowerStraight);
     });
 
@@ -438,8 +448,8 @@ test('community cards have correct lengths for flop, turn, river, and common car
     });
 
     test('intra-category comparison: Two Pair with higher second pair beats lower second pair', () => {
-      const lowerTwoPair = Deck.bestHand([1, 14], [2, 15, 6, 7, 9]); // Aces and Twos
-      const higherTwoPair = Deck.bestHand([1, 14], [3, 16, 6, 7, 9]); // Aces and Threes
+      const lowerTwoPair = Deck.bestHand([1, 14], [2, 15, 6, 7, 9]); 
+      const higherTwoPair = Deck.bestHand([1, 14], [3, 16, 6, 7, 9]); 
       expect(higherTwoPair).toBeGreaterThan(lowerTwoPair);
     });
 

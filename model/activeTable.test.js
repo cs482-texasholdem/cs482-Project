@@ -94,4 +94,34 @@ describe("ActiveTable", () => {
         expect(() => new ActiveTable("table2", "beginner", 0))
             .toThrow("Time limit must be a positive integer.");
     });
+
+    test("not enough players", () => {
+        table.addPlayer("player1");
+        expect(table.rotateDealer()).toBe(false);
+    });
+
+    test("randomly selects the expected dealer", () => {
+        const randomMock = jest.spyOn(Math, "random").mockReturnValue(0.5);
+        table.players = ["Mei", "Alex", "Sam", "Joe"];
+        table.dealerIndex = null; 
+        table.rotateDealer();
+        expect(table.dealerIndex).toBe(2);
+        randomMock.mockRestore();
+    });
+
+    test("move dealer to next player", () => {
+        table.players = ["Mei", "Alex", "Sam", "Joe"];
+        table.dealerIndex = 2; 
+        table.rotateDealer();
+        expect(table.dealerIndex).toBe(3);
+    });
+
+    test("move dealer to next player who is at the front of arr", () => {
+        table.players = ["Mei", "Alex", "Sam", "Joe"];
+        table.dealerIndex = 3; 
+        table.rotateDealer();
+        expect(table.dealerIndex).toBe(0);
+    });
+    
+
 });

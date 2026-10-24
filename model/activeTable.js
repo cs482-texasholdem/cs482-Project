@@ -22,6 +22,8 @@ class ActiveTable {
         this.timeLimit = timeLimit;
         this.maxPlayers = 10;
         this.players = [];
+        this.dealerIndex = null;
+
     }
 
     /**
@@ -82,6 +84,30 @@ class ActiveTable {
         }
 
         this.players.splice(index, 1);
+        return true;
+    }
+/*
+    assignBlinds() {
+        // Determine which players have the small and big blinds.
+        return true; //temporary 
+    }
+*/
+
+    //NOTE: On the front end, the players need to be situated going left
+    rotateDealer() {
+        // A hand needs at least two players 
+        if (this.players.length < 2) {
+            return false;
+        }
+
+        if (this.dealerIndex === null) { // First hand: randomly choose the dealer.
+            this.dealerIndex = Math.floor(Math.random() * this.players.length);
+        } 
+
+        else { // Next hand: move forward, wrapping to index 0.
+            this.dealerIndex = (this.dealerIndex + 1) % this.players.length;
+        }
+
         return true;
     }
 }
