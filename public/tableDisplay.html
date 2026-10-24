@@ -265,12 +265,13 @@
         // Keep the raise amount input synchronized with the slider.
         const betScale = document.getElementById("bet-scale");
         const raiseAmount = document.getElementById("raise-amount");
+        
         const tableMessage = document.getElementById("table-message");
         
         // Load test cards from the backend.
         async function loadTestCards() {
             try {
-                const response = await fetch("/api/test-cards");
+                const response = await fetch("/api/tables/table1/test-cards");
 
                 if (!response.ok) {
                     throw new Error("Failed to load test cards.");
@@ -304,7 +305,7 @@
             });
         }
 
-        loadTestCards();
+        //loadTestCards();
 
         betScale.addEventListener("input", () => {
             raiseAmount.value = betScale.value;
@@ -389,5 +390,7 @@
         );
     </script>
 
+     <script src="tableDisplay.js"></script>
+    
 </body>
 </html>

@@ -13,13 +13,13 @@ const samplePlayers = [
 
 // Get the HTML elements used to display the players and table messages.
 const playersContainer = document.getElementById("players");
-const tableMessage = document.getElementById("table-message");
+//const tableMessage = document.getElementById("table-message");
 
 /**
  * Displays the sample players and their information on the poker table.
  * Creates a seat for each player, including their name, cards, and chip count.
  * Highlights the local demo player.
- *
+ * 
  * @returns {void}
  */
 function displayPlayers() {
@@ -57,8 +57,32 @@ function displayPlayers() {
     });
 }
 
+/**
+ * Displays and handles the dealer logic
+ * @param dealerIndex Used to determine where the dealer Marker is
+ * @returns {void}
+ */
+function displayDealer(dealerIndex) {
+    console.log("Dealer index received:", dealerIndex);
+    // Remove the previous dealer marker.
+    document.querySelectorAll(".dealer-marker").forEach((marker) => {
+        marker.remove();
+    });
+
+    const seats = document.querySelectorAll(".player-seat");
+    const dealerSeat = seats[dealerIndex];
+
+    if (dealerSeat) {
+        const marker = document.createElement("span");
+        marker.classList.add("dealer-marker");
+        marker.textContent = " (D)";
+        dealerSeat.appendChild(marker);
+    }
+}
+
 // Display the sample players when the page loads.
-displayPlayers();
+//displayPlayers();
+//displayDealer(0);
 
 /**
  * Handles clicks on the Fold, Check, Call, and Raise buttons.
@@ -144,7 +168,7 @@ document.getElementById("chat-form").addEventListener(
 
 async function loadTestCards() {
     try {
-        const response = await fetch("/api/test-cards");
+        const response = await fetch("/api/tables/table1/test-cards");
 
         if (!response.ok) {
             throw new Error("Failed to load cards");
@@ -154,6 +178,7 @@ async function loadTestCards() {
 
         renderCards("player-cards", game.playerHands[0]);
         renderCards("community-cards", game.communityCards);
+        displayDealer(game.dealerIndex);
     } catch (error) {
         console.error("Error loading cards:", error);
     }

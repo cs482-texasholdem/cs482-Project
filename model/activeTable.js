@@ -94,6 +94,10 @@ class ActiveTable {
 */
 
     //NOTE: On the front end, the players need to be situated going left
+    /**
+     * Rotates dealer chip around the table 
+     * @returns {boolean} True if the player was removed; otherwise, false.
+     */
     rotateDealer() {
         // A hand needs at least two players 
         if (this.players.length < 2) {

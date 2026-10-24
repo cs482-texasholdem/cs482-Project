@@ -103,8 +103,23 @@ function leaveTable(req, res) {
  * Temporarily tests dealing cards and converting them to readable names.
  */
 function dealTestHand(req, res) {
+    const { tableId } = req.params;
+    const table = tables.get(tableId);
+
+    if (!table) {
+    return res.status(404).json({
+        error: "Table not found."
+    });
+}
+
+    if (!table.rotateDealer()) {
+        return res.status(400).json({
+            error: "Must have at least 2 players in order to start"
+        });
+    }
+    
     const deck = new Deck();
-    const totalPlayers = 2;
+    const totalPlayers = table.players.length;
 
     const playerHands = [
         deck.hand(0, totalPlayers),
@@ -114,6 +129,7 @@ function dealTestHand(req, res) {
     const communityCards = deck.commonCards(totalPlayers);
 
     return res.status(200).json({
+        dealerIndex: table.dealerIndex,
         playerHands: playerHands.map(hand =>
             hand.map(card => Deck.cardToText(card))
         ),

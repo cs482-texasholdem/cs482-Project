@@ -100,6 +100,7 @@ describe("ActiveTable", () => {
         expect(table.rotateDealer()).toBe(false);
     });
 
+    //randomMock was used to set randomizer for the test
     test("randomly selects the expected dealer", () => {
         const randomMock = jest.spyOn(Math, "random").mockReturnValue(0.5);
         table.players = ["Mei", "Alex", "Sam", "Joe"];
