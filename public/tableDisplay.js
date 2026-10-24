@@ -8,7 +8,7 @@ const samplePlayers = [
     { name: "CardShark", chips: 2010 },
     { name: "BlueMoon", chips: 1430 },
     { name: "RiverRat", chips: 860 },
-    { name: "You", chips: 1980, current: true }
+    { name: "Player123", chips: 1980, current: true }
 ];
 
 // Get the HTML elements used to display the players and table messages.
@@ -19,42 +19,44 @@ const tableMessage = document.getElementById("table-message");
  * Displays the sample players and their information on the poker table.
  * Creates a seat for each player, including their name, cards, and chip count.
  * Highlights the local demo player.
- *
+ * 
  * @returns {void}
  */
 function displayPlayers() {
     // Clear existing player seats before displaying the sample players.
-    playersContainer.replaceChildren();
+    if (playersContainer) {
+        playersContainer.replaceChildren();
 
-    // Create a seat for each player in the sample data.
-    samplePlayers.forEach((player) => {
-        const seat = document.createElement("div");
-        seat.classList.add("player-seat");
+        // Create a seat for each player in the sample data.
+        samplePlayers.forEach((player) => {
+            const seat = document.createElement("div");
+            seat.classList.add("player-seat");
 
-        // Highlight the local demo player's seat.
-        if (player.current) {
-            seat.classList.add("current-player");
-        }
+            // Highlight the local demo player's seat.
+            if (player.current) {
+                seat.classList.add("current-player");
+            }
 
-        // Display the player's name.
-        const name = document.createElement("p");
-        name.textContent = player.name;
+            // Display the player's name.
+            const name = document.createElement("p");
+            name.textContent = player.name;
 
-        // Display sample cards for the local player and face-down cards for others.
-        const cards = document.createElement("p");
-        cards.classList.add("player-cards");
-        cards.textContent = player.current ? "A♠ K♥" : "🂠 🂠";
+            // Display sample cards for the local player and face-down cards for others.
+            const cards = document.createElement("p");
+            cards.classList.add("player-cards");
+            cards.textContent = player.current ? "A♠ K♥" : "🂠 🂠";
 
-        // Display the player's chip count.
-        const chips = document.createElement("p");
-        chips.textContent = `${player.chips.toLocaleString()} chips`;
+            // Display the player's chip count.
+            const chips = document.createElement("p");
+            chips.textContent = `${player.chips.toLocaleString()} chips`;
 
-        // Add the player's information to the seat.
-        seat.append(name, cards, chips);
+            // Add the player's information to the seat.
+            seat.append(name, cards, chips);
 
-        // Add the completed seat to the poker table.
-        playersContainer.appendChild(seat);
-    });
+            // Add the completed seat to the poker table.
+            playersContainer.appendChild(seat);
+        });
+    }
 }
 
 // Display the sample players when the page loads.
@@ -62,17 +64,24 @@ displayPlayers();
 
 /**
  * Handles clicks on the Fold, Check, Call, and Raise buttons.
- * Displays a demo message for the selected action.
- * No actual poker rules, betting, or backend requests are performed.
- *
- * @param {Event} event - The click event triggered by the button.
+ * Displays a demo message for the selected action and advances the round.
+ * 
+ * @param {Event} event The click event triggered by the button.
  * @returns {void}
  */
 async function handlePokerAction(event) {
     // Get the selected action from the clicked button.
     const action = event.currentTarget.dataset.action;
-    const response = await fetch("/api/next-round");
-    loadTestCards();
+    
+    try {
+        const response = await fetch("/api/next-round");
+        if (!response.ok) {
+            throw new Error("Failed to advance round.");
+        }
+        loadTestCards();
+    } catch (error) {
+        console.error("Error advancing round:", error);
+    }
 
     // Handle the Raise action separately to validate its amount.
     if (action === "Raise") {
@@ -105,9 +114,8 @@ document.querySelectorAll("[data-action]").forEach((button) => {
 /**
  * Handles chat form submissions on the poker table page.
  * Adds a non-empty message to the local chat panel without reloading the page.
- * Messages are not sent to other players or saved to a server.
- *
- * @param {SubmitEvent} event - The chat form submission event.
+ * 
+ * @param {SubmitEvent} event The chat form submission event.
  * @returns {void}
  */
 function handleChatSubmit(event) {
@@ -132,21 +140,29 @@ function handleChatSubmit(event) {
     messageElement.append(sender, document.createTextNode(message));
 
     // Add the message to the chat panel.
-    document.getElementById("chat-messages").appendChild(messageElement);
+    const chatMessages = document.getElementById("chat-messages");
+    if (chatMessages) {
+        chatMessages.appendChild(messageElement);
+        chatMessages.scrollTop = chatMessages.scrollHeight;
+    }
 
     // Clear the input after adding the message.
     input.value = "";
 }
 
 // Attach the chat handler to the chat form.
-document.getElementById("chat-form").addEventListener(
-    "submit",
-    handleChatSubmit
-);
+const chatForm = document.getElementById("chat-form");
+if (chatForm) {
+    chatForm.addEventListener("submit", handleChatSubmit);
+}
 
+/**
+ * Loads test cards from the backend for the current player.
+ */
 async function loadTestCards() {
     try {
-        const response = await fetch("/api/test-cards");
+        const playerId = "Player123";
+        const response = await fetch(`/api/test-cards?playerId=${encodeURIComponent(playerId)}`);
 
         if (!response.ok) {
             throw new Error("Failed to load cards");
@@ -158,11 +174,22 @@ async function loadTestCards() {
         renderCards("community-cards", game.communityCards);
     } catch (error) {
         console.error("Error loading cards:", error);
+        if (tableMessage) {
+            tableMessage.textContent = "Could not load cards.";
+        }
     }
 }
 
+/**
+ * Displays the cards inside an HTML container.
+ * 
+ * @param {string} containerId ID of the container element.
+ * @param {Array<string>} cards Array of card text representations.
+ */
 function renderCards(containerId, cards) {
     const container = document.getElementById(containerId);
+    if (!container) return;
+    
     container.innerHTML = "";
 
     cards.forEach(cardText => {
@@ -178,4 +205,5 @@ function renderCards(containerId, cards) {
     });
 }
 
+// Initial load of test cards when the script runs.
 loadTestCards();

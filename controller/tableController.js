@@ -1,6 +1,7 @@
 /**
  * Table Controller
  * Handles API requests for joining and leaving poker tables.
+ * 
  * @module tableController
  */
 
@@ -16,8 +17,9 @@ const tables = new Map([
 
 /**
  * Handles a request to join a poker table.
- * @param {Object} req - Express request object.
- * @param {Object} res - Express response object.
+ * 
+ * @param {Object} req Express request object.
+ * @param {Object} res Express response object.
  * @returns {Object} HTTP response containing the result of the request.
  */
 function joinTable(req, res) {
@@ -63,8 +65,9 @@ function joinTable(req, res) {
 
 /**
  * Handles a request to leave a poker table.
- * @param {Object} req - Express request object.
- * @param {Object} res - Express response object.
+ * 
+ * @param {Object} req Express request object.
+ * @param {Object} res Express response object.
  * @returns {Object} HTTP response containing the result of the request.
  */
 function leaveTable(req, res) {
@@ -100,20 +103,37 @@ function leaveTable(req, res) {
 }
 
 /**
- * Temporarily tests dealing cards and converting them to readable names.
+ * Temporarily tests dealing cards to a player and converting them to readable names.
  */
 function dealTestHand(req, res) {
     const workingTable = tables.get("table1");
-    const totalPlayers = 2;
+    
+    // Safely check req.body (optional chaining) since GET requests don't have a body
+    const playerId = req.body?.playerId || req.query.playerId || "Player123";
 
-    const playerHand = workingTable.deck.hand(0, totalPlayers);
+    // Ensure the test player is added to the table so the method's validation passes
+    if (!workingTable.hasPlayer(playerId)) {
+        workingTable.addPlayer(playerId);
+    }
+
+    const playerHand = workingTable.dealHandToPlayer(playerId);
+
+    if (!playerHand) {
+        return res.status(400).json({
+            error: "Failed to deal hand to player."
+        });
+    }
 
     return res.status(200).json({
+        playerId: playerId,
         playerHand: playerHand.map(card => Deck.cardToText(card)),
         communityCards: workingTable.displayCards()
     });
 }
 
+/**
+ * Advances the table to the next round of community cards.
+ */
 function nextRound(req, res) {
     const workingTable = tables.get("table1");
     workingTable.nextRound();

@@ -267,10 +267,11 @@
         const raiseAmount = document.getElementById("raise-amount");
         const tableMessage = document.getElementById("table-message");
         
-        // Load test cards from the backend.
+        // Load test cards from the backend for the current player.
         async function loadTestCards() {
             try {
-                const response = await fetch("/api/test-cards");
+                const playerId = "Player123";
+                const response = await fetch(`/api/test-cards?playerId=${encodeURIComponent(playerId)}`);
 
                 if (!response.ok) {
                     throw new Error("Failed to load test cards.");
