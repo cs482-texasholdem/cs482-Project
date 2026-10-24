@@ -38,15 +38,12 @@
             <div class="container-fluid">
                 <ul class="navbar-nav me-auto">
                     <li class="nav-item">
-                        <a class="nav-link active" href="landing.html"><span class="bi-house-fill"></span> Lobby</a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="admin.html"><span class="bi-shield-lock-fill"></span> Admin Console</a>
+                        <a class="nav-link active" href="index.html"><span class="bi-house-fill"></span> Lobby</a>
                     </li>
                 </ul>
                 <ul class="navbar-nav">
                     <li class="nav-item">
-                        <a class="nav-link" href="index.html"><span class="bi-box-arrow-right"></span> Logout</a>
+                        <a class="nav-link" href="login.html"><span class="bi-box-arrow-right"></span> Logout</a>
                     </li>
                 </ul>
             </div>
@@ -132,44 +129,48 @@
             </div>
         </div>
 
-        <!-- Pop-Up Sidebar (Bootstrap Offcanvas) -->
+       <!-- Pop-Up Sidebar (Bootstrap Offcanvas) -->
         <div class="offcanvas offcanvas-end" tabindex="-1" id="joinGameSidebar" aria-labelledby="joinGameSidebarLabel">
             
-            <div class="offcanvas-header bg-primary text-white">
-                <h5 class="offcanvas-title" id="joinGameSidebarLabel"><i class="bi bi-suit-spade-fill"></i> Table Seating</h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+            <!-- Offcanvas Header -->
+            <div class="offcanvas-header">
+                <h5 class="offcanvas-title fw-bold" id="joinGameSidebarLabel">
+                    <i class="bi bi-suit-spade-fill"></i> Table Seating
+                </h5>
+                <button type="button" class="btn-close btn-close-white shadow-none" data-bs-dismiss="offcanvas" aria-label="Close"></button>
             </div>
             
+            <!-- Offcanvas Body -->
             <div class="offcanvas-body d-flex flex-column">
                 <form id="joinTableForm" action="tableDisplay.html" method="GET">
                     
-                    <!-- The Table Level you selected -->
+                    <!-- Selected Table -->
                     <div class="mb-3">
-                        <label class="form-label text-muted small">Selected Table</label>
-                        <input type="text" class="form-control fw-bold" id="sidebarTableName" readonly>
+                        <label class="form-label small fw-semibold">Selected Table</label>
+                        <input type="text" class="form-control" id="sidebarTableName" readonly>
                     </div>
                     
-                    <!-- The Table Blinds -->
+                    <!-- Table Blinds -->
                     <div class="mb-3">
-                        <label class="form-label text-muted small">Table Blinds</label>
+                        <label class="form-label small fw-semibold">Table Blinds</label>
                         <input type="text" class="form-control" id="sidebarTableBlinds" readonly>
                     </div>
                     
-                    <!-- The Minimum Buy-in Required -->
+                    <!-- Minimum Buy-in Required -->
                     <div class="mb-3">
-                        <label class="form-label text-muted small">Minimum Buy-in Required</label>
+                        <label class="form-label small fw-semibold">Minimum Buy-in Required</label>
                         <input type="text" class="form-control" id="sidebarTableMinBuyin" readonly>
                     </div>
                     
-                    <!-- The Buy-in Amount -->
+                    <!-- Your Buy-in Amount -->
                     <div class="mb-3">
-                        <label for="buyInAmount" class="form-label">Your Buy-in Amount ($)</label>
+                        <label for="buyInAmount" class="form-label small fw-semibold">Your Buy-in Amount ($)</label>
                         <input type="number" class="form-control" id="buyInAmount" name="buyInAmount" value="1000" required>
                     </div>
                     
-                    <!-- The Preferred Seat Position -->
+                    <!-- Preferred Seat Position -->
                     <div class="mb-3">
-                        <label for="seatPreference" class="form-label">Preferred Seat Position</label>
+                        <label for="seatPreference" class="form-label small fw-semibold">Preferred Seat Position</label>
                         <select class="form-select" id="seatPreference" name="seat">
                             <option value="random">Auto-Assign (Random Open Seat)</option>
                             <option value="1">Seat 1 (Dealer)</option>
@@ -179,13 +180,13 @@
                         </select>
                     </div>
 
-                    <!-- The Submit Button -->
+                    <!-- Submit Button -->
                     <div class="mt-auto pt-3">
-                        <button type="submit" class="btn btn-primary w-100 py-2 fw-semibold">Take Your Seat & Play</button>
+                        <button type="submit" class="btn btn-primary w-100 py-2 fw-bold shadow">Take Your Seat & Play</button>
                     </div>
                 </form>
             </div>
-        </div>
+        </div> 
 
         <!-- Footer -->
         <div class="mt-5 p-4 custom-footer text-white text-center">
