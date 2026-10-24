@@ -1,10 +1,3 @@
-/**
- * Table Controller
- * Handles API requests for joining and leaving poker tables.
- * 
- * @module tableController
- */
-
 const ActiveTable = require("../model/activeTable");
 const Deck = require("../util/pokerLogic");
 
@@ -15,43 +8,27 @@ const tables = new Map([
     ["table3", new ActiveTable("table3", "advanced")]
 ]);
 
-/**
- * Handles a request to join a poker table.
- * 
- * @param {Object} req Express request object.
- * @param {Object} res Express response object.
- * @returns {Object} HTTP response containing the result of the request.
- */
 function joinTable(req, res) {
     const { tableId } = req.params;
     const playerId = req.body.playerId;
 
     if (typeof playerId !== "string" || !playerId.trim()) {
-        return res.status(400).json({
-            error: "Player ID is required."
-        });
+        return res.status(400).json({ error: "Player ID is required." });
     }
 
     const table = tables.get(tableId);
-
     if (!table) {
-        return res.status(404).json({
-            error: "Table not found."
-        });
+        return res.status(404).json({ error: "Table not found." });
     }
 
     const id = playerId.trim();
 
     if (table.hasPlayer(id)) {
-        return res.status(409).json({
-            error: "Player has already joined this table."
-        });
+        return res.status(409).json({ error: "Player has already joined this table." });
     }
 
     if (!table.addPlayer(id)) {
-        return res.status(409).json({
-            error: "Table is full."
-        });
+        return res.status(409).json({ error: "Table is full." });
     }
 
     return res.status(200).json({
@@ -63,35 +40,21 @@ function joinTable(req, res) {
     });
 }
 
-/**
- * Handles a request to leave a poker table.
- * 
- * @param {Object} req Express request object.
- * @param {Object} res Express response object.
- * @returns {Object} HTTP response containing the result of the request.
- */
 function leaveTable(req, res) {
     const { tableId } = req.params;
     const playerId = req.body.playerId;
 
     if (typeof playerId !== "string" || !playerId.trim()) {
-        return res.status(400).json({
-            error: "Player ID is required."
-        });
+        return res.status(400).json({ error: "Player ID is required." });
     }
 
     const table = tables.get(tableId);
-
     if (!table) {
-        return res.status(404).json({
-            error: "Table not found."
-        });
+        return res.status(404).json({ error: "Table not found." });
     }
 
     if (!table.removePlayer(playerId.trim())) {
-        return res.status(404).json({
-            error: "Player is not in this table."
-        });
+        return res.status(404).json({ error: "Player is not in this table." });
     }
 
     return res.status(200).json({
@@ -108,10 +71,9 @@ function leaveTable(req, res) {
 function dealTestHand(req, res) {
     const workingTable = tables.get("table1");
     
-    // Safely check req.body (optional chaining) since GET requests don't have a body
-    const playerId = req.body?.playerId || req.query.playerId || "Player123";
+    // Read playerId from query params safely (GET requests do not have req.body)
+    const playerId = req.query.playerId || "Player123";
 
-    // Ensure the test player is added to the table so the method's validation passes
     if (!workingTable.hasPlayer(playerId)) {
         workingTable.addPlayer(playerId);
     }
@@ -119,9 +81,7 @@ function dealTestHand(req, res) {
     const playerHand = workingTable.dealHandToPlayer(playerId);
 
     if (!playerHand) {
-        return res.status(400).json({
-            error: "Failed to deal hand to player."
-        });
+        return res.status(400).json({ error: "Failed to deal hand to player." });
     }
 
     return res.status(200).json({
@@ -131,9 +91,6 @@ function dealTestHand(req, res) {
     });
 }
 
-/**
- * Advances the table to the next round of community cards.
- */
 function nextRound(req, res) {
     const workingTable = tables.get("table1");
     workingTable.nextRound();

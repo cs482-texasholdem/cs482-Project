@@ -21,7 +21,7 @@
         </nav>
 
         <div class="account">
-            Player: <strong>Player123</strong>
+            Player: <strong id="header-player-name">Player123</strong>
             &nbsp; | &nbsp;
             Account Chips: <strong id="account-chips">2,450</strong>
         </div>
@@ -33,21 +33,10 @@
         <aside class="panel chat-panel">
             <h2>Table Chat</h2>
 
-            <div class="chat-messages" id="chat-messages"
-                 aria-live="polite">
+            <div class="chat-messages" id="chat-messages" aria-live="polite">
                 <div class="chat-message">
                     <strong>Dealer</strong>
                     Welcome to Table 1!
-                </div>
-
-                <div class="chat-message">
-                    <strong>PokerPro</strong>
-                    Good luck everyone!
-                </div>
-
-                <div class="chat-message">
-                    <strong>LuckyAce</strong>
-                    Ready to play.
                 </div>
             </div>
 
@@ -71,20 +60,6 @@
                     <h2>Table 1</h2>
                     <p>No Limit Texas Hold'em · Blinds 10 / 20</p>
                 </div>
-
-                <div class="connection-key">
-                    <span class="key-item">
-                        <span class="key-color"
-                              style="background:#676fcb"></span>
-                        Active
-                    </span>
-
-                    <span class="key-item">
-                        <span class="key-color"
-                              style="background:#4d4540"></span>
-                        Disconnected
-                    </span>
-                </div>
             </div>
 
             <!-- Rectangular table with five players on each side -->
@@ -92,90 +67,34 @@
 
                 <!-- Left five player seats -->
                 <div class="player-side left-side">
-
                     <div class="player-seat active">
                         <span class="player-name">Player 1</span>
                         <span class="player-status">Active</span>
                         <span class="player-chips">1,000 chips</span>
                     </div>
-
-                    <div class="player-seat disconnected">
-                        <span class="player-name">Player 2</span>
-                        <span class="player-status">Disconnected</span>
-                        <span class="player-chips">1,500 chips</span>
-                    </div>
-
-                    <div class="player-seat active">
-                        <span class="player-name">Player 3</span>
-                        <span class="player-status">Active</span>
-                        <span class="player-chips">850 chips</span>
-                    </div>
-
-                    <div class="player-seat active">
-                        <span class="player-name">Player 4</span>
-                        <span class="player-status">Active</span>
-                        <span class="player-chips">2,100 chips</span>
-                    </div>
-
-                    <div class="player-seat disconnected">
-                        <span class="player-name">Player 5</span>
-                        <span class="player-status">Disconnected</span>
-                        <span class="player-chips">1,200 chips</span>
-                    </div>
-
                 </div>
 
                 <!-- Pot and five community cards -->
                 <div class="table-center">
-
                     <div class="pot-display">
                         <span>Total Pot</span>
                         <strong id="total-pot">600</strong>
                     </div>
 
-                    <div class="community-cards" id="community-cards" 
-                        aria-label="Community cards">
-                    </div>
+                    <div class="community-cards" id="community-cards" aria-label="Community cards"></div>
 
                     <p class="table-status" id="table-message">
                         Waiting for the next action.
                     </p>
-
                 </div>
 
                 <!-- Right five player seats -->
                 <div class="player-side right-side">
-
-                    <div class="player-seat active">
-                        <span class="player-name">Player 6</span>
-                        <span class="player-status">Active</span>
-                        <span class="player-chips">950 chips</span>
-                    </div>
-
-                    <div class="player-seat active">
-                        <span class="player-name">Player 7</span>
-                        <span class="player-status">Active</span>
-                        <span class="player-chips">1,700 chips</span>
-                    </div>
-
-                    <div class="player-seat disconnected">
-                        <span class="player-name">Player 8</span>
-                        <span class="player-status">Disconnected</span>
-                        <span class="player-chips">2,000 chips</span>
-                    </div>
-
-                    <div class="player-seat active">
-                        <span class="player-name">Player 9</span>
-                        <span class="player-status">Active</span>
-                        <span class="player-chips">750 chips</span>
-                    </div>
-
                     <div class="player-seat active">
                         <span class="player-name">Player 10</span>
                         <span class="player-status">Active</span>
                         <span class="player-chips">1,300 chips</span>
                     </div>
-
                 </div>
 
             </section>
@@ -183,7 +102,7 @@
             <!-- Your hand and personal chip information -->
             <section class="panel your-hand">
                 <div>
-                    <h3>Your Hand</h3>
+                    <h3>Your Hand (<span id="display-player-id">Player123</span>)</h3>
                     <p>Your Chips: <strong id="your-chips">2,450</strong></p>
                     <p>Your Bet: <strong id="your-bet">0</strong></p>
                 </div>
@@ -200,61 +119,11 @@
                     <span>Chips Available: <strong id="available-chips">2,450</strong></span>
                 </div>
 
-                <div class="slider-heading">
-                    <label for="bet-scale">Adjust Raise Amount</label>
-
-                    <input
-                        type="number"
-                        id="raise-amount"
-                        min="20"
-                        max="1000"
-                        step="10"
-                        value="200"
-                    >
-                </div>
-
-                <input
-                    type="range"
-                    id="bet-scale"
-                    min="20"
-                    max="1000"
-                    step="10"
-                    value="200"
-                    aria-label="Raise amount slider"
-                >
-
-                <div class="scale-labels">
-                    <span>20</span>
-                    <span>250</span>
-                    <span>500</span>
-                    <span>750</span>
-                    <span>1,000</span>
-                </div>
-
                 <div class="action-buttons">
-                    <button type="button"
-                            class="action-button fold"
-                            data-action="Fold">
-                        Fold
-                    </button>
-
-                    <button type="button"
-                            class="action-button check"
-                            data-action="Check">
-                        Check
-                    </button>
-
-                    <button type="button"
-                            class="action-button call"
-                            data-action="Call">
-                        Call
-                    </button>
-
-                    <button type="button"
-                            class="action-button raise"
-                            data-action="Raise">
-                        Raise
-                    </button>
+                    <button type="button" class="action-button fold" data-action="Fold">Fold</button>
+                    <button type="button" class="action-button check" data-action="Check">Check</button>
+                    <button type="button" class="action-button call" data-action="Call">Call</button>
+                    <button type="button" class="action-button raise" data-action="Raise">Raise</button>
                 </div>
             </section>
 
@@ -262,16 +131,33 @@
     </main>
 
     <script>
-        // Keep the raise amount input synchronized with the slider.
-        const betScale = document.getElementById("bet-scale");
-        const raiseAmount = document.getElementById("raise-amount");
+        // Extract Player ID from URL (supports ?playerId=Name or shorthand ?Name)
+        function getPlayerIdFromUrl() {
+            const urlParams = new URLSearchParams(window.location.search);
+            let id = urlParams.get("playerId");
+            
+            if (!id) {
+                const keys = Array.from(urlParams.keys());
+                if (keys.length > 0) {
+                    id = keys[0]; // handles shorthand ?Player123
+                }
+            }
+            
+            return id ? decodeURIComponent(id.trim()) : "Player123";
+        }
+
+        const currentPlayerId = getPlayerIdFromUrl();
+
+        // Update UI elements with the dynamic player ID
+        document.getElementById("header-player-name").textContent = currentPlayerId;
+        document.getElementById("display-player-id").textContent = currentPlayerId;
+
         const tableMessage = document.getElementById("table-message");
         
-        // Load test cards from the backend for the current player.
+        // Load test cards from backend using the dynamic player ID
         async function loadTestCards() {
             try {
-                const playerId = "Player123";
-                const response = await fetch(`/api/test-cards?playerId=${encodeURIComponent(playerId)}`);
+                const response = await fetch(`/api/test-cards?playerId=${encodeURIComponent(currentPlayerId)}`);
 
                 if (!response.ok) {
                     throw new Error("Failed to load test cards.");
@@ -287,9 +173,11 @@
             }
         }
 
-        // Display the cards inside an HTML container.
+        // Display cards inside a container
         function renderCards(containerId, cards) {
             const container = document.getElementById(containerId);
+            if (!container) return;
+            
             container.innerHTML = "";
 
             cards.forEach((cardText) => {
@@ -307,19 +195,7 @@
 
         loadTestCards();
 
-        betScale.addEventListener("input", () => {
-            raiseAmount.value = betScale.value;
-        });
-
-        raiseAmount.addEventListener("input", () => {
-            const amount = Number(raiseAmount.value);
-
-            if (amount >= 20 && amount <= 1000) {
-                betScale.value = amount;
-            }
-        });
-
-        // Handle poker actions, call /api/next-round, and update game state.
+        // Handle action buttons and advance round
         document.querySelectorAll("[data-action]").forEach((button) => {
             button.addEventListener("click", async () => {
                 const action = button.dataset.action;
@@ -334,70 +210,36 @@
                     console.error("Error advancing round:", error);
                 }
 
-                if (action === "Raise") {
-                    const amount = Number(raiseAmount.value);
-
-                    if (
-                        !Number.isFinite(amount) ||
-                        amount < 20 ||
-                        amount > 1000
-                    ) {
-                        tableMessage.textContent =
-                            "Choose a raise amount between 20 and 1,000.";
-                        return;
-                    }
-
-                    tableMessage.textContent =
-                        `Raise selected: ${amount} chips (demo only).`;
-                    return;
-                }
-
-                tableMessage.textContent =
-                    `${action} selected (demo only).`;
+                tableMessage.textContent = `${action} selected (demo only).`;
             });
         });
 
-        // Add a sample chat message locally.
-        document.getElementById("chat-form").addEventListener(
-            "submit",
-            (event) => {
-                event.preventDefault();
+        // Chat submission
+        document.getElementById("chat-form").addEventListener("submit", (event) => {
+            event.preventDefault();
 
-                const input = document.getElementById("chat-input");
-                const message = input.value.trim();
+            const input = document.getElementById("chat-input");
+            const message = input.value.trim();
 
-                if (!message) {
-                    return;
-                }
+            if (!message) return;
 
-                const messageElement = document.createElement("div");
-                messageElement.className = "chat-message";
+            const messageElement = document.createElement("div");
+            messageElement.className = "chat-message";
 
-                const sender = document.createElement("strong");
-                sender.textContent = "Player123";
+            const sender = document.createElement("strong");
+            sender.textContent = currentPlayerId + ": ";
 
-                messageElement.append(
-                    sender,
-                    document.createTextNode(message)
-                );
+            messageElement.append(sender, document.createTextNode(message));
 
-                const chatMessages =
-                    document.getElementById("chat-messages");
+            const chatMessages = document.getElementById("chat-messages");
+            chatMessages.appendChild(messageElement);
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+            input.value = "";
+        });
 
-                chatMessages.appendChild(messageElement);
-                chatMessages.scrollTop = chatMessages.scrollHeight;
-                input.value = "";
-            }
-        );
-
-        // Settings button placeholder.
-        document.getElementById("settings-button").addEventListener(
-            "click",
-            () => {
-                tableMessage.textContent =
-                    "Settings are not implemented yet.";
-            }
-        );
+        document.getElementById("settings-button").addEventListener("click", () => {
+            tableMessage.textContent = "Settings are not implemented yet.";
+        });
     </script>
 
 </body>
