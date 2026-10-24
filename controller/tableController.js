@@ -106,18 +106,11 @@ function dealTestHand(req, res) {
     const workingTable = tables.get("table1");
     const totalPlayers = 2;
 
-    const playerHands = [
-        workingTable.deck.hand(0, totalPlayers),
-        workingTable.deck.hand(1, totalPlayers)
-    ];
-
-    let communityCards = workingTable.displayCards();
+    const playerHand = workingTable.deck.hand(0, totalPlayers);
 
     return res.status(200).json({
-        playerHands: playerHands.map(hand =>
-            hand.map(card => Deck.cardToText(card))
-        ),
-        communityCards: communityCards
+        playerHand: playerHand.map(card => Deck.cardToText(card)),
+        communityCards: workingTable.displayCards()
     });
 }
 

@@ -154,7 +154,7 @@ async function loadTestCards() {
 
         const game = await response.json();
 
-        renderCards("player-cards", game.playerHands[0]);
+        renderCards("player-cards", game.playerHand);
         renderCards("community-cards", game.communityCards);
     } catch (error) {
         console.error("Error loading cards:", error);
