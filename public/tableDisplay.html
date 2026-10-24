@@ -318,10 +318,20 @@
             }
         });
 
-        // Display a demo message when a poker action button is clicked.
+        // Handle poker actions, call /api/next-round, and update game state.
         document.querySelectorAll("[data-action]").forEach((button) => {
-            button.addEventListener("click", () => {
+            button.addEventListener("click", async () => {
                 const action = button.dataset.action;
+
+                try {
+                    const response = await fetch("/api/next-round");
+                    if (!response.ok) {
+                        throw new Error("Failed to advance round.");
+                    }
+                    loadTestCards();
+                } catch (error) {
+                    console.error("Error advancing round:", error);
+                }
 
                 if (action === "Raise") {
                     const amount = Number(raiseAmount.value);

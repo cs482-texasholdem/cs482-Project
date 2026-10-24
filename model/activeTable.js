@@ -1,3 +1,5 @@
+const Deck = require("../util/pokerLogic");
+
 /**
  * Represents a poker table and manages its players and settings.
  */
@@ -22,6 +24,10 @@ class ActiveTable {
         this.timeLimit = timeLimit;
         this.maxPlayers = 10;
         this.players = [];
+        //this.gameInProgress = false; //TODO: Players can only join or leave when the game is not in progress
+        this.displayedCards = [];
+        this.deck = new Deck();
+        this.roundPlayerCount = null;
     }
 
     /**
@@ -83,6 +89,46 @@ class ActiveTable {
 
         this.players.splice(index, 1);
         return true;
+    }
+
+    nextRound() {
+        if (this.roundPlayerCount === null) {
+            this.roundPlayerCount = this.players.length;
+        }
+
+        if (this.displayedCards.length === 0) {
+            this.displayedCards = this.deck.showFlop(this.roundPlayerCount);
+        } else if (this.displayedCards.length === 3) {
+            this.displayedCards.push(this.deck.showTurn(this.roundPlayerCount));
+        } else if (this.displayedCards.length === 4) {
+            this.displayedCards.push(this.deck.showRiver(this.roundPlayerCount));
+        } else if (this.displayedCards.length === 5) {
+            // Add winner logic
+            // Cooldown
+            this.newGame();
+        }
+
+        return this.displayedCards;
+    }
+
+    displayCards() {
+        const placeholder = "🂠";
+        return Array.from({ length: 5 }, (_, index) => {
+            const card = this.displayedCards[index];
+            if (card === undefined) {
+                return placeholder;
+            }
+            if (!Number.isInteger(card) || card < 1 || card > 52) {
+                throw new Error("Displayed cards must be valid card numbers.");
+            }
+            return Deck.cardToText(card);
+        });
+    }
+
+    newGame() {
+        this.deck.shuffleCards();
+        this.displayedCards = [];
+        this.roundPlayerCount = null;
     }
 }
 

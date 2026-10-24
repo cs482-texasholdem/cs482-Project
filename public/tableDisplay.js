@@ -68,9 +68,11 @@ displayPlayers();
  * @param {Event} event - The click event triggered by the button.
  * @returns {void}
  */
-function handlePokerAction(event) {
+async function handlePokerAction(event) {
     // Get the selected action from the clicked button.
     const action = event.currentTarget.dataset.action;
+    const response = await fetch("/api/next-round");
+    loadTestCards();
 
     // Handle the Raise action separately to validate its amount.
     if (action === "Raise") {

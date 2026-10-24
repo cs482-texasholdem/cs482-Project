@@ -83,6 +83,88 @@ describe("ActiveTable", () => {
         expect(table.hasPlayer("player2")).toBe(false);
     });
 
+    test("advances community cards through the flop, turn, and river", () => {
+        table.addPlayer("player1");
+        table.addPlayer("player2");
+        table.deck.deck = Array.from({ length: 52 }, (_, index) => index + 1);
+
+        expect(table.nextRound()).toEqual([6, 7, 8]);
+        expect(table.nextRound()).toEqual([6, 7, 8, 10]);
+        expect(table.nextRound()).toEqual([6, 7, 8, 10, 12]);
+    });
+
+    test("displayCards returns 5 placeholders when displayedCards is empty", () => {
+        table.displayedCards = [];
+        expect(table.displayCards()).toEqual(["🂠", "🂠", "🂠", "🂠", "🂠"]);
+    });
+
+    test("displayCards returns correct mix of cards and placeholders for partial community cards", () => {
+        table.displayedCards = [1, 14];
+        const result = table.displayCards();
+        expect(result.length).toBe(5);
+        expect(result[0]).not.toBe("🂠");
+        expect(result[1]).not.toBe("🂠");
+        expect(result[2]).toBe("🂠");
+        expect(result[3]).toBe("🂠");
+        expect(result[4]).toBe("🂠");
+    });
+
+    test("displayCards handles sparse arrays correctly where some indices are undefined", () => {
+        table.displayedCards = [];
+        table.displayedCards[1] = 5;
+        const result = table.displayCards();
+        expect(result[0]).toBe("🂠");
+        expect(result[1]).not.toBe("🂠");
+        expect(result[2]).toBe("🂠");
+    });
+
+    test("rejects null card values in displayedCards", () => {
+        table.displayedCards = [null];
+        expect(() => table.displayCards()).toThrow(
+            "Displayed cards must be valid card numbers."
+        );
+    });
+
+    test("rejects card values below 1 (e.g. 0 or negative numbers)", () => {
+        table.displayedCards = [0];
+        expect(() => table.displayCards()).toThrow(
+            "Displayed cards must be valid card numbers."
+        );
+
+        table.displayedCards = [-5];
+        expect(() => table.displayCards()).toThrow(
+            "Displayed cards must be valid card numbers."
+        );
+    });
+
+    test("rejects card values above 52", () => {
+        table.displayedCards = [53];
+        expect(() => table.displayCards()).toThrow(
+            "Displayed cards must be valid card numbers."
+        );
+    });
+
+    test("rejects non-integer card numbers (floats)", () => {
+        table.displayedCards = [12.5];
+        expect(() => table.displayCards()).toThrow(
+            "Displayed cards must be valid card numbers."
+        );
+    });
+
+    test("ignores extra cards beyond the first 5 in displayedCards", () => {
+        table.displayedCards = [1, 2, 3, 4, 5, 6];
+        const result = table.displayCards();
+        expect(result.length).toBe(5);
+    });
+
+    test("rejects invalid displayed card values instead of returning unsafe content", () => {
+        table.displayedCards = ["<script>alert(1)</script>"];
+
+        expect(() => table.displayCards()).toThrow(
+            "Displayed cards must be valid card numbers."
+        );
+    });
+
     test("returns the current player count", () => {
         table.addPlayer("player1");
         table.addPlayer("player2");

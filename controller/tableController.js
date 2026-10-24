@@ -103,24 +103,31 @@ function leaveTable(req, res) {
  * Temporarily tests dealing cards and converting them to readable names.
  */
 function dealTestHand(req, res) {
-    const deck = new Deck();
+    const workingTable = tables.get("table1");
     const totalPlayers = 2;
 
     const playerHands = [
-        deck.hand(0, totalPlayers),
-        deck.hand(1, totalPlayers)
+        workingTable.deck.hand(0, totalPlayers),
+        workingTable.deck.hand(1, totalPlayers)
     ];
 
-    const communityCards = deck.commonCards(totalPlayers);
+    let communityCards = workingTable.displayCards();
 
     return res.status(200).json({
         playerHands: playerHands.map(hand =>
             hand.map(card => Deck.cardToText(card))
         ),
-        communityCards: communityCards.map(card =>
-            Deck.cardToText(card)
-        )
+        communityCards: communityCards
     });
 }
 
-module.exports = { joinTable, leaveTable, dealTestHand };
+function nextRound(req, res) {
+    const workingTable = tables.get("table1");
+    workingTable.nextRound();
+    return res.status(200).json({
+        message: "Advanced to the next round.",
+        communityCards: workingTable.displayCards()
+    });
+}
+
+module.exports = { joinTable, leaveTable, dealTestHand, nextRound };
