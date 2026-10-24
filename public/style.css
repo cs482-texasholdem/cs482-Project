@@ -647,6 +647,31 @@ body.table-page {
     background: var(--button-hover-blue);
 }
 
+/* Offcanvas Sidebar Matching Midnight Theme */
+.offcanvas {
+    background: linear-gradient(135deg, #101C3A 0%, #1B3260 100%) !important;
+    color: #F4F7FC !important;
+    border-left: 2px solid #527FD1;
+    box-shadow: -15px 0 40px rgba(16, 28, 58, 0.85);
+}
+
+.offcanvas-header {
+    background: rgba(27, 50, 96, 0.95) !important;
+    border-bottom: 1px solid #315CA8;
+}
+
+/* Sidebar & Modal Form Controls */
+.offcanvas .form-control, .offcanvas .form-select {
+    background-color: #101C3A !important;
+    color: #F4F7FC !important;
+    border-color: #315CA8 !important;
+}
+
+.offcanvas .form-control:focus, .offcanvas .form-select:focus {
+    border-color: #527FD1 !important;
+    box-shadow: 0 0 12px rgba(82, 127, 209, 0.6);
+}
+
 /* Responsive layout */
 @media (max-width: 1050px) {
     .table-page .page-layout {
@@ -720,3 +745,5 @@ body.table-page {
         height: 65px;
     }
 }
+
+
