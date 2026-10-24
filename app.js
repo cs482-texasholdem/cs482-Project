@@ -46,7 +46,7 @@ const {joinTable, leaveTable, dealTestHand} = require("./controller/tableControl
 app.post("/api/tables/:tableId/join", joinTable);
 app.post("/api/tables/:tableId/leave", leaveTable);
 // Temporary route to test pokerLogic
-app.get("/api/test-cards", dealTestHand);
+app.get("/api/tables/:tableId/test-cards", dealTestHand);
 
 
 exports.app = app;

@@ -110,21 +110,28 @@ function dealTestHand(req, res) {
     return res.status(404).json({
         error: "Table not found."
     });
-}
+    }
+
+     // Temporary demo players for testing.
+    for (const playerId of ["demo1", "demo2"]) {
+        if (!table.hasPlayer(playerId)) {
+            table.addPlayer(playerId);
+        }
+    }
 
     if (!table.rotateDealer()) {
         return res.status(400).json({
             error: "Must have at least 2 players in order to start"
         });
     }
-    
+
     const deck = new Deck();
     const totalPlayers = table.players.length;
+    
 
-    const playerHands = [
-        deck.hand(0, totalPlayers),
-        deck.hand(1, totalPlayers)
-    ];
+    const playerHands = table.players.map((player, index) =>
+        deck.hand(index, totalPlayers)
+    );
 
     const communityCards = deck.commonCards(totalPlayers);
 
