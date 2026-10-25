@@ -22,9 +22,16 @@ class ActiveTable {
         this.timeLimit = timeLimit;
         this.maxPlayers = 10;
         this.players = [];
+        
+        //moving blinds and dealer around the table
         this.dealerIndex = null;
         this.smallBlindIndex = null;
         this.bigBlindIndex = null;
+
+        //chips and pot
+        this.playerChips = new Map();
+        this.playerBets = new Map();
+        this.pot = 0;
 
     }
 
@@ -58,8 +65,12 @@ class ActiveTable {
      * @param {string} playerId - ID of the player to add.
      * @returns {boolean} True if the player was added; otherwise, false.
      */
-    addPlayer(playerId) {
+    addPlayer(playerId, chips = 1000) {
         if (typeof playerId !== "string" || !playerId.trim()) {
+            return false;
+        }
+
+        if (!Number.isInteger(chips) || chips <= 0) {
             return false;
         }
 
@@ -70,6 +81,8 @@ class ActiveTable {
         }
 
         this.players.push(playerId);
+        this.playerChips.set(playerId, chips);
+
         return true;
     }
 
@@ -86,6 +99,7 @@ class ActiveTable {
         }
 
         this.players.splice(index, 1);
+        this.playerChips.delete(playerId);
         return true;
     }
 
@@ -126,6 +140,37 @@ class ActiveTable {
 
         return true;
     }
+
+    /**
+     * Helper function for the blinds
+     * @param {string} playerId - ID of the player to get chip value
+     * @param {number} blindAmount - The value of the blind amount they owe
+     */
+    postBlind(playerIndex, blindAmount) {
+        const playerId = this.players[playerIndex];
+        const chips = this.playerChips.get(playerId);
+        const bet = Math.min(blindAmount, chips); //case for use has $1 when big blind
+
+        this.playerChips.set(playerId, chips - bet);
+        this.playerBets.set(playerId, bet);
+        this.pot += bet;
+    }
+
+    /**
+     * Deducts blind bets from player stacks and adds them to the pot.
+     * @returns {boolean} Whether the blinds were posted.
+     */
+    postBlinds(){
+        if (this.smallBlindIndex === null || this.bigBlindIndex === null) {
+            return false;
+        }
+
+        this.postBlind(this.smallBlindIndex, 1);
+        this.postBlind(this.bigBlindIndex, 2);
+
+        return true;
+    }
+
 }
 
 module.exports = ActiveTable;

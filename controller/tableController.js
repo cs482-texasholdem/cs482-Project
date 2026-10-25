@@ -112,11 +112,13 @@ function dealTestHand(req, res) {
     });
     }
 
-     // Temporary demo players for testing.
-    for (const playerId of ["demo1", "demo2"]) {
-        if (!table.hasPlayer(playerId)) {
-            table.addPlayer(playerId);
-        }
+    // Temporary demo players and starting chips.
+    if (!table.hasPlayer("demo1")) {
+        table.addPlayer("demo1", 1250);
+    } 
+
+    if (!table.hasPlayer("demo2")) {
+        table.addPlayer("demo2", 980);
     }
 
     if (!table.rotateDealer()) {
@@ -126,6 +128,7 @@ function dealTestHand(req, res) {
     }
 
     table.assignBlinds();
+    table.postBlinds();
 
     const deck = new Deck();
     const totalPlayers = table.players.length;
