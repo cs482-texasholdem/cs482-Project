@@ -129,6 +129,35 @@ function foldPlayer(req, res) {
     });
 }
 
+/**
+ * Handles check logic
+ * @param {Object} req - Express request object.
+ * @param {Object} res - Express response object.
+ * @returns {Object} HTTP response containing the result of the request.
+ */
+function checkPlayer(req, res) {
+    const { tableId } = req.params;
+    const { playerId } = req.body;
+
+    const table = tables.get(tableId);
+
+    if (!table) {
+        return res.status(404).json({
+            error: "Table not found."
+        });
+    }
+
+    if (!table.check(playerId)) {
+        return res.status(400).json({
+            error: "Cannot check. Call, raise, or fold instead."
+        });
+    }
+
+     return res.status(200).json({
+        message: `${playerId} checked.`,
+        playerId
+    });
+}
 
 /**
  * Temporarily test function in the table
@@ -176,7 +205,8 @@ function dealTestHand(req, res) {
     return res.status(200).json({
         players: table.players.map(playerId => ({
             id: playerId,
-            chips: table.playerChips.get(playerId)
+            chips: table.playerChips.get(playerId),
+            bet: table.playerBets.get(playerId) ?? 0
         })),
         pot: table.pot,
         dealerIndex: table.dealerIndex,
@@ -260,4 +290,4 @@ function startDemoHand(req, res) {
 
 
 
-module.exports = { joinTable, leaveTable, dealTestHand, getTableState, startDemoHand, foldPlayer };
+module.exports = { joinTable, leaveTable, dealTestHand, getTableState, startDemoHand, foldPlayer, checkPlayer };

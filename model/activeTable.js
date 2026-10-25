@@ -43,9 +43,13 @@ class ActiveTable {
         this.playerChips = new Map();
         this.playerBets = new Map();
         this.pot = 0;
+        this.currentBet = 0;
 
         //call/raise/fold/check
         this.foldedPlayers = new Set(); 
+        this.checkPlayers = new Set();
+        
+
 
     }
 
@@ -302,7 +306,10 @@ class ActiveTable {
         return true;
     }
 
-    //ends turn
+    /**
+     * Adds player into Set of folded players
+     * @returns {boolean} Whether the blinds were posted.
+     */
     fold(playerId){
         // Reject players who aren't seated or already folded.
         if (!this.hasPlayer(playerId) || this.foldedPlayers.has(playerId)) {
@@ -313,23 +320,63 @@ class ActiveTable {
         return true;
     }
 
-/*    
-    call(playerId){
+    /**
+     * Adds player into Set of checked players
+     * @returns {boolean} Whether the blinds were posted.
+     */
+    check(playerId) {
+        if (!this.hasPlayer(playerId) ||
+            this.checkPlayers.has(playerId) ||
+            this.foldedPlayers.has(playerId)) {
+            return false;
+        }
 
+        const playerBet = this.playerBets.get(playerId) ?? 0;
+
+        // Checking is allowed only when no additional chips are owed.
+        if (playerBet !== this.currentBet) {
+            return false;
+        }
+
+        this.checkPlayers.add(playerId);
+        return true;
     }
 
-    check(playerId){
+    /**
+     * Adds player into Set of call players and raises the money
+     * @returns {boolean} Whether the blinds were posted.
+     */
+    call(playerId) {
+        if (!this.hasPlayer(playerId) || this.foldedPlayers.has(playerId)) {
+            return false;
+        }
 
+        const chips = this.playerChips.get(playerId);
+        const playerBet = this.playerBets.get(playerId) ?? 0;
+        const amountOwed = this.currentBet - playerBet;
+
+        //matched bet
+        if (amountOwed <= 0 || chips <= 0) {
+            return false;
+        }
+
+        // Pay the amount owed, or all remaining chips if there aren't enough.
+        const payment = Math.min(amountOwed, chips);
+
+        this.playerChips.set(playerId, chips - payment);
+        this.playerBets.set(playerId, playerBet + payment);
+        this.pot += payment;
+
+        return true;
     }
-
+/*
     raise(playerId){
         const playerId = this.players[playerIndex];
         const chips = this.playerChips.get(playerId);
 
-    }
-
-    
+    } 
 */
+
 }
 
 module.exports = ActiveTable;

@@ -133,6 +133,24 @@ function displayChips(players, pot) {
     document.getElementById("total-pot").textContent = pot.toLocaleString();
 }
 
+function displayYourChips(players) {
+    // Temporarily treat demo1 as the local player.
+    const player = players.find(player => player.id === "demo1");
+
+    if (!player) {
+        return;
+    }
+
+    document.getElementById("your-chips").textContent =
+        player.chips.toLocaleString();
+
+    document.getElementById("your-bet").textContent =
+        player.bet.toLocaleString();
+
+    document.getElementById("available-chips").textContent =
+        player.chips.toLocaleString();
+}
+
 /**
  * Handles clicks on the Fold, Check, Call, and Raise buttons.
  * Displays a demo message for the selected action.
@@ -172,6 +190,33 @@ async function handlePokerAction(event) {
             tableMessage.textContent = error.message;
         }
 
+        return;
+    }
+
+    if (action === "Call") {
+        try {
+            const response = await fetch("/api/tables/table1/call", {
+                method: "POST",
+                headers: {"Content-Type": "application/json"},
+                body: JSON.stringify({
+                    playerId: "demo1"
+                })
+            });
+
+            const result = await response.json();
+
+            if (!response.ok) {
+                throw new Error(result.error);
+            }
+
+            tableMessage.textContent = result.message;
+            displayChips(result.players, result.pot);
+            displayYourChips(result.players);
+        } 
+        
+        catch (error) {
+            tableMessage.textContent = error.message;
+        }
         return;
     }
 
@@ -292,6 +337,7 @@ async function loadTestCards() {
         displayDealer(game.dealerIndex);
         displayBlinds(game.smallBlindIndex, game.bigBlindIndex);
         displayChips(game.players, game.pot);
+        displayYourChips(game.players);
 
     } catch (error) {
         console.error("Error loading cards:", error);
