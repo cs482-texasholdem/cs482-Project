@@ -457,5 +457,56 @@ describe("ActiveTable", () => {
             expect(table.pot).toBe(8);
         });
     });
-    
+
+    describe("raise", () => {
+        test("rejects a missing player", () => {
+            expect(table.raise("missing", 10)).toBe(false);
+        });
+
+        test("rejects a folded player", () => {
+            table.addPlayer("player1", 100);
+            table.fold("player1");
+
+            expect(table.raise("player1", 10)).toBe(false);
+        });
+
+        test("rejects a non-integer amount", () => {
+            table.addPlayer("player1", 100);
+
+            expect(table.raise("player1", 2.5)).toBe(false);
+        });
+
+        test("rejects an amount equal to the current bet", () => {
+            table.addPlayer("player1", 100);
+            table.currentBet = 10;
+
+            expect(table.raise("player1", 10)).toBe(false);
+        });
+
+        test("rejects a nonpositive payment", () => {
+            table.addPlayer("player1", 100);
+            table.currentBet = 2;
+            table.playerBets.set("player1", 10);
+
+            expect(table.raise("player1", 10)).toBe(false);
+        });
+
+        test("rejects a payment exceeding available chips", () => {
+            table.addPlayer("player1", 5);
+            table.currentBet = 2;
+
+            expect(table.raise("player1", 10)).toBe(false);
+        });
+
+        test("raises successfully with no previous bet", () => {
+            table.addPlayer("player1", 100);
+            table.currentBet = 2;
+
+            expect(table.raise("player1", 10)).toBe(true);
+            expect(table.playerChips.get("player1")).toBe(90);
+            expect(table.playerBets.get("player1")).toBe(10);
+            expect(table.currentBet).toBe(10);
+            expect(table.pot).toBe(10);
+        });
+    });
 });

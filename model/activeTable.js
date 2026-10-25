@@ -184,6 +184,7 @@ class ActiveTable {
 
     /**
      * Adds player into Set of folded players
+     * @param {string} playerId  - ID of the player input into Set
      * @returns {boolean} Whether the blinds were posted.
      */
     fold(playerId){
@@ -198,6 +199,7 @@ class ActiveTable {
 
     /**
      * Adds player into Set of checked players
+     * @param {string} playerId  - ID of the player input into Set
      * @returns {boolean} Whether the blinds were posted.
      */
     check(playerId) {
@@ -207,6 +209,7 @@ class ActiveTable {
             return false;
         }
 
+        // Get the player's current bet, or use 0 if no bet is recorded.
         const playerBet = this.playerBets.get(playerId) ?? 0;
 
         // Checking is allowed only when no additional chips are owed.
@@ -219,7 +222,8 @@ class ActiveTable {
     }
 
     /**
-     * Adds player into Set of call players and raises the money
+     * Allows user to match current bet
+     * @param {string} playerId To get ID to get current pot
      * @returns {boolean} Whether the blinds were posted.
      */
     call(playerId) {
@@ -245,14 +249,42 @@ class ActiveTable {
 
         return true;
     }
-/*
-    raise(playerId){
-        const playerId = this.players[playerIndex];
+
+    /**
+     * Allows user to match current bet
+     * @param {string} playerId To get ID to get current pot
+     * @param {number} raiseTo - user's value to raise
+     * @returns {boolean} Whether the blinds were posted.
+     */
+    raise(playerId, raiseTo) {
+        if (!this.hasPlayer(playerId) ||
+            this.foldedPlayers.has(playerId)) {
+            return false;
+        }
+
         const chips = this.playerChips.get(playerId);
+        const playerBet = this.playerBets.get(playerId) ?? 0;
 
-    } 
-*/
+        // higher than current bet
+        if (!Number.isInteger(raiseTo) ||
+            raiseTo <= this.currentBet) {
+            return false;
+        }
 
+        const payment = raiseTo - playerBet;
+
+        // Reject raises the player cannot afford.
+        if (payment <= 0 || payment > chips) {
+            return false;
+        }
+
+        this.playerChips.set(playerId, chips - payment);
+        this.playerBets.set(playerId, raiseTo);
+        this.pot += payment;
+        this.currentBet = raiseTo;
+
+        return true;
+    }
 }
 
 module.exports = ActiveTable;
