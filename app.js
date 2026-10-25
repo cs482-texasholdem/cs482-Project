@@ -40,6 +40,14 @@ app.get('/loggeduser', UserCont.loggedUser);
 app.get('/logout', UserCont.logout); 
 app.get('/deluser/:id', UserCont.deleteOne); 
 
+// Social & Friend System Routes
+app.get('/api/users/search', UserCont.searchUsers);        
+app.post('/friends/request', UserCont.sendFriendRequest);  
+app.post('/friends/accept', UserCont.acceptFriendRequest);
+app.post('/friends/decline', UserCont.declineFriendRequest);
+app.get('/api/friends/data', UserCont.getFriendsData);
+
+// In game actions
 const {joinTable, leaveTable, dealTestHand, getTableState, startDemoHand, foldPlayer, checkPlayer, callPlayer, raisePlayer} = require("./controller/tableController");
 app.post("/api/tables/:tableId/join", joinTable);
 app.post("/api/tables/:tableId/leave", leaveTable);
