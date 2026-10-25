@@ -15,9 +15,21 @@ describe("ActiveTable", () => {
         expect(table.players).toEqual([]);
     });
 
+    test("rejects invalid tableId in constructor", () => {
+        expect(() => new ActiveTable("", "beginner")).toThrow("Table ID is required.");
+        expect(() => new ActiveTable(null, "beginner")).toThrow("Table ID is required.");
+        expect(() => new ActiveTable(123, "beginner")).toThrow("Table ID is required.");
+    });
+
     test("adds a player to the table", () => {
         expect(table.addPlayer("player1")).toBe(true);
         expect(table.players).toContain("player1");
+    });
+
+    test("rejects invalid player ID when adding", () => {
+        expect(table.addPlayer("")).toBe(false);
+        expect(table.addPlayer(null)).toBe(false);
+        expect(table.addPlayer("   ")).toBe(false);
     });
 
     test("does not allow the same player to join twice", () => {
@@ -83,14 +95,36 @@ describe("ActiveTable", () => {
         expect(table.hasPlayer("player2")).toBe(false);
     });
 
-    test("advances community cards through the flop, turn, and river", () => {
+    test("advances community cards through the flop, turn, river, and showdown", () => {
         table.addPlayer("player1");
         table.addPlayer("player2");
+        table.dealHandToPlayer("player1");
+        table.dealHandToPlayer("player2");
         table.deck.deck = Array.from({ length: 52 }, (_, index) => index + 1);
 
-        expect(table.nextRound()).toEqual([6, 7, 8]);
-        expect(table.nextRound()).toEqual([6, 7, 8, 10]);
-        expect(table.nextRound()).toEqual([6, 7, 8, 10, 12]);
+        // Flop
+        let res = table.nextRound();
+        expect(res.communityCards).toEqual(["7♥", "8♥", "9♥", "🂠", "🂠"]);
+        expect(res.winnerData).toBeNull();
+
+        // Turn
+        res = table.nextRound();
+        expect(res.communityCards).toEqual(["7♥", "8♥", "9♥", "J♥", "🂠"]);
+        expect(res.winnerData).toBeNull();
+
+        // River
+        res = table.nextRound();
+        expect(res.communityCards).toEqual(["7♥", "8♥", "9♥", "J♥", "K♥"]);
+        expect(res.winnerData).toBeNull();
+
+        // Showdown
+        res = table.nextRound();
+        expect(res.winnerData).toHaveProperty("winners");
+        expect(res.winnerData).toHaveProperty("maxScore");
+
+        // Next call after showdown automatically triggers newGame and starts flop
+        res = table.nextRound();
+        expect(table.gameOver).toBe(false);
     });
 
     test("displayCards returns 5 placeholders when displayedCards is empty", () => {
@@ -175,5 +209,10 @@ describe("ActiveTable", () => {
     test("rejects an invalid time limit", () => {
         expect(() => new ActiveTable("table2", "beginner", 0))
             .toThrow("Time limit must be a positive integer.");
+    });
+
+    test("dealHandToPlayer returns false for invalid player or player not at table", () => {
+        expect(table.dealHandToPlayer("nonExistent")).toBe(false);
+        expect(table.dealHandToPlayer(123)).toBe(false);
     });
 });
