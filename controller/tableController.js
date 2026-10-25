@@ -160,6 +160,42 @@ function checkPlayer(req, res) {
 }
 
 /**
+ * Handles call logic
+ * @param {Object} req - Express request object.
+ * @param {Object} res - Express response object.
+ * @returns {Object} HTTP response containing the result of the request.
+ */
+function callPlayer(req, res) {
+    const { tableId } = req.params;
+    const { playerId } = req.body;
+    
+    const table = tables.get(tableId);
+
+    if (!table) {
+        return res.status(404).json({
+            error: "Table not found."
+        });
+    }
+
+    if (!table.call(playerId)) {
+        return res.status(400).json({
+            error: "Cannot call: player is missing, folded, has no chips, or owes nothing."
+        });
+    }
+
+    return res.status(200).json({
+        message: `${playerId} called.`,
+        players: table.players.map(id => ({
+            id,
+            chips: table.playerChips.get(id),
+            bet: table.playerBets.get(id) ?? 0
+        })),
+        pot: table.pot,
+        currentBet: table.currentBet
+    });
+}
+
+/**
  * Temporarily test function in the table
  */
 function dealTestHand(req, res) {
