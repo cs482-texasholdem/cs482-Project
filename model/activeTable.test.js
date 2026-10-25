@@ -20,13 +20,11 @@ describe("ActiveTable", () => {
     });
 
     test("throws when table ID is empty", () => {
-        expect(() => new ActiveTable("", "beginner"))
-            .toThrow("Table ID is required.");
+        expect(() => new ActiveTable("", "beginner")).toThrow("Table ID is required.");
     });
 
     test("throws when table ID contains only spaces", () => {
-        expect(() => new ActiveTable("   ", "beginner"))
-            .toThrow("Table ID is required.");
+        expect(() => new ActiveTable("   ", "beginner")).toThrow("Table ID is required.");
     });
 
     test("adds a player to the table", () => {

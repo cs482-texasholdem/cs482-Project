@@ -107,7 +107,7 @@ class ActiveTable {
         if (this.players.length < 2 || this.dealerIndex === null) {
             return false;
         }
-        if (this.players.length === 2) { //special case )(with two players, the dealer is also the small blind)
+        if (this.players.length === 2) { //special case (with two players, the dealer is also the small blind)
              this.smallBlindIndex = this.dealerIndex;
         } 
         else { // With three or more players, use the player after the dealer.
@@ -118,7 +118,6 @@ class ActiveTable {
         
         return true;
      }
-
 
     /**
      * Rotates dealer chip around the table 
