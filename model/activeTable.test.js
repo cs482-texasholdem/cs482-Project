@@ -301,14 +301,6 @@ describe("ActiveTable", () => {
             expect(table.fold("missing-player")).toBe(false);
             expect(table.foldedPlayers.size).toBe(0);
         });
-
-        test("player already folded", () => {
-            table.addPlayer("player1");
-            table.fold("player1");
-
-            expect(table.fold("player1")).toBe(false);
-            expect(table.foldedPlayers.size).toBe(1);
-        });
         
         test("player has already folded", () => {
             table.addPlayer("player1");
@@ -325,4 +317,145 @@ describe("ActiveTable", () => {
             expect(table.foldedPlayers.size).toBe(1);
         });
     });
+
+    describe("check", () => {
+        test("player is not at the table", () => {
+            expect(table.check("missing-player")).toBe(false);
+            expect(table.checkPlayers.size).toBe(0);
+        });
+
+        test("player already checked", () => {
+            table.addPlayer("player1");
+            table.check("player1");
+
+            expect(table.check("player1")).toBe(false);
+            expect(table.checkPlayers.size).toBe(1);
+        });
+        
+        test("player has already checked", () => {
+            table.addPlayer("player1");
+            table.check("player1");
+
+            expect(table.check("player1")).toBe(false);
+            expect(table.checkPlayers.size).toBe(1);
+        });
+
+        test("player has already folded", () => {
+            table.addPlayer("player1");
+            table.fold("player1");
+
+            expect(table.fold("player1")).toBe(false);
+            expect(table.foldedPlayers.size).toBe(1);
+        });
+
+        test("player check", () => {
+            table.addPlayer("player1");
+            expect(table.check("player1")).toBe(true);
+            expect(table.checkPlayers.has("player1")).toBe(true);
+            expect(table.checkPlayers.size).toBe(1);
+        });
+
+        test("missing player becomes as zero", () => {
+            table.addPlayer("player1");
+            table.currentBet = 0;
+
+            expect(table.playerBets.has("player1")).toBe(false);
+            expect(table.check("player1")).toBe(true);
+            expect(table.checkPlayers.has("player1")).toBe(true);
+        });
+
+        test("check does not matched the current bet", () => {
+            table.addPlayer("player1", 1);
+            table.playerBets.set("player1", 1);
+            table.currentBet = 2;
+
+            expect(table.check("player1")).toBe(false);
+            expect(table.checkPlayers.has("player1")).toBe(false);
+        });
+    });
+
+    describe("call", () => {
+        test("player is not at the table", () => {
+            expect(table.call("missing-player")).toBe(false);
+            expect(table.pot).toBe(0);
+        });
+
+        test("player already folded", () => {
+            table.addPlayer("player1");
+            table.fold("player1");
+
+            expect(table.fold("player1")).toBe(false);
+            expect(table.foldedPlayers.size).toBe(1);
+        });
+
+        test("rejects calling when the player already matched the bet", () => {
+            table.addPlayer("player1", 100);
+            table.playerBets.set("player1", 10);
+            table.currentBet = 10;
+
+            expect(table.call("player1")).toBe(false);
+            expect(table.playerChips.get("player1")).toBe(100);
+            expect(table.pot).toBe(0);
+        });
+
+        test("rejects calling when the player has no chips", () => {
+            table.addPlayer("player1", 100);
+            table.playerChips.set("player1", 0);
+            table.currentBet = 10;
+
+            expect(table.call("player1")).toBe(false);
+            expect(table.playerChips.get("player1")).toBe(0);
+            expect(table.pot).toBe(0);
+        });
+
+        test("uses zero when no previous bet is recorded", () => {
+            table.addPlayer("player1", 100);
+            table.currentBet = 10;
+
+            expect(table.call("player1")).toBe(true);
+            expect(table.playerChips.get("player1")).toBe(90);
+            expect(table.playerBets.get("player1")).toBe(10);
+            expect(table.pot).toBe(10);
+        });
+
+        test("pays only the difference and adds it to the existing pot", () => {
+            table.addPlayer("player1", 100);
+            table.playerBets.set("player1", 2);
+            table.currentBet = 10;
+            table.pot = 12;
+
+            expect(table.call("player1")).toBe(true);
+
+            // Owes 10 - 2 = 8 chips.
+            expect(table.playerChips.get("player1")).toBe(92);
+            expect(table.playerBets.get("player1")).toBe(10);
+            expect(table.pot).toBe(20);
+        });
+
+        test("posts remaining chips when unable to cover the call", () => {
+            table.addPlayer("player1", 3);
+            table.playerBets.set("player1", 2);
+            table.currentBet = 10;
+            table.pot = 12;
+
+            expect(table.call("player1")).toBe(true);
+
+            // Owes 8, but can pay only 3.
+            expect(table.playerChips.get("player1")).toBe(0);
+            expect(table.playerBets.get("player1")).toBe(5);
+            expect(table.pot).toBe(15);
+        });
+
+        test("can call with exactly the remaining chips", () => {
+            table.addPlayer("player1", 8);
+            table.playerBets.set("player1", 2);
+            table.currentBet = 10;
+
+            expect(table.call("player1")).toBe(true);
+            expect(table.playerChips.get("player1")).toBe(0);
+            expect(table.playerBets.get("player1")).toBe(10);
+            expect(table.pot).toBe(8);
+        });
+    });
+    
 });
