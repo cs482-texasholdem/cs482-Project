@@ -42,12 +42,12 @@ app.get('/deluser/:id', UserCont.deleteOne);
 
 
  // Table Actions
-const {joinTable, leaveTable, dealTestHand, getTableState, startDemoHand} = require("./controller/tableController");
+const {joinTable, leaveTable, dealTestHand, getTableState, startDemoHand, foldPlayer} = require("./controller/tableController");
 app.post("/api/tables/:tableId/join", joinTable);
 app.post("/api/tables/:tableId/leave", leaveTable);
+app.post("/api/tables/:tableId/fold", foldPlayer);
 app.get("/api/tables/:tableId/test-cards", dealTestHand); // Temporary route to test pokerLogic
 app.post("/api/tables/:tableId/start-demo", startDemoHand);
 app.get("/api/tables/:tableId/state", getTableState);
-
 
 exports.app = app;

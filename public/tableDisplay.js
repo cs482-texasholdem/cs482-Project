@@ -59,7 +59,7 @@ function displayPlayers() {
 
 /**
  * Displays and handles the dealer logic
- * @param dealerIndex Used to determine where the dealer Marker is
+ * @param {number} dealerIndex Used to determine where the dealer Marker is
  * @returns {void}
  */
 function displayDealer(dealerIndex) {
@@ -80,6 +80,12 @@ function displayDealer(dealerIndex) {
     }
 }
 
+/**
+ * Displays and handles the Blind
+ * @param {number} smallBlindIndex Used to determine where the small blind marker is
+ * @param {number} bigBlindIndex Used to determine where the big blind marker is
+ * @returns {void}
+ */
 function displayBlinds(smallBlindIndex, bigBlindIndex) {
     // Remove the previous blind markers.
     document.querySelectorAll(".blind-marker").forEach((marker) => {
@@ -106,9 +112,26 @@ function displayBlinds(smallBlindIndex, bigBlindIndex) {
     }
 }
 
-// Display the sample players when the page loads.
-//displayPlayers();
-//displayDealer(0);
+/**
+ * Displays and handles the chips
+ * @param {string} players Players
+ * @param {number} pot the current pot in game
+ * @returns {void}
+ */
+function displayChips(players, pot) {
+    const seats = document.querySelectorAll(".player-seat");
+
+    players.forEach((player, index) => {
+        const seat = seats[index];
+
+        if (seat) {
+            seat.querySelector(".player-name").textContent = player.id;
+            seat.querySelector(".player-chips").textContent =`${player.chips.toLocaleString()} chips`;
+        }
+    });
+
+    document.getElementById("total-pot").textContent = pot.toLocaleString();
+}
 
 /**
  * Handles clicks on the Fold, Check, Call, and Raise buttons.
@@ -118,9 +141,39 @@ function displayBlinds(smallBlindIndex, bigBlindIndex) {
  * @param {Event} event - The click event triggered by the button.
  * @returns {void}
  */
-function handlePokerAction(event) {
+async function handlePokerAction(event) {
     // Get the selected action from the clicked button.
     const action = event.currentTarget.dataset.action;
+
+    if (action === "Fold"){ 
+        try {
+            const response = await fetch("/api/tables/table1/fold", {
+                method: "POST",
+                headers: {"Content-Type": "application/json"},
+                body: JSON.stringify({
+                    playerId: "demo1"
+                })
+            });
+
+            const result = await response.json();
+
+            if (!response.ok) {
+                throw new Error(result.error);
+            }
+
+            tableMessage.textContent = result.message;
+
+            // Mark demo1's seat as folded.
+            const seat = document.querySelectorAll(".player-seat")[0];
+            seat.querySelector(".player-status").textContent = "Folded";
+        } 
+
+        catch (error) {
+            tableMessage.textContent = error.message;
+        }
+
+        return;
+    }
 
     // Handle the Raise action separately to validate its amount.
     if (action === "Raise") {
@@ -235,8 +288,11 @@ async function loadTestCards() {
 
         renderCards("player-cards", game.playerHands[0]);
         renderCards("community-cards", game.communityCards);
+        
         displayDealer(game.dealerIndex);
         displayBlinds(game.smallBlindIndex, game.bigBlindIndex);
+        displayChips(game.players, game.pot);
+
     } catch (error) {
         console.error("Error loading cards:", error);
     }

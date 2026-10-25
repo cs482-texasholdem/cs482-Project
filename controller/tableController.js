@@ -100,7 +100,38 @@ function leaveTable(req, res) {
 }
 
 /**
- * Temporarily tests dealing cards and converting them to readable names.
+ * Handles folding logic
+ * @param {Object} req - Express request object.
+ * @param {Object} res - Express response object.
+ * @returns {Object} HTTP response containing the result of the request.
+ */
+function foldPlayer(req, res) {
+    const { tableId } = req.params;
+    const { playerId } = req.body;
+
+    const table = tables.get(tableId);
+
+    if (!table) {
+        return res.status(404).json({
+            error: "Table not found."
+        });
+    }
+
+    if (!table.fold(playerId)) {
+        return res.status(400).json({
+            error: "Player is not seated or has already folded."
+        });
+    }
+
+    return res.status(200).json({
+        message: `${playerId} folded.`,
+        playerId
+    });
+}
+
+
+/**
+ * Temporarily test function in the table
  */
 function dealTestHand(req, res) {
     const { tableId } = req.params;
@@ -112,12 +143,16 @@ function dealTestHand(req, res) {
     });
     }
 
-     // Temporary demo players for testing.
-    for (const playerId of ["demo1", "demo2"]) {
-        if (!table.hasPlayer(playerId)) {
-            table.addPlayer(playerId);
-        }
+    // Temporary demo players and starting chips.
+    if (!table.hasPlayer("demo1")) {
+        table.addPlayer("demo1", 1250);
+    } 
+
+    if (!table.hasPlayer("demo2")) {
+        table.addPlayer("demo2", 980);
     }
+
+    table.foldedPlayers.clear(); //resets folded players
 
     if (!table.rotateDealer()) {
         return res.status(400).json({
@@ -126,6 +161,7 @@ function dealTestHand(req, res) {
     }
 
     table.assignBlinds();
+    table.postBlinds();
 
     const deck = new Deck();
     const totalPlayers = table.players.length;
@@ -138,6 +174,11 @@ function dealTestHand(req, res) {
     const communityCards = deck.commonCards(totalPlayers);
 
     return res.status(200).json({
+        players: table.players.map(playerId => ({
+            id: playerId,
+            chips: table.playerChips.get(playerId)
+        })),
+        pot: table.pot,
         dealerIndex: table.dealerIndex,
         smallBlindIndex: table.smallBlindIndex,
         bigBlindIndex: table.bigBlindIndex,
@@ -219,4 +260,4 @@ function startDemoHand(req, res) {
 
 
 
-module.exports = { joinTable, leaveTable, dealTestHand, getTableState, startDemoHand };
+module.exports = { joinTable, leaveTable, dealTestHand, getTableState, startDemoHand, foldPlayer };

@@ -22,12 +22,30 @@ class ActiveTable {
         this.timeLimit = timeLimit;
         this.maxPlayers = 10;
         this.players = [];
+        
+        //moving blinds and dealer around the table
         this.dealerIndex = null;
         this.smallBlindIndex = null;
         this.bigBlindIndex = null;
         this.currentPlayerIndex = null;
         this.turnEndsAt = null; //timestamp
         this.foldedPlayers = []; //IDs of folded players for current hand
+
+        //chips and pot
+        this.playerChips = new Map();
+        this.playerBets = new Map();
+        this.pot = 0;
+
+        //call/raise/fold/check
+        this.foldedPlayers = new Set(); 
+
+        //chips and pot
+        this.playerChips = new Map();
+        this.playerBets = new Map();
+        this.pot = 0;
+
+        //call/raise/fold/check
+        this.foldedPlayers = new Set(); 
 
     }
 
@@ -61,8 +79,12 @@ class ActiveTable {
      * @param {string} playerId - ID of the player to add.
      * @returns {boolean} True if the player was added; otherwise, false.
      */
-    addPlayer(playerId) {
+    addPlayer(playerId, chips = 1000) {
         if (typeof playerId !== "string" || !playerId.trim()) {
+            return false;
+        }
+
+        if (!Number.isInteger(chips) || chips <= 0) {
             return false;
         }
 
@@ -73,6 +95,8 @@ class ActiveTable {
         }
 
         this.players.push(playerId);
+        this.playerChips.set(playerId, chips);
+
         return true;
     }
 
@@ -89,14 +113,19 @@ class ActiveTable {
         }
 
         this.players.splice(index, 1);
+        this.playerChips.delete(playerId);
         return true;
     }
 
+    /**
+     * Removes a player from the table.
+     * @returns {boolean} True if the player was removed; otherwise, false.
+     */
     assignBlinds() {
         if (this.players.length < 2 || this.dealerIndex === null) {
             return false;
         }
-        if (this.players.length === 2) { //special case )(with two players, the dealer is also the small blind)
+        if (this.players.length === 2) { //special case (with two players, the dealer is also the small blind)
              this.smallBlindIndex = this.dealerIndex;
         } 
         else { // With three or more players, use the player after the dealer.
@@ -107,7 +136,6 @@ class ActiveTable {
         
         return true;
      }
-
 
     /**
      * Rotates dealer chip around the table 
@@ -242,6 +270,66 @@ class ActiveTable {
 
 
 
+
+    /**
+     * Helper function for the blinds
+     * @param {string} playerId - ID of the player to get chip value
+     * @param {number} blindAmount - The value of the blind amount they owe
+     * @returns {void}
+     */
+    postBlind(playerIndex, blindAmount) {
+        const playerId = this.players[playerIndex];
+        const chips = this.playerChips.get(playerId);
+        const bet = Math.min(blindAmount, chips); //case for use has $1 when big blind
+
+        this.playerChips.set(playerId, chips - bet);
+        this.playerBets.set(playerId, bet);
+        this.pot += bet;
+    }
+
+    /**
+     * Deducts blind bets from player stacks and adds them to the pot.
+     * @returns {boolean} Whether the blinds were posted.
+     */
+    postBlinds(){
+        if (this.smallBlindIndex === null || this.bigBlindIndex === null) {
+            return false;
+        }
+
+        this.postBlind(this.smallBlindIndex, 1);
+        this.postBlind(this.bigBlindIndex, 2);
+
+        return true;
+    }
+
+    //ends turn
+    fold(playerId){
+        // Reject players who aren't seated or already folded.
+        if (!this.hasPlayer(playerId) || this.foldedPlayers.has(playerId)) {
+            return false;
+        }
+
+        this.foldedPlayers.add(playerId);
+        return true;
+    }
+
+/*    
+    call(playerId){
+
+    }
+
+    check(playerId){
+
+    }
+
+    raise(playerId){
+        const playerId = this.players[playerIndex];
+        const chips = this.playerChips.get(playerId);
+
+    }
+
+    
+*/
 }
 
 module.exports = ActiveTable;
