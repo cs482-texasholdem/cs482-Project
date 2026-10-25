@@ -40,15 +40,15 @@ app.get('/loggeduser', UserCont.loggedUser);
 app.get('/logout', UserCont.logout); 
 app.get('/deluser/:id', UserCont.deleteOne); 
 
-
- // Table Actions
-const {joinTable, leaveTable, dealTestHand, foldPlayer, checkPlayer} = require("./controller/tableController");
+const {joinTable, leaveTable, dealTestHand, getTableState, startDemoHand, foldPlayer, checkPlayer, callPlayer} = require("./controller/tableController");
 app.post("/api/tables/:tableId/join", joinTable);
 app.post("/api/tables/:tableId/leave", leaveTable);
 app.post("/api/tables/:tableId/fold", foldPlayer);
 app.post("/api/tables/:tableId/fold", checkPlayer);
-// Temporary route to test pokerLogic
-app.get("/api/tables/:tableId/test-cards", dealTestHand);
+app.post("/api/tables/:tableId/fold", callPlayer);
+app.get("/api/tables/:tableId/test-cards", dealTestHand); // Temporary route to test pokerLogic
+app.post("/api/tables/:tableId/start-demo", startDemoHand);
+app.get("/api/tables/:tableId/state", getTableState);
 
 
 exports.app = app;

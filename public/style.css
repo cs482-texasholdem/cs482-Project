@@ -746,4 +746,139 @@ body.table-page {
     }
 }
 
+/* Current player's turn */
+.table-page .turn-status {
+    grid-column: 1 / -1;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    width: 100%;
+    max-width: 340px;
+    justify-self: center;
+    margin: 0 auto;
+    padding: 12px 16px;
+    border: 1px solid var(--button-hover-blue);
+    border-radius: 18px;
+    background: var(--nav-background);
+    box-shadow: 0 5px 18px var(--shadow);
+}
 
+.table-page .turn-player {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 0;
+}
+
+.table-page .turn-avatar {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    width: 44px;
+    height: 44px;
+    border: 2px solid var(--button-hover-blue);
+    border-radius: 50%;
+    background: #203E70;
+    color: #F2D27A;
+    font-size: 25px;
+}
+
+.table-page .turn-player-info {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 0;
+    text-align: left;
+}
+
+.table-page .turn-label {
+    color: var(--secondary-text);
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 1px;
+}
+
+.table-page #current-player {
+    overflow-wrap: anywhere;
+    font-size: 15px;
+}
+
+.table-page .timer-ring {
+    --timer-progress: 100%;
+
+    display: grid;
+    place-items: center;
+    flex-shrink: 0;
+    width: 66px;
+    height: 66px;
+    border-radius: 50%;
+    background: conic-gradient(
+        from -90deg,
+        #F2D27A var(--timer-progress),
+        #35425B var(--timer-progress)
+    );
+    transition: background 0.3s;
+}
+
+.table-page .timer-ring-inner {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    width: 54px;
+    height: 54px;
+    border-radius: 50%;
+    background: #101C3A;
+}
+
+.table-page #turn-timer {
+    font-size: 19px;
+    font-weight: 800;
+    line-height: 1.1;
+}
+
+.table-page .timer-unit {
+    margin-top: 2px;
+    color: var(--secondary-text);
+    font-size: 8px;
+    letter-spacing: 1px;
+}
+
+/* Highlight the timer when time is almost up */
+.table-page .timer-ring.urgent {
+    background: conic-gradient(
+        from -90deg,
+        #FF5C64 var(--timer-progress),
+        #35425B var(--timer-progress)
+    );
+}
+
+.table-page .timer-ring.urgent #turn-timer {
+    color: #FF777D;
+}
+
+@media (max-width: 760px) {
+    .table-page .turn-status {
+        max-width: 260px;
+        padding: 9px 12px;
+        gap: 10px;
+    }
+
+    .table-page .turn-avatar {
+        width: 36px;
+        height: 36px;
+        font-size: 21px;
+    }
+
+    .table-page .timer-ring {
+        width: 56px;
+        height: 56px;
+    }
+
+    .table-page .timer-ring-inner {
+        width: 46px;
+        height: 46px;
+    }
+}

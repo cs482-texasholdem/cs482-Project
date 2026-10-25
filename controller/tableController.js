@@ -168,7 +168,7 @@ function checkPlayer(req, res) {
 function callPlayer(req, res) {
     const { tableId } = req.params;
     const { playerId } = req.body;
-    
+
     const table = tables.get(tableId);
 
     if (!table) {
@@ -257,4 +257,73 @@ function dealTestHand(req, res) {
     });
 }
 
-module.exports = { joinTable, leaveTable, dealTestHand, foldPlayer, checkPlayer};
+
+/**
+ * Gets the current turn information for a table.
+ */
+function getTableState(req, res) {
+    const { tableId } = req.params;
+    const table = tables.get(tableId);
+
+    if (!table) {
+        return res.status(404).json({ error: "Table not found." });
+    }
+
+    // Fold the current player if their timer has expired.
+    table.checkTurnTimeout();
+
+    return res.status(200).json({
+        tableId: table.tableId,
+        players: table.players,
+        currentPlayerIndex: table.currentPlayerIndex,
+        currentPlayer:
+            table.currentPlayerIndex === null
+                ? null
+                : table.players[table.currentPlayerIndex],
+        timeLimit: table.timeLimit,
+        timeRemaining: table.getTimeRemaining(),
+        turnEndsAt: table.turnEndsAt,
+        foldedPlayers: table.foldedPlayers
+    });
+}
+
+
+function startDemoHand(req, res) {
+    const { tableId } = req.params;
+    const table = tables.get(tableId);
+
+    if (!table) {
+        return res.status(404).json({ error: "Table not found." });
+    }
+
+    const demoPlayers = ["Blossom", "Bubbles", "Buttercup", "Professor Utonium", "Mojo Jojo", "You"];
+
+    // Reset the table for the demo.
+    table.players = [];
+    table.foldedPlayers = [];
+    table.currentPlayerIndex = null;
+    table.turnEndsAt = null;
+
+    for (const playerId of demoPlayers) {
+        table.addPlayer(playerId);
+    }
+
+    table.rotateDealer();
+    table.assignBlinds();
+    table.startTurn(0);
+
+    return res.status(200).json({
+        message: "Demo hand started.",
+        players: table.players,
+        dealerIndex: table.dealerIndex,
+        smallBlindIndex: table.smallBlindIndex,
+        bigBlindIndex: table.bigBlindIndex,
+        currentPlayer: table.players[table.currentPlayerIndex],
+        timeLimit: table.timeLimit,
+        timeRemaining: table.getTimeRemaining()
+    });
+}
+
+
+
+module.exports = { joinTable, leaveTable, dealTestHand, getTableState, startDemoHand, foldPlayer, checkPlayer, callPlayer };

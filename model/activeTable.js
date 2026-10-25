@@ -27,6 +27,17 @@ class ActiveTable {
         this.dealerIndex = null;
         this.smallBlindIndex = null;
         this.bigBlindIndex = null;
+        this.currentPlayerIndex = null;
+        this.turnEndsAt = null; //timestamp
+        this.foldedPlayers = []; //IDs of folded players for current hand
+
+        //chips and pot
+        this.playerChips = new Map();
+        this.playerBets = new Map();
+        this.pot = 0;
+
+        //call/raise/fold/check
+        this.foldedPlayers = new Set(); 
 
         //chips and pot
         this.playerChips = new Map();
@@ -149,6 +160,116 @@ class ActiveTable {
         }
 
         return true;
+    }
+
+    /**
+     * Starts the turn for a player.
+     * @param {number} playerIndex - Index of the player.
+     * @returns {boolean} True if the turn started successfully.
+     */
+    startTurn(playerIndex) {
+        if (!Number.isInteger(playerIndex) || playerIndex < 0 || playerIndex >= this.players.length) {
+            return false;
+        }
+
+        if (this.foldedPlayers.includes(this.players[playerIndex])) {
+            return false;
+        }
+
+        this.currentPlayerIndex = playerIndex;
+        this.turnEndsAt = Date.now() + this.timeLimit * 1000;
+
+        return true;
+    }
+
+    /**
+     * Gets the number of seconds remaining in the current turn.
+     * @returns {number} Seconds remaining, or 0 if the timer has expired.
+     */
+    getTimeRemaining() {
+        if (this.turnEndsAt === null) {
+            return 0;
+        }
+        return Math.max(0, Math.ceil((this.turnEndsAt - Date.now()) / 1000));
+    }
+
+    /**
+     * Checks whether the current turn has expired.
+     * @returns {boolean} True if the timer has expired.
+     */
+    isTurnExpired() {
+        return this.turnEndsAt !== null && Date.now() >= this.turnEndsAt;
+    }
+    
+    /**
+     * Advances to the next player who has not folded.
+     * @returns {boolean} True if the next turn started successfully.
+     */
+    advanceTurn() {
+        if (this.players.length < 2 || this.currentPlayerIndex === null) {
+            return false;
+        }
+
+        // Check each remaining seat, moving clockwise.
+        for (let i = 1; i <= this.players.length; i++) {
+            const nextIndex = (this.currentPlayerIndex + i) % this.players.length;
+            const nextPlayer = this.players[nextIndex];
+
+            if (!this.foldedPlayers.includes(nextPlayer)) {
+                return this.startTurn(nextIndex);
+            }
+        }
+
+        // No eligible players remain.
+        this.currentPlayerIndex = null;
+        this.turnEndsAt = null;
+
+        return false;
+    }
+    
+    /**
+     * Folds a player and advances to the next eligible player.
+     * @param {string} playerId - ID of the player who folds.
+     * @returns {boolean} True if the player folded successfully.
+     */
+    foldPlayer(playerId) {
+        if (!this.players.includes(playerId)) {
+            return false;
+        }
+
+        if (this.foldedPlayers.includes(playerId)) {
+            return false;
+        }
+
+        this.foldedPlayers.push(playerId);
+
+        // If this player has the current turn, advance to the next player.
+        const playerIndex = this.players.indexOf(playerId);
+
+        if (playerIndex === this.currentPlayerIndex) {
+            this.advanceTurn();
+        }
+
+        return true;
+    }
+    
+    /**
+     * Checks whether the current player's turn has timed out.
+     * Automatically folds the player if their time has expired.
+     * @returns {boolean} True if a player was automatically folded.
+     */
+    checkTurnTimeout() {
+        if (!this.isTurnExpired() || this.currentPlayerIndex === null) {
+            return false;
+        }
+
+        const currentPlayer = this.players[this.currentPlayerIndex];
+
+        if (!currentPlayer) {
+            return false;
+        }
+
+        return this.foldPlayer(currentPlayer);
     }
 
     /**

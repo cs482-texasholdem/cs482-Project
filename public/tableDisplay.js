@@ -3,11 +3,11 @@
  * This data is for demonstration only and is not connected to the backend.
  */
 const samplePlayers = [
-    { name: "PokerPro", chips: 1250 },
-    { name: "LuckyAce", chips: 980 },
-    { name: "CardShark", chips: 2010 },
-    { name: "BlueMoon", chips: 1430 },
-    { name: "RiverRat", chips: 860 },
+    { name: "Blossom", chips: 1250 },
+    { name: "Bubbles", chips: 980 },
+    { name: "Buttercup", chips: 2010 },
+    { name: "Professor Utonium", chips: 1430 },
+    { name: "Mojo Jojo", chips: 860 },
     { name: "You", chips: 1980, current: true }
 ];
 
@@ -290,6 +290,37 @@ document.getElementById("chat-form").addEventListener(
     handleChatSubmit
 );
 
+
+async function updateTurnStatus() {
+    try {
+        const response = await fetch("/api/tables/table1/state");
+
+        if (!response.ok) {
+            throw new Error("Failed to load table state.");
+        }
+
+        const table = await response.json();
+        const playerDisplay = document.getElementById("current-player");
+        const timerDisplay = document.getElementById("turn-timer");
+        const timerRing = document.getElementById("timer-ring");
+        playerDisplay.textContent = table.currentPlayer || "Waiting...";
+        const seconds = table.timeRemaining;
+        timerDisplay.textContent = seconds;
+        const timeLimit = table.timeLimit || 30;
+        const percentage = Math.max(0, Math.min(100, (seconds / timeLimit) * 100));
+
+        timerRing.style.setProperty("--timer-progress", `${percentage}%`);
+        timerRing.classList.toggle("urgent", seconds <= 10);
+
+    } catch (error) {
+        console.error("Error updating turn status:", error);
+    }
+}
+
+updateTurnStatus();
+setInterval(updateTurnStatus, 1000);
+
+
 async function loadTestCards() {
     try {
         const response = await fetch("/api/tables/table1/test-cards");
@@ -331,3 +362,61 @@ function renderCards(containerId, cards) {
 }
 
 loadTestCards();
+
+
+
+async function updatePlayerSeats() {
+    try {
+        const response = await fetch("/api/tables/table1/state");
+
+        if (!response.ok) {
+            throw new Error("Failed to fetch table state");
+        }
+
+        const data = await response.json();
+        console.log("Players:", data.players);
+
+        const playerSeats = document.querySelectorAll(".player-seat");
+
+        playerSeats.forEach((seat, index) => {
+            const nameElement = seat.querySelector(".player-name");
+            const statusElement = seat.querySelector(".player-status");
+            const chipsElement = seat.querySelector(".player-chips");
+
+            // Check that the HTML elements exist
+            if (!nameElement || !statusElement || !chipsElement) {
+                console.warn("Player seat HTML is missing an expected element:", seat);
+                return;
+            }
+
+            const player = data.players[index];
+
+            if (player) {
+                // Support either a player object or a player name string
+                nameElement.textContent =
+                    typeof player === "string" ? player : player.name;
+
+                statusElement.textContent = "Active";
+                chipsElement.textContent = "1,500 chips";
+
+                seat.classList.add("active");
+                seat.classList.remove("inactive", "disconnected");
+            } else {
+                nameElement.textContent = "Empty Seat";
+                statusElement.textContent = "Inactive";
+                chipsElement.textContent = "";
+
+                seat.classList.remove("active");
+                seat.classList.add("inactive");
+                seat.classList.remove("disconnected");
+            }
+        });
+    } catch (error) {
+        console.error("Error updating player seats:", error);
+    }
+}
+
+updatePlayerSeats();
+
+
+
