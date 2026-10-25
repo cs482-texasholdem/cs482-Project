@@ -162,4 +162,148 @@ describe("ActiveTable", () => {
         expect(table.smallBlindIndex).toBe(2);
         expect(table.bigBlindIndex).toBe(0);
     });
+
+    test("rejects an invalid table ID", () => {
+        expect(() => new ActiveTable("", "beginner")).toThrow("Table ID is required.");
+    });
+
+    test("rejects an invalid player ID", () => {
+        expect(table.addPlayer("")).toBe(false);
+        expect(table.addPlayer("   ")).toBe(false);
+        expect(table.addPlayer(null)).toBe(false);
+    });
+    
+    describe("Turn and timer management", () => {
+        beforeEach(() => {
+            table.addPlayer("Blossom");
+            table.addPlayer("Bubbles");
+            table.addPlayer("Buttercup");
+        });
+
+        test("starts a turn for a valid player", () => {
+            expect(table.startTurn(0)).toBe(true);
+            expect(table.currentPlayerIndex).toBe(0);
+            expect(table.turnEndsAt).toBeGreaterThan(Date.now());
+        });
+
+        test("rejects invalid player indices", () => {
+            expect(table.startTurn(-1)).toBe(false);
+            expect(table.startTurn(3)).toBe(false);
+            expect(table.startTurn(1.5)).toBe(false);
+            expect(table.startTurn("1")).toBe(false);
+        });
+
+        test("rejects starting a turn for a folded player", () => {
+            table.foldedPlayers.push("Bubbles");
+            expect(table.startTurn(1)).toBe(false);
+        });
+
+        test("returns zero when no timer has started", () => {
+            expect(table.getTimeRemaining()).toBe(0);
+        });
+
+        test("returns remaining time for an active turn", () => {
+            table.turnEndsAt = Date.now() + 10000;
+            expect(table.getTimeRemaining()).toBeGreaterThan(0);
+            expect(table.getTimeRemaining()).toBeLessThanOrEqual(10);
+        });
+
+        test("returns zero after the timer expires", () => {
+            table.turnEndsAt = Date.now() - 1000;
+            expect(table.getTimeRemaining()).toBe(0);
+        });
+
+        test("detects whether a turn has expired", () => {
+            expect(table.isTurnExpired()).toBe(false);
+
+            table.turnEndsAt = Date.now() + 10000;
+            expect(table.isTurnExpired()).toBe(false);
+
+            table.turnEndsAt = Date.now() - 1000;
+            expect(table.isTurnExpired()).toBe(true);
+        });
+
+        test("advances to the next player", () => {
+            table.startTurn(0);
+            expect(table.advanceTurn()).toBe(true);
+            expect(table.currentPlayerIndex).toBe(1);
+        });
+
+        test("skips folded players when advancing", () => {
+            table.startTurn(0);
+            table.foldedPlayers.push("Bubbles");
+            expect(table.advanceTurn()).toBe(true);
+            expect(table.currentPlayerIndex).toBe(2);
+        });
+
+        test("wraps around to the first player", () => {
+            table.startTurn(2);
+            expect(table.advanceTurn()).toBe(true);
+            expect(table.currentPlayerIndex).toBe(0);
+        });
+
+        test("cannot advance when there is no current turn", () => {
+            expect(table.advanceTurn()).toBe(false);
+        });
+
+        test("cannot advance with fewer than two players", () => {
+            table.players = ["Blossom"];
+            table.currentPlayerIndex = 0;
+
+            expect(table.advanceTurn()).toBe(false);
+        });
+
+        test("clears the turn when every player has folded", () => {
+            table.startTurn(0);
+            table.foldedPlayers = ["Blossom", "Bubbles", "Buttercup"];
+            expect(table.advanceTurn()).toBe(false);
+            expect(table.currentPlayerIndex).toBe(null);
+            expect(table.turnEndsAt).toBe(null);
+        });
+
+        test("folds a player who is not currently taking a turn", () => {
+            expect(table.foldPlayer("Bubbles")).toBe(true);
+            expect(table.foldedPlayers).toContain("Bubbles");
+        });
+
+        test("rejects folding a player who is not at the table", () => {
+            expect(table.foldPlayer("Unknown")).toBe(false);
+        });
+
+        test("rejects folding the same player twice", () => {
+            table.foldPlayer("Bubbles");
+            expect(table.foldPlayer("Bubbles")).toBe(false);
+        });
+
+        test("advances when the current player folds", () => {
+            table.startTurn(0);
+            expect(table.foldPlayer("Blossom")).toBe(true);
+            expect(table.currentPlayerIndex).toBe(1);
+        });
+
+        test("does not fold a player before timeout", () => {
+            table.startTurn(0);
+            expect(table.checkTurnTimeout()).toBe(false);
+            expect(table.foldedPlayers).not.toContain("Blossom");
+        });
+
+        test("automatically folds the player after timeout", () => {
+            table.startTurn(0);
+            table.turnEndsAt = Date.now() - 1000;
+            expect(table.checkTurnTimeout()).toBe(true);
+            expect(table.foldedPlayers).toContain("Blossom");
+            expect(table.currentPlayerIndex).toBe(1);
+        });
+
+        test("does not time out when no current player is set", () => {
+            table.turnEndsAt = Date.now() - 1000;
+            expect(table.checkTurnTimeout()).toBe(false);
+        });
+
+        test("handles a missing current player", () => {
+            table.currentPlayerIndex = 99;
+            table.turnEndsAt = Date.now() - 1000;
+            expect(table.checkTurnTimeout()).toBe(false);
+        });
+    });
 });
