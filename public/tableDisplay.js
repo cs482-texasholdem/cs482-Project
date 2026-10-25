@@ -1,3 +1,5 @@
+const tableController = require('./controllers/tableController'); // Adjust path as needed
+
 /**
  * Temporary sample player data for the poker table frontend.
  * This data is for demonstration only and is not connected to the backend.
@@ -73,37 +75,45 @@ async function handlePokerAction(event) {
     // Get the selected action from the clicked button.
     const action = event.currentTarget.dataset.action;
     
-    try {
-        const response = await fetch("/api/next-round");
-        if (!response.ok) {
-            throw new Error("Failed to advance round.");
-        }
-        loadTestCards();
-    } catch (error) {
-        console.error("Error advancing round:", error);
-    }
-
     // Handle the Raise action separately to validate its amount.
     if (action === "Raise") {
         const amount = Number(
             document.getElementById("raise-amount").value
         );
 
-        // Reject invalid raise amounts in the demo.
         if (!Number.isFinite(amount) || amount < 20) {
             tableMessage.textContent =
                 "Enter a raise amount of at least 20.";
             return;
         }
-
-        // Display the selected raise amount without placing a real bet.
-        tableMessage.textContent =
-            `Raise selected: ${amount} chips (demo only).`;
-        return;
     }
+    
+    try {
+        const response = await fetch("/api/next-round");
+        if (!response.ok) {
+            throw new Error("Failed to advance round.");
+        }
+        
+        const data = await response.json();
+        renderCards("community-cards", data.communityCards);
 
-    // Display the selected action without changing the game state.
-    tableMessage.textContent = `${action} selected (demo only).`;
+        // Check if winner data was returned at showdown
+        if (data.winnerData && data.winnerData.winners) {
+            const winnersText = data.winnerData.winners.join(", ");
+            tableMessage.textContent = 
+                `🏆 Round Over! Winner(s): ${winnersText} (Score: ${data.winnerData.maxScore})`;
+            return;
+        }
+
+        if (action === "Raise") {
+            const amount = Number(document.getElementById("raise-amount").value);
+            tableMessage.textContent = `Raise selected: ${amount} chips (demo only).`;
+        } else {
+            tableMessage.textContent = `${action} selected (demo only).`;
+        }
+    } catch (error) {
+        console.error("Error advancing round:", error);
+    }
 }
 
 // Attach the action handler to each poker action button.

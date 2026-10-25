@@ -5,6 +5,66 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Texas Hold'em Poker</title>
     <link rel="stylesheet" href="style.css">
+    <style>
+        /* Poker Chip Modal Popup Styles */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+        }
+        .modal-content {
+            background: #22252a;
+            color: #ffffff;
+            width: 340px;
+            height: 340px;
+            border-radius: 50%;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            padding: 45px;
+            box-sizing: border-box;
+            border: 6px dashed #f1c40f;
+            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.9), inset 0 0 0 10px #15181c;
+            position: relative;
+        }
+        .modal-content h2 {
+            margin: 0 0 8px 0;
+            color: #f1c40f;
+            font-size: 1.15rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        .modal-content p {
+            font-size: 0.9rem;
+            margin: 8px 0 16px 0;
+            line-height: 1.3;
+            color: #d1d5db;
+        }
+        .modal-content button {
+            background: #676fcb;
+            color: #fff;
+            border: none;
+            padding: 8px 18px;
+            font-size: 0.85rem;
+            font-weight: bold;
+            border-radius: 4px;
+            cursor: pointer;
+            text-transform: uppercase;
+            transition: background 0.2s;
+        }
+        .modal-content button:hover {
+            background: #535bc0;
+        }
+    </style>
 </head>
 
 <body class="table-page">
@@ -161,6 +221,15 @@
         </section>
     </main>
 
+    <!-- Poker Chip Winner Popup Modal Overlay -->
+    <div id="winner-modal" class="modal-overlay">
+        <div class="modal-content">
+            <h2>Showdown</h2>
+            <p id="winner-modal-text">Calculating winner...</p>
+            <button type="button" id="modal-close-btn">Next Hand</button>
+        </div>
+    </div>
+
     <script>
         // Extract Player ID from URL (supports ?playerId=Name or shorthand ?Name)
         function getPlayerIdFromUrl() {
@@ -170,7 +239,7 @@
             if (!id) {
                 const keys = Array.from(urlParams.keys());
                 if (keys.length > 0) {
-                    id = keys[0]; // handles shorthand ?Player123
+                    id = keys[0];
                 }
             }
             
@@ -183,12 +252,17 @@
         document.getElementById("header-player-name").textContent = currentPlayerId;
         document.getElementById("display-player-id").textContent = currentPlayerId;
 
-        // Keep the raise amount input synchronized with the slider.
+        // DOM Elements
         const betScale = document.getElementById("bet-scale");
         const raiseAmount = document.getElementById("raise-amount");
         const tableMessage = document.getElementById("table-message");
+        const winnerModal = document.getElementById("winner-modal");
+        const winnerModalText = document.getElementById("winner-modal-text");
+        const modalCloseBtn = document.getElementById("modal-close-btn");
         
-        // Load test cards from backend using the dynamic player ID
+        let modalTimeout = null;
+
+        // Load initial test cards from backend using the dynamic player ID
         async function loadTestCards() {
             try {
                 const response = await fetch(`/api/test-cards?playerId=${encodeURIComponent(currentPlayerId)}`);
@@ -242,6 +316,24 @@
             }
         });
 
+        // Function to start a new game automatically
+        async function startNewGameAutomatically() {
+            winnerModal.style.display = "none";
+            try {
+                const response = await fetch(`/api/new-game?playerId=${encodeURIComponent(currentPlayerId)}`);
+                if (!response.ok) {
+                    throw new Error("Failed to start new game.");
+                }
+                const game = await response.json();
+                renderCards("player-cards", game.playerHand);
+                renderCards("community-cards", game.communityCards);
+                tableMessage.textContent = "New game started. Waiting for next action.";
+            } catch (error) {
+                console.error("Error starting new game:", error);
+                tableMessage.textContent = "Could not start new game.";
+            }
+        }
+
         // Handle action buttons and advance round
         document.querySelectorAll("[data-action]").forEach((button) => {
             button.addEventListener("click", async () => {
@@ -252,31 +344,58 @@
                     if (!response.ok) {
                         throw new Error("Failed to advance round.");
                     }
-                    loadTestCards();
-                } catch (error) {
-                    console.error("Error advancing round:", error);
-                }
+                    
+                    const data = await response.json();
+                    renderCards("community-cards", data.communityCards);
 
-                if (action === "Raise") {
-                    const amount = Number(raiseAmount.value);
+                    // Check if winner data was returned at showdown
+                    if (data.winnerData && data.winnerData.winners) {
+                        const winnersText = data.winnerData.winners.join(", ");
+                        winnerModalText.innerHTML = `Winner(s):<br><strong>${winnersText}</strong><br>Score: ${data.winnerData.maxScore}`;
+                        winnerModal.style.display = "flex";
+                        tableMessage.textContent = "Round complete. Showing winner chip...";
 
-                    if (
-                        !Number.isFinite(amount) ||
-                        amount < 20 ||
-                        amount > 1000
-                    ) {
-                        tableMessage.textContent =
-                            "Choose a raise amount between 20 and 1,000.";
+                        // Clear any existing timeout to avoid overlaps
+                        if (modalTimeout) clearTimeout(modalTimeout);
+
+                        // Automatically move on to the next game after 3.5 seconds
+                        modalTimeout = setTimeout(() => {
+                            startNewGameAutomatically();
+                        }, 3500);
+
                         return;
                     }
 
-                    tableMessage.textContent =
-                        `Raise selected: ${amount} chips (demo only).`;
-                    return;
-                }
+                    if (action === "Raise") {
+                        const amount = Number(raiseAmount.value);
 
-                tableMessage.textContent = `${action} selected (demo only).`;
+                        if (
+                            !Number.isFinite(amount) ||
+                            amount < 20 ||
+                            amount > 1000
+                        ) {
+                            tableMessage.textContent =
+                                "Choose a raise amount between 20 and 1,000.";
+                            return;
+                        }
+
+                        tableMessage.textContent =
+                            `Raise selected: ${amount} chips (demo only).`;
+                        return;
+                    }
+
+                    tableMessage.textContent = `${action} selected (demo only).`;
+
+                } catch (error) {
+                    console.error("Error advancing round:", error);
+                }
             });
+        });
+
+        // Allow manual skip via the button as well
+        modalCloseBtn.addEventListener("click", () => {
+            if (modalTimeout) clearTimeout(modalTimeout);
+            startNewGameAutomatically();
         });
 
         // Chat submission

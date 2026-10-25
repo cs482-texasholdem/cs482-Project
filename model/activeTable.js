@@ -22,6 +22,7 @@ class ActiveTable {
         this.deck = new Deck();
         this.roundPlayerCount = null;
         this.playerHands = new Map();
+        this.gameOver = false; // Track showdown state
     }
 
     isFull() {
@@ -87,6 +88,14 @@ class ActiveTable {
             this.roundPlayerCount = this.players.length;
         }
 
+        let winnerData = null;
+
+        // If the previous action was a showdown, reset the game now before starting the next hand
+        if (this.gameOver) {
+            this.newGame();
+            this.roundPlayerCount = this.players.length;
+        }
+
         if (this.displayedCards.length === 0) {
             this.displayedCards = this.deck.showFlop(this.roundPlayerCount);
         } else if (this.displayedCards.length === 3) {
@@ -94,11 +103,14 @@ class ActiveTable {
         } else if (this.displayedCards.length === 4) {
             this.displayedCards.push(this.deck.showRiver(this.roundPlayerCount));
         } else if (this.displayedCards.length === 5) {
-            this.handleWinner();
-            this.newGame();
+            winnerData = this.handleWinner();
+            this.gameOver = true; // Mark that we are showing winners
         }
 
-        return this.displayedCards;
+        return {
+            communityCards: this.displayCards(),
+            winnerData: winnerData
+        };
     }
 
     displayCards() {
@@ -120,10 +132,10 @@ class ActiveTable {
         this.displayedCards = [];
         this.roundPlayerCount = null;
         this.playerHands.clear();
+        this.gameOver = false; // Ensure gameOver flag is reset when starting a new game
     }
 
     handleWinner() {
-        // 1. Hoist the common cards evaluation out of the loop
         const commonCards = this.deck.commonCards(this.roundPlayerCount);
         
         let maxScore = -1;
@@ -133,12 +145,11 @@ class ActiveTable {
             const hand = this.playerHands.get(playerId);
             const score = Deck.bestHand(hand, commonCards);
 
-            // 2. Track the max score and handle ties in a single pass
             if (score > maxScore) {
                 maxScore = score;
-                winners = [playerId]; // New high score, reset the winners array
+                winners = [playerId];
             } else if (score === maxScore) {
-                winners.push(playerId); // Tie detected, add to the winners array
+                winners.push(playerId);
             }
         }
 

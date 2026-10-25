@@ -93,11 +93,36 @@ function dealTestHand(req, res) {
 
 function nextRound(req, res) {
     const workingTable = tables.get("table1");
-    workingTable.nextRound();
+    const result = workingTable.nextRound();
     return res.status(200).json({
         message: "Advanced to the next round.",
+        communityCards: result.communityCards,
+        winnerData: result.winnerData
+    });
+}
+
+function startNewGame(req, res) {
+    const workingTable = tables.get("table1");
+    const playerId = req.query.playerId || "Player123";
+
+    workingTable.newGame();
+
+    if (!workingTable.hasPlayer(playerId)) {
+        workingTable.addPlayer(playerId);
+    }
+
+    const playerHand = workingTable.dealHandToPlayer(playerId);
+
+    if (!playerHand) {
+        return res.status(400).json({ error: "Failed to deal hand for new game." });
+    }
+
+    return res.status(200).json({
+        message: "New game started successfully.",
+        playerId: playerId,
+        playerHand: playerHand.map(card => Deck.cardToText(card)),
         communityCards: workingTable.displayCards()
     });
 }
 
-module.exports = { joinTable, leaveTable, dealTestHand, nextRound };
+module.exports = { joinTable, leaveTable, dealTestHand, nextRound, startNewGame };
