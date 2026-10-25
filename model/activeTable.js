@@ -29,15 +29,6 @@ class ActiveTable {
         this.bigBlindIndex = null;
         this.currentPlayerIndex = null;
         this.turnEndsAt = null; //timestamp
-        this.foldedPlayers = []; //IDs of folded players for current hand
-
-        //chips and pot
-        this.playerChips = new Map();
-        this.playerBets = new Map();
-        this.pot = 0;
-
-        //call/raise/fold/check
-        this.foldedPlayers = new Set(); 
 
         //chips and pot
         this.playerChips = new Map();
@@ -48,9 +39,6 @@ class ActiveTable {
         //call/raise/fold/check
         this.foldedPlayers = new Set(); 
         this.checkPlayers = new Set();
-        
-
-
     }
 
     /**
@@ -172,7 +160,7 @@ class ActiveTable {
             return false;
         }
 
-        if (this.foldedPlayers.includes(this.players[playerIndex])) {
+        if (this.foldedPlayers.has(this.players[playerIndex])) {
             return false;
         }
 
@@ -215,7 +203,7 @@ class ActiveTable {
             const nextIndex = (this.currentPlayerIndex + i) % this.players.length;
             const nextPlayer = this.players[nextIndex];
 
-            if (!this.foldedPlayers.includes(nextPlayer)) {
+            if (!this.foldedPlayers.has(nextPlayer)) {
                 return this.startTurn(nextIndex);
             }
         }
@@ -233,15 +221,9 @@ class ActiveTable {
      * @returns {boolean} True if the player folded successfully.
      */
     foldPlayer(playerId) {
-        if (!this.players.includes(playerId)) {
+        if (!this.fold(playerId)) {
             return false;
         }
-
-        if (this.foldedPlayers.includes(playerId)) {
-            return false;
-        }
-
-        this.foldedPlayers.push(playerId);
 
         // If this player has the current turn, advance to the next player.
         const playerIndex = this.players.indexOf(playerId);
@@ -292,13 +274,15 @@ class ActiveTable {
      * Deducts blind bets from player stacks and adds them to the pot.
      * @returns {boolean} Whether the blinds were posted.
      */
-    postBlinds(){
+    postBlinds() {
         if (this.smallBlindIndex === null || this.bigBlindIndex === null) {
             return false;
         }
 
         this.postBlind(this.smallBlindIndex, 1);
         this.postBlind(this.bigBlindIndex, 2);
+
+        this.currentBet = 2;
 
         return true;
     }

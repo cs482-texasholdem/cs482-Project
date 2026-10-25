@@ -3,12 +3,12 @@
  * This data is for demonstration only and is not connected to the backend.
  */
 const samplePlayers = [
+    { name: "You", chips: 1980, current: true },
     { name: "Blossom", chips: 1250 },
     { name: "Bubbles", chips: 980 },
     { name: "Buttercup", chips: 2010 },
     { name: "Professor Utonium", chips: 1430 },
-    { name: "Mojo Jojo", chips: 860 },
-    { name: "You", chips: 1980, current: true }
+    { name: "Mojo Jojo", chips: 860 }
 ];
 
 // Get the HTML elements used to display the players and table messages.
@@ -249,6 +249,32 @@ document.querySelectorAll("[data-action]").forEach((button) => {
 });
 
 /**
+ * Displays the users who folded
+ * @param players - current players
+ * @param {number} foldedPlayers - folded players
+ * @returns {void}
+ */
+function displayFoldedPlayers(players, foldedPlayers) {
+    const seats = document.querySelectorAll(".player-seat");
+
+    players.forEach((playerId, index) => {
+        const seat = seats[index];
+
+        if (!seat) {
+            return;
+        }
+
+        const folded = foldedPlayers.includes(playerId);
+
+        seat.querySelector(".player-status").textContent =
+            folded ? "Folded" : "Active";
+
+        seat.classList.toggle("folded", folded);
+        seat.classList.toggle("active", !folded);
+    });
+}
+
+/**
  * Handles chat form submissions on the poker table page.
  * Adds a non-empty message to the local chat panel without reloading the page.
  * Messages are not sent to other players or saved to a server.
@@ -300,6 +326,8 @@ async function updateTurnStatus() {
         }
 
         const table = await response.json();
+        displayFoldedPlayers(table.players, table.foldedPlayers);
+
         const playerDisplay = document.getElementById("current-player");
         const timerDisplay = document.getElementById("turn-timer");
         const timerRing = document.getElementById("timer-ring");
@@ -331,6 +359,8 @@ async function loadTestCards() {
 
         const game = await response.json();
 
+        document.getElementById("current-bet").textContent =game.currentBet;
+
         renderCards("player-cards", game.playerHands[0]);
         renderCards("community-cards", game.communityCards);
         
@@ -338,6 +368,8 @@ async function loadTestCards() {
         displayBlinds(game.smallBlindIndex, game.bigBlindIndex);
         displayChips(game.players, game.pot);
         displayYourChips(game.players);
+
+        
 
     } catch (error) {
         console.error("Error loading cards:", error);
@@ -395,9 +427,6 @@ async function updatePlayerSeats() {
                 // Support either a player object or a player name string
                 nameElement.textContent =
                     typeof player === "string" ? player : player.name;
-
-                statusElement.textContent = "Active";
-                chipsElement.textContent = "1,500 chips";
 
                 seat.classList.add("active");
                 seat.classList.remove("inactive", "disconnected");

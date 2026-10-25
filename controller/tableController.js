@@ -117,7 +117,7 @@ function foldPlayer(req, res) {
         });
     }
 
-    if (!table.fold(playerId)) {
+    if (!table.foldPlayer(playerId)) {
         return res.status(400).json({
             error: "Player is not seated or has already folded."
         });
@@ -243,15 +243,6 @@ function dealTestHand(req, res) {
     });
     }
 
-    // Temporary demo players and starting chips.
-    if (!table.hasPlayer("demo1")) {
-        table.addPlayer("demo1", 1250);
-    } 
-
-    if (!table.hasPlayer("demo2")) {
-        table.addPlayer("demo2", 980);
-    }
-
     table.foldedPlayers.clear(); //resets folded players
 
     if (!table.rotateDealer()) {
@@ -283,6 +274,7 @@ function dealTestHand(req, res) {
         dealerIndex: table.dealerIndex,
         smallBlindIndex: table.smallBlindIndex,
         bigBlindIndex: table.bigBlindIndex,
+        currentBet: table.currentBet,
         playerHands: playerHands.map(hand =>
             hand.map(card => Deck.cardToText(card))
         ),
@@ -318,7 +310,7 @@ function getTableState(req, res) {
         timeLimit: table.timeLimit,
         timeRemaining: table.getTimeRemaining(),
         turnEndsAt: table.turnEndsAt,
-        foldedPlayers: table.foldedPlayers
+        foldedPlayers: [...table.foldedPlayers],
     });
 }
 
@@ -335,7 +327,8 @@ function startDemoHand(req, res) {
 
     // Reset the table for the demo.
     table.players = [];
-    table.foldedPlayers = [];
+    //table.foldedPlayers = [];
+    table.foldedPlayers.clear();
     table.currentPlayerIndex = null;
     table.turnEndsAt = null;
 
