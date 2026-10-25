@@ -1,3 +1,4 @@
+const ActiveTable = require("../model/activeTable");
 const request = require("supertest");
 const { app } = require("../app");
 
@@ -66,6 +67,22 @@ describe("Leave Table API", () => {
         expect(response.body.tableId).toBe("table1");
     });
 
+    test("table full", async () => {
+        const spy = jest.spyOn(ActiveTable.prototype, "addPlayer").mockReturnValue(false);
+
+        try {
+            const response = await request(app)
+                .post("/api/tables/table1/join")
+                .send({ playerId: "extra-player" });
+
+            expect(response.status).toBe(409);
+            expect(response.body.error).toBe("Table is full.");
+        
+        } finally {
+            spy.mockRestore();
+        }
+    });
+
     test("rejects leaving a table that does not exist", async () => {
         const response = await request(app)
             .post("/api/tables/table99/leave")
@@ -95,3 +112,42 @@ describe("Leave Table API", () => {
         );
     });
 });
+
+describe("dealTestHand", () => {
+    const url = "/api/tables/table1/test-cards";
+    
+    test("table does not exist", async () => {
+        const response = await request(app).get("/api/tables/missing-table/test-cards");
+        expect(response.status).toBe(404);
+        expect(response.body.error).toBe("Table not found.");
+    });
+
+    test("returns 400 when there are not enough players", async () => {
+        //set value to the randomizer
+        const spy = jest.spyOn(ActiveTable.prototype, "rotateDealer") .mockReturnValue(false);
+
+        try {
+            const response = await request(app).get("/api/tables/table1/test-cards");
+            expect(response.status).toBe(400);
+            expect(response.body.error).toBe("Must have at least 2 players in order to start");
+        } 
+        finally {
+            spy.mockRestore();
+        }
+    });  
+
+    test("returns 200 with game data", async () => {
+        const response = await request(app).get("/api/tables/table1/test-cards");
+        expect(response.status).toBe(200);
+        expect(response.body).toEqual({
+            players: expect.any(Array),
+            pot: expect.any(Number),
+            dealerIndex: expect.any(Number),
+            smallBlindIndex: expect.any(Number),
+            bigBlindIndex: expect.any(Number),
+            playerHands: expect.any(Array),
+            communityCards: expect.any(Array)
+        });
+    });
+
+});    

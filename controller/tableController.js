@@ -100,7 +100,7 @@ function leaveTable(req, res) {
 }
 
 /**
- * Temporarily tests dealing cards and converting them to readable names.
+ * Temporarily test function in the table
  */
 function dealTestHand(req, res) {
     const { tableId } = req.params;
@@ -141,6 +141,11 @@ function dealTestHand(req, res) {
     const communityCards = deck.commonCards(totalPlayers);
 
     return res.status(200).json({
+        players: table.players.map(playerId => ({
+            id: playerId,
+            chips: table.playerChips.get(playerId)
+        })),
+        pot: table.pot,
         dealerIndex: table.dealerIndex,
         smallBlindIndex: table.smallBlindIndex,
         bigBlindIndex: table.bigBlindIndex,
