@@ -18,6 +18,7 @@ const mongoose = require('mongoose');
  */
 const userSchema = new mongoose.Schema({
     login: { type: String, alias: 'email', required: true },
+    username: { type: String, required: true, unique: true, trim: true},
     password: String,
     permission: Number,
     creation: { type: Date, default: Date.now },

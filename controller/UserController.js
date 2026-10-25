@@ -120,7 +120,8 @@ exports.postCreateOrUpdate = async function(req, res){
 exports.register = async function(req, res){
     try {
         let userData = {};
-        userData.login = req.body.txt_login;
+        userData.username = req.body.txt_username;
+        userData.email = req.body.txt_login;
         userData.permission = 2; // New signups are always standard players
         userData.points = 1000; // Starting points
 
@@ -132,7 +133,7 @@ exports.register = async function(req, res){
         await dao.create(userData);
 
         // Automatically log them in or redirect them straight to home
-        req.session.user = userData.login;
+        req.session.user = userData.email;
         req.session.permission = 2;
 
         res.redirect('/index.html');
