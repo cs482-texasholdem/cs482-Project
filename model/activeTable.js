@@ -94,6 +94,7 @@ class ActiveTable {
         } else if (this.displayedCards.length === 4) {
             this.displayedCards.push(this.deck.showRiver(this.roundPlayerCount));
         } else if (this.displayedCards.length === 5) {
+            this.handleWinner();
             this.newGame();
         }
 
@@ -119,6 +120,29 @@ class ActiveTable {
         this.displayedCards = [];
         this.roundPlayerCount = null;
         this.playerHands.clear();
+    }
+
+    handleWinner() {
+        // 1. Hoist the common cards evaluation out of the loop
+        const commonCards = this.deck.commonCards(this.roundPlayerCount);
+        
+        let maxScore = -1;
+        let winners = [];
+
+        for (const playerId of this.players) {
+            const hand = this.playerHands.get(playerId);
+            const score = Deck.bestHand(hand, commonCards);
+
+            // 2. Track the max score and handle ties in a single pass
+            if (score > maxScore) {
+                maxScore = score;
+                winners = [playerId]; // New high score, reset the winners array
+            } else if (score === maxScore) {
+                winners.push(playerId); // Tie detected, add to the winners array
+            }
+        }
+
+        return { winners, maxScore };
     }
 }
 
