@@ -17,8 +17,24 @@ class ActiveTable {
             throw new Error("Time limit must be a positive integer.");
         }
 
+        //table attr
         this.tableId = tableId;
         this.skillLevel = skillLevel;
+        // Set the blind amounts for this table.
+        if (skillLevel === "beginner") {
+            this.smallBlindAmount = 1;
+            this.bigBlindAmount = 2;
+        } else if (skillLevel === "intermediate") {
+            this.smallBlindAmount = 25;
+            this.bigBlindAmount = 50;
+        } else if (skillLevel === "advanced") {
+            this.smallBlindAmount = 5;
+            this.bigBlindAmount = 10;
+        } else {
+            throw new Error("Unknown skill level.");
+        }
+
+
         this.timeLimit = timeLimit;
         this.maxPlayers = 10;
         this.players = [];
@@ -279,10 +295,10 @@ class ActiveTable {
             return false;
         }
 
-        this.postBlind(this.smallBlindIndex, 1);
-        this.postBlind(this.bigBlindIndex, 2);
+        this.postBlind(this.smallBlindIndex, this.smallBlindAmount);
+        this.postBlind(this.bigBlindIndex, this.bigBlindAmount);
 
-        this.currentBet = 2;
+        this.currentBet = this.bigBlindAmount;
 
         return true;
     }

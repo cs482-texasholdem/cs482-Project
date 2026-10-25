@@ -1,4 +1,6 @@
 let currentPlayerId = null;
+const params = new URLSearchParams(window.location.search);
+const tableId = params.get("tableId") || "table1";
 
 /**
  * Temporary sample player data for the poker table frontend.
@@ -174,7 +176,7 @@ async function handlePokerAction(event) {
 
     if (action === "Fold"){ 
         try {
-            const response = await fetch("/api/tables/table1/fold", {
+            const response = await fetch(`/api/tables/${tableId}/fold`, {
                 method: "POST",
                 headers: {"Content-Type": "application/json"},
                 body: JSON.stringify({
@@ -204,7 +206,7 @@ async function handlePokerAction(event) {
 
     if (action === "Check") {
         try {
-            const response = await fetch("/api/tables/table1/check", {
+            const response = await fetch(`/api/tables/${tableId}/check`, {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json"
@@ -231,7 +233,7 @@ async function handlePokerAction(event) {
 
     if (action === "Call") {
         try {
-            const response = await fetch("/api/tables/table1/call", {
+            const response = await fetch(`/api/tables/${tableId}/call`, {
                 method: "POST",
                 headers: {"Content-Type": "application/json"},
                 body: JSON.stringify({
@@ -267,7 +269,7 @@ async function handlePokerAction(event) {
     }
 
     try {
-        const response = await fetch("/api/tables/table1/raise", {
+        const response = await fetch(`/api/tables/${tableId}/raise`, {
             method: "POST",
             headers: {
                 "Content-Type": "application/json"
@@ -381,7 +383,7 @@ document.getElementById("chat-form").addEventListener(
 
 async function updateTurnStatus() {
     try {
-        const response = await fetch("/api/tables/table1/state");
+        const response = await fetch(`/api/tables/${tableId}/state`);
 
         if (!response.ok) {
             throw new Error("Failed to load table state.");
@@ -415,7 +417,7 @@ setInterval(updateTurnStatus, 1000);
 
 async function loadTestCards() {
     try {
-        const response = await fetch("/api/tables/table1/test-cards");
+        const response = await fetch(`/api/tables/${tableId}/test-cards`);
 
         if (!response.ok) {
             throw new Error("Failed to load cards");
@@ -463,7 +465,7 @@ loadTestCards();
 
 async function updatePlayerSeats() {
     try {
-        const response = await fetch("/api/tables/table1/state");
+        const response = await fetch(`/api/tables/${tableId}/state`);
 
         if (!response.ok) {
             throw new Error("Failed to fetch table state");

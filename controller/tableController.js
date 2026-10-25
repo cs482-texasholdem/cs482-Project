@@ -260,6 +260,22 @@ function dealTestHand(req, res) {
     });
     }
 
+        // Temporary demo setup: populate the selected table if it is empty.
+    if (table.getPlayerCount() === 0) {
+        const demoPlayers = [
+            "Blossom",
+            "Bubbles",
+            "Buttercup",
+            "Professor Utonium",
+            "Mojo Jojo",
+            "You"
+        ];
+
+        demoPlayers.forEach(playerId => {
+            table.addPlayer(playerId, 1000);
+        });
+    }
+    
     table.foldedPlayers.clear(); //resets folded players
 
     if (!table.rotateDealer()) {
