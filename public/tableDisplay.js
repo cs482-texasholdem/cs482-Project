@@ -1,25 +1,29 @@
+let currentPlayerId = null;
+const params = new URLSearchParams(window.location.search);
+const tableId = params.get("tableId") || "table1";
+
 /**
  * Temporary sample player data for the poker table frontend.
  * This data is for demonstration only and is not connected to the backend.
  */
 const samplePlayers = [
-    { name: "PokerPro", chips: 1250 },
-    { name: "LuckyAce", chips: 980 },
-    { name: "CardShark", chips: 2010 },
-    { name: "BlueMoon", chips: 1430 },
-    { name: "RiverRat", chips: 860 },
-    { name: "You", chips: 1980, current: true }
+    { name: "You", chips: 1980, current: true },
+    { name: "Blossom", chips: 1250 },
+    { name: "Bubbles", chips: 980 },
+    { name: "Buttercup", chips: 2010 },
+    { name: "Professor Utonium", chips: 1430 },
+    { name: "Mojo Jojo", chips: 860 }
 ];
 
 // Get the HTML elements used to display the players and table messages.
 const playersContainer = document.getElementById("players");
-const tableMessage = document.getElementById("table-message");
+//const tableMessage = document.getElementById("table-message");
 
 /**
  * Displays the sample players and their information on the poker table.
  * Creates a seat for each player, including their name, cards, and chip count.
  * Highlights the local demo player.
- *
+ * 
  * @returns {void}
  */
 function displayPlayers() {
@@ -57,8 +61,99 @@ function displayPlayers() {
     });
 }
 
-// Display the sample players when the page loads.
-displayPlayers();
+/**
+ * Displays and handles the dealer logic
+ * @param {number} dealerIndex Used to determine where the dealer Marker is
+ * @returns {void}
+ */
+function displayDealer(dealerIndex) {
+    console.log("Dealer index received:", dealerIndex);
+    // Remove the previous dealer marker.
+    document.querySelectorAll(".dealer-marker").forEach((marker) => {
+        marker.remove();
+    });
+
+    const seats = document.querySelectorAll(".player-seat");
+    const dealerSeat = seats[dealerIndex];
+
+    if (dealerSeat) {
+        const marker = document.createElement("span");
+        marker.classList.add("dealer-marker");
+        marker.textContent = " (D)";
+        dealerSeat.appendChild(marker);
+    }
+}
+
+/**
+ * Displays and handles the Blind
+ * @param {number} smallBlindIndex Used to determine where the small blind marker is
+ * @param {number} bigBlindIndex Used to determine where the big blind marker is
+ * @returns {void}
+ */
+function displayBlinds(smallBlindIndex, bigBlindIndex) {
+    // Remove the previous blind markers.
+    document.querySelectorAll(".blind-marker").forEach((marker) => {
+        marker.remove();
+    });
+
+    const seats = document.querySelectorAll(".player-seat");
+
+    const smallBlindSeat = seats[smallBlindIndex];
+    const bigBlindSeat = seats[bigBlindIndex];
+
+    if (smallBlindSeat) {
+        const marker = document.createElement("span");
+        marker.classList.add("blind-marker");
+        marker.textContent = " (SB)";
+        smallBlindSeat.appendChild(marker);
+    }
+
+    if (bigBlindSeat) {
+        const marker = document.createElement("span");
+        marker.classList.add("blind-marker");
+        marker.textContent = " (BB)";
+        bigBlindSeat.appendChild(marker);
+    }
+}
+
+/**
+ * Displays and handles the chips
+ * @param {string} players Players
+ * @param {number} pot the current pot in game
+ * @returns {void}
+ */
+function displayChips(players, pot) {
+    const seats = document.querySelectorAll(".player-seat");
+
+    players.forEach((player, index) => {
+        const seat = seats[index];
+
+        if (seat) {
+            seat.querySelector(".player-name").textContent = player.id;
+            seat.querySelector(".player-chips").textContent =`${player.chips.toLocaleString()} chips`;
+        }
+    });
+
+    document.getElementById("total-pot").textContent = pot.toLocaleString();
+}
+
+function displayYourChips(players) {
+    // Temporarily treat demo1 as the local player.
+    const player = players.find(player => player.id === currentPlayerId);
+
+    if (!player) {
+        return;
+    }
+
+    document.getElementById("your-chips").textContent =
+        player.chips.toLocaleString();
+
+    document.getElementById("your-bet").textContent =
+        player.bet.toLocaleString();
+
+    document.getElementById("available-chips").textContent =
+        player.chips.toLocaleString();
+}
 
 /**
  * Handles clicks on the Fold, Check, Call, and Raise buttons.
@@ -68,28 +163,145 @@ displayPlayers();
  * @param {Event} event - The click event triggered by the button.
  * @returns {void}
  */
-function handlePokerAction(event) {
+async function handlePokerAction(event) {
+    const playerId = currentPlayerId;
+
+    if (!playerId) {
+        tableMessage.textContent = "No player currently has the turn.";
+        return;
+    }
+
     // Get the selected action from the clicked button.
     const action = event.currentTarget.dataset.action;
 
-    // Handle the Raise action separately to validate its amount.
-    if (action === "Raise") {
-        const amount = Number(
-            document.getElementById("raise-amount").value
-        );
+    if (action === "Fold"){ 
+        try {
+            const response = await fetch(`/api/tables/${tableId}/fold`, {
+                method: "POST",
+                headers: {"Content-Type": "application/json"},
+                body: JSON.stringify({
+                    playerId: playerId
+                })
+            });
 
-        // Reject invalid raise amounts in the demo.
-        if (!Number.isFinite(amount) || amount < 20) {
-            tableMessage.textContent =
-                "Enter a raise amount of at least 20.";
-            return;
+            const result = await response.json();
+
+            if (!response.ok) {
+                throw new Error(result.error);
+            }
+
+            tableMessage.textContent = result.message;
+
+            // Mark demo1's seat as folded.
+            const seat = document.querySelectorAll(".player-seat")[0];
+            seat.querySelector(".player-status").textContent = "Folded";
+        } 
+
+        catch (error) {
+            tableMessage.textContent = error.message;
         }
 
-        // Display the selected raise amount without placing a real bet.
-        tableMessage.textContent =
-            `Raise selected: ${amount} chips (demo only).`;
         return;
     }
+
+    if (action === "Check") {
+        try {
+            const response = await fetch(`/api/tables/${tableId}/check`, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({
+                    playerId: playerId
+                })
+            });
+
+            const result = await response.json();
+
+            if (!response.ok) {
+                throw new Error(result.error);
+            }
+
+            tableMessage.textContent = result.message;
+            await updateTurnStatus();
+        } catch (error) {
+            tableMessage.textContent = error.message;
+        }
+
+        return;
+    }
+
+    if (action === "Call") {
+        try {
+            const response = await fetch(`/api/tables/${tableId}/call`, {
+                method: "POST",
+                headers: {"Content-Type": "application/json"},
+                body: JSON.stringify({
+                    playerId: playerId
+                })
+            });
+
+            const result = await response.json();
+
+            if (!response.ok) {
+                throw new Error(result.error);
+            }
+
+            tableMessage.textContent = result.message;
+            displayChips(result.players, result.pot);
+            displayYourChips(result.players);
+        } 
+        
+        catch (error) {
+            tableMessage.textContent = error.message;
+        }
+        return;
+    }
+
+    // Handle the Raise action separately to validate its amount.
+    if (action === "Raise") {
+    const raiseTo = Number(document.getElementById("raise-amount").value);
+
+    if (!Number.isInteger(raiseTo) || raiseTo <= 0) {
+        tableMessage.textContent =
+            "Enter a positive whole-number raise amount.";
+        return;
+    }
+
+    try {
+        const response = await fetch(`/api/tables/${tableId}/raise`, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+                playerId,
+                raiseTo
+            })
+        });
+
+        const result = await response.json();
+
+        if (!response.ok) {
+            throw new Error(result.error);
+        }
+
+        tableMessage.textContent = result.message;
+
+        displayChips(result.players, result.pot);
+        displayYourChips(result.players);
+
+        document.getElementById("current-bet").textContent =
+            result.currentBet.toLocaleString();
+
+        await updateTurnStatus();
+
+    } catch (error) {
+        tableMessage.textContent = error.message;
+    }
+
+    return;
+}
 
     // Display the selected action without changing the game state.
     tableMessage.textContent = `${action} selected (demo only).`;
@@ -99,6 +311,32 @@ function handlePokerAction(event) {
 document.querySelectorAll("[data-action]").forEach((button) => {
     button.addEventListener("click", handlePokerAction);
 });
+
+/**
+ * Displays the users who folded
+ * @param players - current players
+ * @param {number} foldedPlayers - folded players
+ * @returns {void}
+ */
+function displayFoldedPlayers(players, foldedPlayers) {
+    const seats = document.querySelectorAll(".player-seat");
+
+    players.forEach((playerId, index) => {
+        const seat = seats[index];
+
+        if (!seat) {
+            return;
+        }
+
+        const folded = foldedPlayers.includes(playerId);
+
+        seat.querySelector(".player-status").textContent =
+            folded ? "Folded" : "Active";
+
+        seat.classList.toggle("folded", folded);
+        seat.classList.toggle("active", !folded);
+    });
+}
 
 /**
  * Handles chat form submissions on the poker table page.
@@ -142,9 +380,44 @@ document.getElementById("chat-form").addEventListener(
     handleChatSubmit
 );
 
+
+async function updateTurnStatus() {
+    try {
+        const response = await fetch(`/api/tables/${tableId}/state`);
+
+        if (!response.ok) {
+            throw new Error("Failed to load table state.");
+        }
+
+        const table = await response.json();
+        currentPlayerId = table.currentPlayer;
+        displayFoldedPlayers(table.players, table.foldedPlayers);
+        
+
+        const playerDisplay = document.getElementById("current-player");
+        const timerDisplay = document.getElementById("turn-timer");
+        const timerRing = document.getElementById("timer-ring");
+        playerDisplay.textContent = table.currentPlayer || "Waiting...";
+        const seconds = table.timeRemaining;
+        timerDisplay.textContent = seconds;
+        const timeLimit = table.timeLimit || 30;
+        const percentage = Math.max(0, Math.min(100, (seconds / timeLimit) * 100));
+
+        timerRing.style.setProperty("--timer-progress", `${percentage}%`);
+        timerRing.classList.toggle("urgent", seconds <= 10);
+
+    } catch (error) {
+        console.error("Error updating turn status:", error);
+    }
+}
+
+updateTurnStatus();
+setInterval(updateTurnStatus, 1000);
+
+
 async function loadTestCards() {
     try {
-        const response = await fetch("/api/test-cards");
+        const response = await fetch(`/api/tables/${tableId}/test-cards`);
 
         if (!response.ok) {
             throw new Error("Failed to load cards");
@@ -152,8 +425,18 @@ async function loadTestCards() {
 
         const game = await response.json();
 
+        document.getElementById("current-bet").textContent =game.currentBet;
+
         renderCards("player-cards", game.playerHands[0]);
         renderCards("community-cards", game.communityCards);
+        
+        displayDealer(game.dealerIndex);
+        displayBlinds(game.smallBlindIndex, game.bigBlindIndex);
+        displayChips(game.players, game.pot);
+        displayYourChips(game.players);
+
+        
+
     } catch (error) {
         console.error("Error loading cards:", error);
     }
@@ -177,3 +460,58 @@ function renderCards(containerId, cards) {
 }
 
 loadTestCards();
+
+
+
+async function updatePlayerSeats() {
+    try {
+        const response = await fetch(`/api/tables/${tableId}/state`);
+
+        if (!response.ok) {
+            throw new Error("Failed to fetch table state");
+        }
+
+        const data = await response.json();
+        console.log("Players:", data.players);
+
+        const playerSeats = document.querySelectorAll(".player-seat");
+
+        playerSeats.forEach((seat, index) => {
+            const nameElement = seat.querySelector(".player-name");
+            const statusElement = seat.querySelector(".player-status");
+            const chipsElement = seat.querySelector(".player-chips");
+
+            // Check that the HTML elements exist
+            if (!nameElement || !statusElement || !chipsElement) {
+                console.warn("Player seat HTML is missing an expected element:", seat);
+                return;
+            }
+
+            const player = data.players[index];
+
+            if (player) {
+                // Support either a player object or a player name string
+                nameElement.textContent =
+                    typeof player === "string" ? player : player.name;
+
+                seat.classList.add("active");
+                seat.classList.remove("inactive", "disconnected");
+            } else {
+                nameElement.textContent = "Empty Seat";
+                statusElement.textContent = "Inactive";
+                chipsElement.textContent = "";
+
+                seat.classList.remove("active");
+                seat.classList.add("inactive");
+                seat.classList.remove("disconnected");
+            }
+        });
+    } catch (error) {
+        console.error("Error updating player seats:", error);
+    }
+}
+
+updatePlayerSeats();
+
+
+

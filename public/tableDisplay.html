@@ -95,31 +95,31 @@
 
                     <div class="player-seat active">
                         <span class="player-name">Player 1</span>
-                        <span class="player-status">Active</span>
+                        <span class="player-status">Inactive</span>
                         <span class="player-chips">1,000 chips</span>
                     </div>
 
-                    <div class="player-seat disconnected">
+                    <div class="player-seat active">
                         <span class="player-name">Player 2</span>
-                        <span class="player-status">Disconnected</span>
+                        <span class="player-status">Inactive</span>
                         <span class="player-chips">1,500 chips</span>
                     </div>
 
                     <div class="player-seat active">
                         <span class="player-name">Player 3</span>
-                        <span class="player-status">Active</span>
+                        <span class="player-status">Inactive</span>
                         <span class="player-chips">850 chips</span>
                     </div>
 
                     <div class="player-seat active">
                         <span class="player-name">Player 4</span>
-                        <span class="player-status">Active</span>
+                        <span class="player-status">Inactive</span>
                         <span class="player-chips">2,100 chips</span>
                     </div>
 
-                    <div class="player-seat disconnected">
+                    <div class="player-seat active">
                         <span class="player-name">Player 5</span>
-                        <span class="player-status">Disconnected</span>
+                        <span class="player-status">Inactive</span>
                         <span class="player-chips">1,200 chips</span>
                     </div>
 
@@ -148,37 +148,63 @@
 
                     <div class="player-seat active">
                         <span class="player-name">Player 6</span>
-                        <span class="player-status">Active</span>
+                        <span class="player-status">Inactive</span>
                         <span class="player-chips">950 chips</span>
                     </div>
 
                     <div class="player-seat active">
                         <span class="player-name">Player 7</span>
-                        <span class="player-status">Active</span>
-                        <span class="player-chips">1,700 chips</span>
+                        <span class="player-status">Inactive</span>
+                        <span class="player-chips"></span>
                     </div>
 
                     <div class="player-seat disconnected">
                         <span class="player-name">Player 8</span>
-                        <span class="player-status">Disconnected</span>
-                        <span class="player-chips">2,000 chips</span>
+                        <span class="player-status">Inactive</span>
+                        <span class="player-chips"></span>
                     </div>
 
                     <div class="player-seat active">
                         <span class="player-name">Player 9</span>
-                        <span class="player-status">Active</span>
-                        <span class="player-chips">750 chips</span>
+                        <span class="player-status">Inactive</span>
+                        <span class="player-chips"></span>
                     </div>
 
                     <div class="player-seat active">
                         <span class="player-name">Player 10</span>
-                        <span class="player-status">Active</span>
-                        <span class="player-chips">1,300 chips</span>
+                        <span class="player-status">Inactive</span>
+                        <span class="player-chips"></span>
                     </div>
 
                 </div>
 
+                <!-- Current player's turn indicator and countdown timer -->
+                <div id="turn-status" class="turn-status">
+                    <div class="turn-player">
+                        <div class="turn-avatar" aria-hidden="true">♠</div>
+
+                        <div class="turn-player-info">
+                            <span class="turn-label">CURRENT TURN</span>
+                            <strong id="current-player">Waiting...</strong>
+                        </div>
+                    </div>
+
+                    <div
+                        class="timer-ring"
+                        id="timer-ring"
+                        role="timer"
+                        aria-label="Time remaining"
+                        style="--timer-progress: 100%"
+                    >
+                        <div class="timer-ring-inner">
+                            <span id="turn-timer">30</span>
+                            <span class="timer-unit">SEC</span>
+                        </div>
+                    </div>
+                </div>
+
             </section>
+
 
             <!-- Your hand and personal chip information -->
             <section class="panel your-hand">
@@ -265,12 +291,13 @@
         // Keep the raise amount input synchronized with the slider.
         const betScale = document.getElementById("bet-scale");
         const raiseAmount = document.getElementById("raise-amount");
+        
         const tableMessage = document.getElementById("table-message");
         
         // Load test cards from the backend.
         async function loadTestCards() {
             try {
-                const response = await fetch("/api/test-cards");
+                const response = await fetch("/api/tables/table1/test-cards");
 
                 if (!response.ok) {
                     throw new Error("Failed to load test cards.");
@@ -304,7 +331,7 @@
             });
         }
 
-        loadTestCards();
+        //loadTestCards();
 
         betScale.addEventListener("input", () => {
             raiseAmount.value = betScale.value;
@@ -387,7 +414,54 @@
                     "Settings are not implemented yet.";
             }
         );
-    </script>
+        
+        async function startDemo() {
+            try {
+                const response = await fetch("/api/tables/table1/start-demo", {
+                    method: "POST"
+                });
 
+                if (!response.ok) {
+                    throw new Error("Failed to start the demo.");
+                }
+
+                const data = await response.json();
+
+                // Find all 10 player name elements.
+                const playerNames = document.querySelectorAll(".player-name");
+
+                // Display the six names returned by the backend.
+                data.players.forEach((name, index) => {
+                    playerNames[index].textContent = name;
+                });
+
+                // Display placeholders for the remaining four seats.
+                for (let i = data.players.length; i < playerNames.length; i++) {
+                    playerNames[i].textContent = "Empty Seat";
+                }
+
+                // Update the current player's turn.
+                document.getElementById("current-player").textContent =
+                    data.currentPlayer;
+
+                // Update the countdown display.
+                document.getElementById("turn-timer").textContent =
+                    data.timeRemaining;
+
+            } catch (error) {
+                console.error("Error starting demo:", error);
+                document.getElementById("table-message").textContent =
+                    "Could not start the demo.";
+            }
+        }
+
+        document.addEventListener("DOMContentLoaded", () => {
+            startDemo();
+        });
+    </script>
+    
+
+     <script src="tableDisplay.js"></script>
+    
 </body>
 </html>
