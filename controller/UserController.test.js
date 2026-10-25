@@ -99,9 +99,9 @@ test('deleteOne should forbid access when non-admin tries to delete', async func
 // ==========================================
 // 4. register Tests
 // ==========================================
-test('register should create user, set session, and redirect to index.html on success', async function(){
+test('register should create user, set session object, and redirect to index.html on success', async function(){
     let req = {
-        body: { txt_login: 'newplayer', txt_pass: 'secure123' },
+        body: { txt_login: 'newplayer', txt_email: 'newplayer@mail.com', txt_pass: 'secure123' },
         session: {}
     };
     let res = { redirect: jest.fn() };
@@ -112,8 +112,12 @@ test('register should create user, set session, and redirect to index.html on su
 
     expect(passUtil.hashPassword).toHaveBeenCalledWith('secure123');
     expect(dao.create).toHaveBeenCalled();
-    expect(req.session.user).toBe('newplayer');
-    expect(req.session.permission).toBe(2);
+    expect(req.session.user).toEqual({
+        login: 'newplayer',
+        email: 'newplayer@mail.com',
+        permission: 2,
+        points: 1000
+    });
     expect(res.redirect).toHaveBeenCalledWith('/index.html');
 });
 
@@ -226,34 +230,222 @@ test('logout should clear session user and redirect to index.html', function(){
 });
 
 // ==========================================
-// 7. postCreateOrUpdate Tests
+// 8. Social & Friend System Tests
 // ==========================================
-test('postCreateOrUpdate should insert new user when no ID is provided', async function(){
+test('searchUsers should query DAO and return matching usernames as JSON', async function(){
     let req = {
-        body: { txt_login: 'newbie', txt_pass: 'pass123' },
-        session: { user: { permission: 2 } }
+        query: { q: 'bub' },
+        session: { user: { login: 'alice@mail.com', username: 'alice' } }
     };
-    let res = { redirect: jest.fn() };
-    passUtil.hashPassword.mockReturnValue('hashed');
-    dao.create.mockResolvedValue(true);
+    let res = {
+        json: jest.fn()
+    };
+    dao.find.mockResolvedValue([{ username: 'bubbles', login: 'bubbles@mail.com' }]);
 
-    await controller.postCreateOrUpdate(req, res);
+    await controller.searchUsers(req, res);
 
-    expect(dao.create).toHaveBeenCalled();
-    expect(res.redirect).toHaveBeenCalledWith('index.html');
+    expect(dao.find).toHaveBeenCalled();
+    expect(res.json).toHaveBeenCalledWith([{ username: 'bubbles' }]);
 });
 
-test('postCreateOrUpdate should update existing user when ID is provided', async function(){
+test('sendFriendRequest should push sender username into recipient friendRequests and redirect', async function(){
     let req = {
-        body: { txt_login: 'existingUser', txt_pass: 'newPass123', id: '651234abcde' },
-        session: { user: { permission: 2 } }
+        body: { targetUser: 'bubbles' },
+        session: { user: { login: 'alice@mail.com', username: 'alice' } }
     };
-    let res = { redirect: jest.fn() };
-    passUtil.hashPassword.mockReturnValue('hashed');
+    let res = {
+        redirect: jest.fn(),
+        status: jest.fn().mockReturnThis(),
+        send: jest.fn()
+    };
+    
+    // 1st findOne: lookup sender, 2nd findOne: lookup recipient
+    dao.findOne
+        .mockResolvedValueOnce({ username: 'alice', login: 'alice@mail.com' })
+        .mockResolvedValueOnce({ username: 'bubbles', login: 'bubbles@mail.com' });
     dao.update.mockResolvedValue(true);
 
-    await controller.postCreateOrUpdate(req, res);
+    await controller.sendFriendRequest(req, res);
 
     expect(dao.update).toHaveBeenCalled();
-    expect(res.redirect).toHaveBeenCalledWith('index.html');
+    expect(res.redirect).toHaveBeenCalledWith('/index.html');
+});
+
+test('getFriendsData should return resolved friends and requests JSON', async function(){
+    let req = {
+        session: { user: { login: 'alice@mail.com', username: 'alice' } }
+    };
+    let res = {
+        json: jest.fn()
+    };
+
+    // 1st findOne: get logged-in user, 2nd findOne: resolve 'bob', 3rd findOne: resolve 'charlie'
+    dao.findOne
+        .mockResolvedValueOnce({
+            username: 'alice',
+            friends: ['bob'],
+            friendRequests: ['charlie']
+        })
+        .mockResolvedValueOnce({ username: 'bob' })
+        .mockResolvedValueOnce({ username: 'charlie' });
+
+    await controller.getFriendsData(req, res);
+
+    expect(res.json).toHaveBeenCalledWith({
+        friends: ['bob'],
+        friendRequests: ['charlie']
+    });
+});
+
+test('acceptFriendRequest should move requester from requests to friends and update both users', async function(){
+    let req = {
+        body: { requester: 'charlie' },
+        session: { user: { login: 'alice@mail.com', username: 'alice' } }
+    };
+    let res = {
+        redirect: jest.fn()
+    };
+    dao.update.mockResolvedValue(true);
+
+    await controller.acceptFriendRequest(req, res);
+
+    expect(dao.update).toHaveBeenCalledTimes(2);
+    expect(res.redirect).toHaveBeenCalledWith('/index.html');
+});
+
+test('declineFriendRequest should remove requester from friendRequests array and redirect', async function(){
+    let req = {
+        body: { requester: 'charlie' },
+        session: { user: { login: 'alice@mail.com', username: 'alice' } }
+    };
+    let res = {
+        redirect: jest.fn()
+    };
+    dao.update.mockResolvedValue(true);
+
+    await controller.declineFriendRequest(req, res);
+
+    expect(dao.update).toHaveBeenCalled();
+    expect(res.redirect).toHaveBeenCalledWith('/index.html');
+});
+
+// ==========================================
+// 9. Social & Friend System Error & Guard Tests
+// ==========================================
+test('searchUsers should handle database errors and return 500 status', async function(){
+    let req = {
+        query: { q: 'bub' },
+        session: { user: { login: 'alice@mail.com', username: 'alice' } }
+    };
+    let res = {
+        status: jest.fn().mockReturnThis(),
+        json: jest.fn()
+    };
+    dao.find.mockRejectedValue(new Error('Database search failed'));
+
+    await controller.searchUsers(req, res);
+
+    expect(res.status).toHaveBeenCalledWith(500);
+    expect(res.json).toHaveBeenCalledWith({ error: "Server error" });
+});
+
+test('sendFriendRequest should return 401 Unauthorized if user is not sessioned', async function(){
+    let req = { body: { targetUser: 'bubbles' }, session: {} };
+    let res = { status: jest.fn().mockReturnThis(), send: jest.fn() };
+
+    await controller.sendFriendRequest(req, res);
+
+    expect(res.status).toHaveBeenCalledWith(401);
+    expect(res.send).toHaveBeenCalledWith("Unauthorized");
+});
+
+test('sendFriendRequest should catch errors and redirect to index.html', async function(){
+    let req = {
+        body: { targetUser: 'bubbles' },
+        session: { user: { login: 'alice@mail.com', username: 'alice' } }
+    };
+    let res = { redirect: jest.fn() };
+    dao.findOne.mockRejectedValue(new Error('DB error'));
+
+    await controller.sendFriendRequest(req, res);
+
+    expect(res.redirect).toHaveBeenCalledWith('/index.html');
+});
+
+test('getFriendsData should return 401 Unauthorized if not logged in', async function(){
+    let req = { session: {} };
+    let res = { status: jest.fn().mockReturnThis(), json: jest.fn() };
+
+    await controller.getFriendsData(req, res);
+
+    expect(res.status).toHaveBeenCalledWith(401);
+    expect(res.json).toHaveBeenCalledWith({ error: "Unauthorized" });
+});
+
+test('getFriendsData should return 404 if user document is not found', async function(){
+    let req = { session: { user: { login: 'alice@mail.com', username: 'alice' } } };
+    let res = { status: jest.fn().mockReturnThis(), json: jest.fn() };
+    dao.findOne.mockResolvedValue(null);
+
+    await controller.getFriendsData(req, res);
+
+    expect(res.status).toHaveBeenCalledWith(404);
+    expect(res.json).toHaveBeenCalledWith({ error: "User not found" });
+});
+
+test('getFriendsData should catch errors and return 500 status', async function(){
+    let req = { session: { user: { login: 'alice@mail.com', username: 'alice' } } };
+    let res = { status: jest.fn().mockReturnThis(), json: jest.fn() };
+    dao.findOne.mockRejectedValue(new Error('DB failure'));
+
+    await controller.getFriendsData(req, res);
+
+    expect(res.status).toHaveBeenCalledWith(500);
+    expect(res.json).toHaveBeenCalledWith({ error: "Server error" });
+});
+
+test('acceptFriendRequest should return 401 if unauthenticated', async function(){
+    let req = { session: {}, body: { requester: 'charlie' } };
+    let res = { status: jest.fn().mockReturnThis(), send: jest.fn() };
+
+    await controller.acceptFriendRequest(req, res);
+
+    expect(res.status).toHaveBeenCalledWith(401);
+    expect(res.send).toHaveBeenCalledWith("Unauthorized");
+});
+
+test('acceptFriendRequest should catch errors and redirect to index.html', async function(){
+    let req = {
+        body: { requester: 'charlie' },
+        session: { user: { login: 'alice@mail.com', username: 'alice' } }
+    };
+    let res = { redirect: jest.fn() };
+    dao.update.mockRejectedValue(new Error('DB error'));
+
+    await controller.acceptFriendRequest(req, res);
+
+    expect(res.redirect).toHaveBeenCalledWith('/index.html');
+});
+
+test('declineFriendRequest should return 401 if unauthenticated', async function(){
+    let req = { session: {}, body: { requester: 'charlie' } };
+    let res = { status: jest.fn().mockReturnThis(), send: jest.fn() };
+
+    await controller.declineFriendRequest(req, res);
+
+    expect(res.status).toHaveBeenCalledWith(401);
+    expect(res.send).toHaveBeenCalledWith("Unauthorized");
+});
+
+test('declineFriendRequest should catch errors and redirect to index.html', async function(){
+    let req = {
+        body: { requester: 'charlie' },
+        session: { user: { login: 'alice@mail.com', username: 'alice' } }
+    };
+    let res = { redirect: jest.fn() };
+    dao.update.mockRejectedValue(new Error('DB error'));
+
+    await controller.declineFriendRequest(req, res);
+
+    expect(res.redirect).toHaveBeenCalledWith('/index.html');
 });
