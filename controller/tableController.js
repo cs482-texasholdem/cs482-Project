@@ -196,6 +196,41 @@ function callPlayer(req, res) {
 }
 
 /**
+ * Handles call logic
+ * @param {Object} req - Express request object.
+ * @param {Object} res - Express response object.
+ * @returns {Object} HTTP response containing the result of the request.
+ */
+function raisePlayer(req, res) {
+    const { tableId } = req.params;
+    const { playerId, raiseTo } = req.body;
+    const table = tables.get(tableId);
+
+    if (!table) {
+        return res.status(404).json({
+            error: "Table not found."
+        });
+    }
+
+    if (!table.raise(playerId, raiseTo)) {
+        return res.status(400).json({
+            error: "Cannot raise. Check the amount, available chips, and player status."
+        });
+    }
+
+    return res.status(200).json({
+        message: `${playerId} raised to ${raiseTo} chips.`,
+        players: table.players.map(id => ({
+            id,
+            chips: table.playerChips.get(id),
+            bet: table.playerBets.get(id) ?? 0
+        })),
+        pot: table.pot,
+        currentBet: table.currentBet
+    });
+}
+
+/**
  * Temporarily test function in the table
  */
 function dealTestHand(req, res) {
@@ -326,4 +361,4 @@ function startDemoHand(req, res) {
 
 
 
-module.exports = { joinTable, leaveTable, dealTestHand, getTableState, startDemoHand, foldPlayer, checkPlayer, callPlayer };
+module.exports = { joinTable, leaveTable, dealTestHand, getTableState, startDemoHand, foldPlayer, checkPlayer, callPlayer, raisePlayer };
