@@ -119,6 +119,37 @@
                     <span>Chips Available: <strong id="available-chips">2,450</strong></span>
                 </div>
 
+                <div class="slider-heading">
+                    <label for="bet-scale">Adjust Raise Amount</label>
+
+                    <input
+                        type="number"
+                        id="raise-amount"
+                        min="20"
+                        max="1000"
+                        step="10"
+                        value="200"
+                    >
+                </div>
+
+                <input
+                    type="range"
+                    id="bet-scale"
+                    min="20"
+                    max="1000"
+                    step="10"
+                    value="200"
+                    aria-label="Raise amount slider"
+                >
+
+                <div class="scale-labels">
+                    <span>20</span>
+                    <span>250</span>
+                    <span>500</span>
+                    <span>750</span>
+                    <span>1,000</span>
+                </div>
+
                 <div class="action-buttons">
                     <button type="button" class="action-button fold" data-action="Fold">Fold</button>
                     <button type="button" class="action-button check" data-action="Check">Check</button>
@@ -152,6 +183,9 @@
         document.getElementById("header-player-name").textContent = currentPlayerId;
         document.getElementById("display-player-id").textContent = currentPlayerId;
 
+        // Keep the raise amount input synchronized with the slider.
+        const betScale = document.getElementById("bet-scale");
+        const raiseAmount = document.getElementById("raise-amount");
         const tableMessage = document.getElementById("table-message");
         
         // Load test cards from backend using the dynamic player ID
@@ -195,6 +229,19 @@
 
         loadTestCards();
 
+        // Slider and number input synchronization
+        betScale.addEventListener("input", () => {
+            raiseAmount.value = betScale.value;
+        });
+
+        raiseAmount.addEventListener("input", () => {
+            const amount = Number(raiseAmount.value);
+
+            if (amount >= 20 && amount <= 1000) {
+                betScale.value = amount;
+            }
+        });
+
         // Handle action buttons and advance round
         document.querySelectorAll("[data-action]").forEach((button) => {
             button.addEventListener("click", async () => {
@@ -208,6 +255,24 @@
                     loadTestCards();
                 } catch (error) {
                     console.error("Error advancing round:", error);
+                }
+
+                if (action === "Raise") {
+                    const amount = Number(raiseAmount.value);
+
+                    if (
+                        !Number.isFinite(amount) ||
+                        amount < 20 ||
+                        amount > 1000
+                    ) {
+                        tableMessage.textContent =
+                            "Choose a raise amount between 20 and 1,000.";
+                        return;
+                    }
+
+                    tableMessage.textContent =
+                        `Raise selected: ${amount} chips (demo only).`;
+                    return;
                 }
 
                 tableMessage.textContent = `${action} selected (demo only).`;
