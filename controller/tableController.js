@@ -148,12 +148,29 @@ function checkPlayer(req, res) {
     }
 
     if (!table.check(playerId)) {
+        const playerBet = table.playerBets.get(playerId) ?? 0;
+        const amountOwed = table.currentBet - playerBet;
+
+        let message;
+
+        if (!table.hasPlayer(playerId)) {
+            message = "You are not seated at this table.";
+        } else if (table.foldedPlayers.has(playerId)) {
+            message = "You have folded and cannot act until the next hand.";
+        } else if (table.checkPlayers.has(playerId)) {
+            message = "You already checked this betting round.";
+        } else if (amountOwed > 0) {
+            message = `You owe ${amountOwed} chips. Call to match the bet, raise, or fold.`;
+        } else {
+            message = "Cannot check with the current bet.";
+        }
+
         return res.status(400).json({
-            error: "Cannot check. Call, raise, or fold instead."
+            error: message
         });
     }
 
-     return res.status(200).json({
+    return res.status(200).json({
         message: `${playerId} checked.`,
         playerId
     });

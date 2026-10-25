@@ -1,3 +1,5 @@
+let currentPlayerId = null;
+
 /**
  * Temporary sample player data for the poker table frontend.
  * This data is for demonstration only and is not connected to the backend.
@@ -135,7 +137,7 @@ function displayChips(players, pot) {
 
 function displayYourChips(players) {
     // Temporarily treat demo1 as the local player.
-    const player = players.find(player => player.id === "demo1");
+    const player = players.find(player => player.id === currentPlayerId);
 
     if (!player) {
         return;
@@ -160,6 +162,13 @@ function displayYourChips(players) {
  * @returns {void}
  */
 async function handlePokerAction(event) {
+    const playerId = currentPlayerId;
+
+    if (!playerId) {
+        tableMessage.textContent = "No player currently has the turn.";
+        return;
+    }
+
     // Get the selected action from the clicked button.
     const action = event.currentTarget.dataset.action;
 
@@ -169,7 +178,7 @@ async function handlePokerAction(event) {
                 method: "POST",
                 headers: {"Content-Type": "application/json"},
                 body: JSON.stringify({
-                    playerId: "demo1"
+                    playerId: playerId
                 })
             });
 
@@ -193,13 +202,40 @@ async function handlePokerAction(event) {
         return;
     }
 
+    if (action === "Check") {
+        try {
+            const response = await fetch("/api/tables/table1/check", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({
+                    playerId: playerId
+                })
+            });
+
+            const result = await response.json();
+
+            if (!response.ok) {
+                throw new Error(result.error);
+            }
+
+            tableMessage.textContent = result.message;
+            await updateTurnStatus();
+        } catch (error) {
+            tableMessage.textContent = error.message;
+        }
+
+        return;
+    }
+
     if (action === "Call") {
         try {
             const response = await fetch("/api/tables/table1/call", {
                 method: "POST",
                 headers: {"Content-Type": "application/json"},
                 body: JSON.stringify({
-                    playerId: "demo1"
+                    playerId: playerId
                 })
             });
 
@@ -222,22 +258,48 @@ async function handlePokerAction(event) {
 
     // Handle the Raise action separately to validate its amount.
     if (action === "Raise") {
-        const amount = Number(
-            document.getElementById("raise-amount").value
-        );
+    const raiseTo = Number(document.getElementById("raise-amount").value);
 
-        // Reject invalid raise amounts in the demo.
-        if (!Number.isFinite(amount) || amount < 20) {
-            tableMessage.textContent =
-                "Enter a raise amount of at least 20.";
-            return;
-        }
-
-        // Display the selected raise amount without placing a real bet.
+    if (!Number.isInteger(raiseTo) || raiseTo <= 0) {
         tableMessage.textContent =
-            `Raise selected: ${amount} chips (demo only).`;
+            "Enter a positive whole-number raise amount.";
         return;
     }
+
+    try {
+        const response = await fetch("/api/tables/table1/raise", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+                playerId,
+                raiseTo
+            })
+        });
+
+        const result = await response.json();
+
+        if (!response.ok) {
+            throw new Error(result.error);
+        }
+
+        tableMessage.textContent = result.message;
+
+        displayChips(result.players, result.pot);
+        displayYourChips(result.players);
+
+        document.getElementById("current-bet").textContent =
+            result.currentBet.toLocaleString();
+
+        await updateTurnStatus();
+
+    } catch (error) {
+        tableMessage.textContent = error.message;
+    }
+
+    return;
+}
 
     // Display the selected action without changing the game state.
     tableMessage.textContent = `${action} selected (demo only).`;
@@ -326,7 +388,9 @@ async function updateTurnStatus() {
         }
 
         const table = await response.json();
+        currentPlayerId = table.currentPlayer;
         displayFoldedPlayers(table.players, table.foldedPlayers);
+        
 
         const playerDisplay = document.getElementById("current-player");
         const timerDisplay = document.getElementById("turn-timer");
