@@ -64,6 +64,7 @@
                             <thead class="table-dark">
                                 <tr>
                                     <th class="ps-4">Username</th>
+                                    <th>Email</th>
                                     <th>Role</th>
                                     <th>Points / Chips</th>
                                     <th>Status</th>
@@ -96,13 +97,19 @@
                             <!-- Hidden ID field for backend update mapping -->
                             <input type="hidden" id="txt_id" name="txt_id">
 
-                            <!-- All usernames from database-->
+                            <!-- Username field -->
                             <div class="mb-3">
                                 <label for="txt_login" class="form-label">Username</label>
                                 <input type="text" class="form-control" id="txt_login" name="txt_login" required>
                             </div>
 
-                            <!-- All permission roles from database -->
+                            <!-- Email field -->
+                            <div class="mb-3">
+                                <label for="txt_email" class="form-label">Email Address</label>
+                                <input type="email" class="form-control" id="txt_email" name="txt_email" required>
+                            </div>
+
+                            <!-- Permission roles from database -->
                             <div class="mb-3">
                                 <label for="txt_perm" class="form-label">Permission Role (1 = Admin, 2 = Player)</label>
                                 <input type="number" class="form-control" id="txt_perm" name="txt_perm" min="1" max="2" required>
@@ -110,7 +117,7 @@
 
                             <!-- Points field for the user -->
                             <div class="mb-3">
-                                <label for="txt_points" class="form-label">Points </label>
+                                <label for="txt_points" class="form-label">Points</label>
                                 <input type="number" class="form-control" id="txt_points" name="txt_points">
                             </div>
 

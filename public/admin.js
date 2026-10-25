@@ -43,9 +43,9 @@ async function loadUsers() {
         const tableBody = document.getElementById("userTableBody");
         tableBody.innerHTML = "";
 
-        // Handle scenario where no user records are returned
+        // Handle scenario where no user records are returned (spanning 6 columns now)
         if (users.length === 0) {
-            tableBody.innerHTML = `<tr><td colspan="5" class="text-center py-4 text-muted">No users found.</td></tr>`;
+            tableBody.innerHTML = `<tr><td colspan="6" class="text-center py-4 text-muted">No users found.</td></tr>`;
             return;
         }
 
@@ -56,9 +56,14 @@ async function loadUsers() {
                 ? '<span class="badge bg-danger">ADMIN</span>' 
                 : '<span class="badge bg-secondary">PLAYER</span>';
 
+            // Determine explicit display fields for username and email
+            let usernameDisplay = user.username || (user.login && !user.login.includes('@') ? user.login : 'N/A');
+            let emailDisplay = user.email || (user.login && user.login.includes('@') ? user.login : 'N/A');
+
             let row = `
                 <tr>
-                    <td class="ps-4 fw-semibold">${user.login || user.txt_login || 'N/A'}</td>
+                    <td class="ps-4 fw-semibold">${usernameDisplay}</td>
+                    <td>${emailDisplay}</td>
                     <td>${roleBadge}</td>
                     <td>${user.points}</td>
                     <td><span class="badge bg-success">Active</span></td>
@@ -85,9 +90,10 @@ async function loadUsers() {
  */
 function openEditModal(user) {
     document.getElementById('txt_id').value = user._id;
-    document.getElementById('txt_login').value = user.login || user.txt_login || '';
+    document.getElementById('txt_login').value = user.username || (user.login && !user.login.includes('@') ? user.login : '');
+    document.getElementById('txt_email').value = user.email || (user.login && user.login.includes('@') ? user.login : '');
     document.getElementById('txt_perm').value = user.permission || 2;
-    document.getElementById('txt_points').value = user.points || user.chips || 10000;
+    document.getElementById('txt_points').value = user.points || user.chips || 1000;
     document.getElementById('txt_pass').value = ''; // Reset password field
     editModal.show();
 }
