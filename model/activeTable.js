@@ -103,6 +103,10 @@ class ActiveTable {
         return true;
     }
 
+    /**
+     * Removes a player from the table.
+     * @returns {boolean} True if the player was removed; otherwise, false.
+     */
     assignBlinds() {
         if (this.players.length < 2 || this.dealerIndex === null) {
             return false;
@@ -144,6 +148,7 @@ class ActiveTable {
      * Helper function for the blinds
      * @param {string} playerId - ID of the player to get chip value
      * @param {number} blindAmount - The value of the blind amount they owe
+     * @returns {void}
      */
     postBlind(playerIndex, blindAmount) {
         const playerId = this.players[playerIndex];
