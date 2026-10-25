@@ -141,9 +141,39 @@ function displayChips(players, pot) {
  * @param {Event} event - The click event triggered by the button.
  * @returns {void}
  */
-function handlePokerAction(event) {
+async function handlePokerAction(event) {
     // Get the selected action from the clicked button.
     const action = event.currentTarget.dataset.action;
+
+    if (action === "Fold"){ 
+        try {
+            const response = await fetch("/api/tables/table1/fold", {
+                method: "POST",
+                headers: {"Content-Type": "application/json"},
+                body: JSON.stringify({
+                    playerId: "demo1"
+                })
+            });
+
+            const result = await response.json();
+
+            if (!response.ok) {
+                throw new Error(result.error);
+            }
+
+            tableMessage.textContent = result.message;
+
+            // Mark demo1's seat as folded.
+            const seat = document.querySelectorAll(".player-seat")[0];
+            seat.querySelector(".player-status").textContent = "Folded";
+        } 
+
+        catch (error) {
+            tableMessage.textContent = error.message;
+        }
+
+        return;
+    }
 
     // Handle the Raise action separately to validate its amount.
     if (action === "Raise") {

@@ -33,6 +33,9 @@ class ActiveTable {
         this.playerBets = new Map();
         this.pot = 0;
 
+        //call/raise/fold/check
+        this.foldedPlayers = new Set(); 
+
     }
 
     /**
@@ -175,6 +178,34 @@ class ActiveTable {
         return true;
     }
 
+    //ends turn
+    fold(playerId){
+        // Reject players who aren't seated or already folded.
+        if (!this.hasPlayer(playerId) || this.foldedPlayers.has(playerId)) {
+            return false;
+        }
+
+        this.foldedPlayers.add(playerId);
+        return true;
+    }
+
+/*    
+    call(playerId){
+
+    }
+
+    check(playerId){
+
+    }
+
+    raise(playerId){
+        const playerId = this.players[playerIndex];
+        const chips = this.playerChips.get(playerId);
+
+    }
+
+    
+*/
 }
 
 module.exports = ActiveTable;

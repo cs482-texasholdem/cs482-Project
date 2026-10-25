@@ -100,6 +100,37 @@ function leaveTable(req, res) {
 }
 
 /**
+ * Handles folding logic
+ * @param {Object} req - Express request object.
+ * @param {Object} res - Express response object.
+ * @returns {Object} HTTP response containing the result of the request.
+ */
+function foldPlayer(req, res) {
+    const { tableId } = req.params;
+    const { playerId } = req.body;
+
+    const table = tables.get(tableId);
+
+    if (!table) {
+        return res.status(404).json({
+            error: "Table not found."
+        });
+    }
+
+    if (!table.fold(playerId)) {
+        return res.status(400).json({
+            error: "Player is not seated or has already folded."
+        });
+    }
+
+    return res.status(200).json({
+        message: `${playerId} folded.`,
+        playerId
+    });
+}
+
+
+/**
  * Temporarily test function in the table
  */
 function dealTestHand(req, res) {
@@ -120,6 +151,8 @@ function dealTestHand(req, res) {
     if (!table.hasPlayer("demo2")) {
         table.addPlayer("demo2", 980);
     }
+
+    table.foldedPlayers.clear(); //resets folded players
 
     if (!table.rotateDealer()) {
         return res.status(400).json({
@@ -158,4 +191,4 @@ function dealTestHand(req, res) {
     });
 }
 
-module.exports = { joinTable, leaveTable, dealTestHand };
+module.exports = { joinTable, leaveTable, dealTestHand, foldPlayer};

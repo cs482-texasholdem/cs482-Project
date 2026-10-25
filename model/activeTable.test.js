@@ -296,5 +296,33 @@ describe("ActiveTable", () => {
         });
     });
 
+    describe("fold", () => {
+        test("player is not at the table", () => {
+            expect(table.fold("missing-player")).toBe(false);
+            expect(table.foldedPlayers.size).toBe(0);
+        });
 
+        test("player already folded", () => {
+            table.addPlayer("player1");
+            table.fold("player1");
+
+            expect(table.fold("player1")).toBe(false);
+            expect(table.foldedPlayers.size).toBe(1);
+        });
+        
+        test("player has already folded", () => {
+            table.addPlayer("player1");
+            table.fold("player1");
+
+            expect(table.fold("player1")).toBe(false);
+            expect(table.foldedPlayers.size).toBe(1);
+        });
+
+        test("player folded", () => {
+            table.addPlayer("player1");
+            expect(table.fold("player1")).toBe(true);
+            expect(table.foldedPlayers.has("player1")).toBe(true);
+            expect(table.foldedPlayers.size).toBe(1);
+        });
+    });
 });
