@@ -40,6 +40,7 @@ class ActiveTable {
         this.aggressorIndex = 0;
         this.gameCount = 0;
         this.turnStartTime = null;
+        this.consecutiveTimeouts = new Map();
     }
 
     isFull() {
@@ -91,15 +92,28 @@ class ActiveTable {
             return false;
         }
 
+        const pIndex = this.players.indexOf(playerId);
+        const isCurrentTurnPlayer = (this.gameInProgress && pIndex !== -1 && this.currentTurnIndex === pIndex);
+
         this.playerObjects.delete(playerId);
+        this.consecutiveTimeouts.delete(playerId);
         const index = this.queue.indexOf(playerId);
         if (index !== -1) {
             this.queue.splice(index, 1);
         }
-        const pIndex = this.players.indexOf(playerId);
+
         if (pIndex !== -1) {
             this.players.splice(pIndex, 1);
+            if (this.players.length > 0) {
+                if (pIndex < this.currentTurnIndex) {
+                    this.currentTurnIndex--;
+                }
+                this.currentTurnIndex = (this.currentTurnIndex + this.players.length) % this.players.length;
+            } else {
+                this.currentTurnIndex = 0;
+            }
         }
+
         const sIndex = this.spectators.indexOf(playerId);
         if (sIndex !== -1) {
             this.spectators.splice(sIndex, 1);
@@ -107,6 +121,28 @@ class ActiveTable {
 
         this.playerHands.delete(playerId);
         this._updateQueueDistribution();
+
+        if (this.gameInProgress) {
+            const activeNonFolded = this.players.map(id => this.playerObjects.get(id)).filter(p => p && !p.folded);
+            if (activeNonFolded.length <= 1 || this.players.length < 2) {
+                this.handleWinner();
+                this.resetToLobby();
+            } else {
+                // Bulletproof turn adjustment: skip folded players securely
+                let safety = 0;
+                while (safety < this.players.length) {
+                    const currentId = this.players[this.currentTurnIndex];
+                    const pObj = this.playerObjects.get(currentId);
+                    if (pObj && !pObj.folded) {
+                        break;
+                    }
+                    this.currentTurnIndex = (this.currentTurnIndex + 1) % this.players.length;
+                    safety++;
+                }
+                this.turnStartTime = Date.now();
+            }
+        }
+
         return true;
     }
 
@@ -146,7 +182,15 @@ class ActiveTable {
             if (player && !player.folded && !player.hasActed) {
                 const canCheck = (player.currentBet === this.currentHighestBet);
                 const action = canCheck ? "Check" : "Fold";
+                
+                const timeouts = (this.consecutiveTimeouts.get(currentId) || 0) + 1;
+                this.consecutiveTimeouts.set(currentId, timeouts);
+
                 this.recordAction(currentId, action, 0);
+
+                if (timeouts >= 2) {
+                    this.removePlayer(currentId);
+                }
                 return true;
             }
         }
@@ -163,13 +207,17 @@ class ActiveTable {
         }
         if (player.hasActed && action !== "Raise") return { success: false, error: "You have already acted this round." };
 
+        this.consecutiveTimeouts.set(playerId, 0);
+
         if (action === "Fold") {
             player.folded = true;
             if (this.players.indexOf(playerId) === this.aggressorIndex) {
                 let idx = this.aggressorIndex;
+                let safety = 0;
                 do {
                     idx = (idx + 1) % this.players.length;
-                } while (this.playerObjects.get(this.players[idx]).folded);
+                    safety++;
+                } while (this.playerObjects.get(this.players[idx]).folded && safety < this.players.length);
                 this.aggressorIndex = idx;
             }
         } else if (action === "Check") {
@@ -218,9 +266,11 @@ class ActiveTable {
             return { success: true, roundAdvanced: true, ...roundResult };
         }
 
+        let safety = 0;
         do {
             this.currentTurnIndex = (this.currentTurnIndex + 1) % this.players.length;
-        } while (this.playerObjects.get(this.players[this.currentTurnIndex]).folded);
+            safety++;
+        } while (this.playerObjects.get(this.players[this.currentTurnIndex]).folded && safety < this.players.length);
 
         this.turnStartTime = Date.now();
 
@@ -252,8 +302,10 @@ class ActiveTable {
         }
         this.currentHighestBet = 0;
         this.currentTurnIndex = (this.dealerIndex + 1) % this.players.length;
-        while (this.playerObjects.get(this.players[this.currentTurnIndex]).folded) {
+        let safety = 0;
+        while (this.playerObjects.get(this.players[this.currentTurnIndex]).folded && safety < this.players.length) {
             this.currentTurnIndex = (this.currentTurnIndex + 1) % this.players.length;
+            safety++;
         }
         this.turnStartTime = Date.now();
     }
@@ -377,6 +429,7 @@ class ActiveTable {
         this.currentHighestBet = 0;
         this.currentTurnIndex = 0;
         this.turnStartTime = null;
+        this.consecutiveTimeouts.clear();
         this._updateQueueDistribution();
         for (const [_, p] of this.playerObjects) {
             p.folded = false;

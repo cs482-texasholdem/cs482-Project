@@ -51,6 +51,7 @@ const currentBetElem = document.getElementById("current-bet");
 const currentTurnPlayerElem = document.getElementById("current-turn-player");
 const timerText = document.getElementById("turn-timer-text");
 const timerCircle = document.getElementById("turn-timer-circle");
+const leaveTableBtn = document.getElementById("leave-table-btn");
 const actionButtons = document.querySelectorAll("[data-action]");
 
 let modalTimeout = null;
@@ -73,7 +74,6 @@ function updateTimerDisplay(rem) {
     }
 }
 
-// Local 1s countdown tick for smooth client experience
 setInterval(() => {
     if (currentTimerRemaining > 0) {
         currentTimerRemaining--;
@@ -182,6 +182,21 @@ async function joinTable() {
         tableMessage.textContent = "Could not join table.";
     }
 }
+
+leaveTableBtn.addEventListener("click", async () => {
+    if (confirm("Are you sure you want to leave the table?")) {
+        try {
+            await fetch("/api/table/leave", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ playerId: currentPlayerId })
+            });
+            window.location.href = "index.html";
+        } catch (error) {
+            console.error("Failed to leave table:", error);
+        }
+    }
+});
 
 function showJoinPrompt(isSpectator = false) {
     let joinModalElem = document.getElementById("join-modal");
