@@ -28,7 +28,7 @@ class ActiveTable {
         this.playerObjects = new Map(); 
         this.displayedCards = [];
         this.deck = new Deck();
-        this.roundPlayerCount = null; // Stays constant during a hand
+        this.roundPlayerCount = null; 
         this.playerHands = new Map();
         this.gameOver = false;
         this.gameStarted = false;
@@ -76,6 +76,7 @@ class ActiveTable {
             this.players = this.queue.slice(0, this.maxPlayers);
             this.spectators = this.queue.slice(this.maxPlayers);
         } else {
+            // Mid-game join semaphore: lock active players, put new joiners strictly in spectators
             const activeSet = new Set(this.players);
             this.spectators = this.queue.filter(id => !activeSet.has(id));
         }
@@ -125,7 +126,7 @@ class ActiveTable {
         }
 
         const playerIndex = this.players.indexOf(playerId);
-        const totalPlayers = this.roundPlayerCount; // Use constant round player count
+        const totalPlayers = this.roundPlayerCount; 
 
         const hand = this.deck.hand(playerIndex, totalPlayers);
         this.playerHands.set(playerId, hand);
@@ -172,7 +173,6 @@ class ActiveTable {
     }
 
     allPlayersHaveActedAndMatched() {
-        // Only iterate through active, non-folded participants of the current hand
         const activeNonFolded = this.players
             .map(id => this.playerObjects.get(id))
             .filter(p => p && !p.folded);
@@ -224,7 +224,6 @@ class ActiveTable {
 
         this.resetPlayerActions();
 
-        // Use constant this.roundPlayerCount for dealing community cards
         const totalP = this.roundPlayerCount;
 
         if (this.displayedCards.length === 0) {
@@ -233,14 +232,6 @@ class ActiveTable {
             this.displayedCards.push(this.deck.showTurn(totalP));
         } else if (this.displayedCards.length === 4) {
             this.displayedCards.push(this.deck.showRiver(totalP));
-        }
-
-        const updatedActive = this.players
-            .map(id => this.playerObjects.get(id))
-            .filter(p => p && !p.folded);
-
-        if (updatedActive.length <= 1 || this.displayedCards.length >= 5) {
-            // Ready for showdown on next evaluation if needed
         }
 
         return {
@@ -272,7 +263,6 @@ class ActiveTable {
         this.pot = 0;
         this.currentHighestBet = 0;
 
-        // Freeze active players and round player count at the start of the session
         this.players = this.queue.slice(0, this.maxPlayers);
         this.spectators = this.queue.slice(this.maxPlayers);
         this.roundPlayerCount = this.players.length;

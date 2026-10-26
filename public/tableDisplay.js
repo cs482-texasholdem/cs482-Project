@@ -102,8 +102,8 @@ function renderActivePlayers(status) {
     yourBetElem.textContent = status.playerBet || 0;
     currentBetElem.textContent = status.currentHighestBet || 0;
 
-    // Deactivate action buttons if player has already acted or game is not started/in progress
-    if (status.playerHasActed || !status.gameStarted) {
+    // Block action buttons for spectating players, players who already acted, or when game is not started
+    if (status.isSpectator || !status.isPlayer || status.playerHasActed || !status.gameStarted) {
         actionButtons.forEach(btn => {
             btn.disabled = true;
             btn.style.opacity = "0.5";

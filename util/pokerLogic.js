@@ -260,7 +260,7 @@ class Deck {
       const suitRanks = new Set(cards.filter(c => c.suit === suit).map(c => c.rank));
       if (
         suitRanks.has(8) &&
-        suitRناس.has(9) &&
+        suitRanks.has(9) &&
         suitRanks.has(10) &&
         suitRanks.has(11) &&
         suitRanks.has(12)
