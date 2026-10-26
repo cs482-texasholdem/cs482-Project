@@ -4,6 +4,8 @@ const Deck = require("../util/pokerLogic");
 const mainTable = new ActiveTable("main", "general");
 
 function getTableStatus(req, res) {
+    mainTable.checkTimeout(); // Check if current player's turn has timed out
+
     const playerId = req.query.playerId;
     const inTable = playerId ? mainTable.hasPlayer(playerId) : false;
     const isPlayer = playerId ? mainTable.players.includes(playerId) : false;
@@ -32,6 +34,9 @@ function getTableStatus(req, res) {
     const dealerPlayerId = (mainTable.gameInProgress && mainTable.players.length > 0) ? mainTable.players[mainTable.dealerIndex] : null;
     const isCurrentTurn = playerId === currentTurnPlayer;
     const buttonsBlocked = !isPlayer || isSpectator || !mainTable.gameInProgress || !isCurrentTurn || playerHasActed;
+
+    const elapsed = mainTable.turnStartTime ? Math.floor((Date.now() - mainTable.turnStartTime) / 1000) : 0;
+    const turnTimeRemaining = Math.max(0, 30 - elapsed);
 
     const allPlayersData = mainTable.players.map(id => {
         const p = mainTable.playerObjects.get(id);
@@ -67,6 +72,7 @@ function getTableStatus(req, res) {
         currentTurnPlayer,
         isCurrentTurn,
         buttonsBlocked,
+        turnTimeRemaining,
         currentHighestBet: mainTable.currentHighestBet,
         communityCards: mainTable.displayCards(),
         playerHand

@@ -49,6 +49,8 @@ const availableChipsElem = document.getElementById("available-chips");
 const yourBetElem = document.getElementById("your-bet");
 const currentBetElem = document.getElementById("current-bet");
 const currentTurnPlayerElem = document.getElementById("current-turn-player");
+const timerText = document.getElementById("turn-timer-text");
+const timerCircle = document.getElementById("turn-timer-circle");
 const actionButtons = document.querySelectorAll("[data-action]");
 
 let modalTimeout = null;
@@ -105,6 +107,21 @@ function renderActivePlayers(status) {
 
     if (currentTurnPlayerElem) {
         currentTurnPlayerElem.textContent = status.currentTurnPlayer || "None";
+    }
+
+    if (timerText && timerCircle && status.turnTimeRemaining !== undefined) {
+        const rem = status.turnTimeRemaining;
+        timerText.textContent = rem + "s";
+        if (rem > 15) {
+            timerCircle.style.backgroundColor = "#3c8d79"; // green
+            timerCircle.style.borderColor = "#2e6d5e";
+        } else if (rem > 5) {
+            timerCircle.style.backgroundColor = "#f1c40f"; // yellow
+            timerCircle.style.borderColor = "#d4ac0d";
+        } else {
+            timerCircle.style.backgroundColor = "#d42c25"; // red
+            timerCircle.style.borderColor = "#961e19";
+        }
     }
 
     if (status.buttonsBlocked) {

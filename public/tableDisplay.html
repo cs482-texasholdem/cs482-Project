@@ -63,6 +63,33 @@
         .modal-content button:hover {
             background: #535bc0;
         }
+        .turn-timer-circle {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: 11px;
+            color: #fff;
+            border: 2px solid rgba(255,255,255,0.3);
+            margin-left: 8px;
+            vertical-align: middle;
+            transition: background-color 0.3s, border-color 0.3s;
+        }
+        .current-turn-box {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            margin-top: 6px;
+            padding: 6px 14px;
+            background: rgba(16, 28, 58, 0.75);
+            border: 1px solid var(--button-hover-blue);
+            border-radius: 8px;
+            font-size: 13px;
+            color: var(--secondary-text);
+        }
     </style>
 </head>
 
@@ -130,8 +157,11 @@
 
                     <div class="community-cards" id="community-cards" aria-label="Community cards"></div>
 
-                    <div class="current-turn-box" id="current-turn-box" style="margin-top: 6px; padding: 6px 14px; background: rgba(16, 28, 58, 0.75); border: 1px solid var(--button-hover-blue); border-radius: 8px; font-size: 13px; color: var(--secondary-text);">
-                        Current turn: <strong id="current-turn-player" style="color: var(--main-text);">--</strong>
+                    <div class="current-turn-box" id="current-turn-box">
+                        <span>Current turn: <strong id="current-turn-player" style="color: var(--main-text);">--</strong></span>
+                        <div class="turn-timer-circle" id="turn-timer-circle">
+                            <span id="turn-timer-text">30s</span>
+                        </div>
                     </div>
 
                     <p class="table-status" id="table-message">
