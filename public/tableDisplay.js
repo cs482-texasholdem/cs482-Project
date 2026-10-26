@@ -78,7 +78,7 @@ function renderActivePlayers(status) {
 
         const nameSpan = document.createElement("span");
         nameSpan.className = "player-name";
-        nameSpan.textContent = p.id + (p.isCurrent ? " (You)" : "");
+        nameSpan.textContent = p.id + (p.isDealer ? " (D)" : "") + (p.isCurrent ? " (You)" : "");
 
         const statusSpan = document.createElement("span");
         statusSpan.className = "player-status";
@@ -107,7 +107,6 @@ function renderActivePlayers(status) {
         currentTurnPlayerElem.textContent = status.currentTurnPlayer || "None";
     }
 
-    // Bulletproof buttonsBlocked enforcement from server
     if (status.buttonsBlocked) {
         actionButtons.forEach(btn => {
             btn.disabled = true;
@@ -315,7 +314,7 @@ actionButtons.forEach((button) => {
                 return;
             }
 
-            tableMessage.textContent = `${action} successful. Round automatically advanced/updated.`;
+            tableMessage.textContent = `${action} successful. Turn updated.`;
             refreshUI();
         } catch (error) {
             console.error("Error executing action:", error);

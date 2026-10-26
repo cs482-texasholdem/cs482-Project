@@ -36,6 +36,9 @@ class ActiveTable {
         this.pot = 0;
         this.currentHighestBet = 0; 
         this.currentTurnIndex = 0;
+        this.dealerIndex = 0;
+        this.aggressorIndex = 0;
+        this.gameCount = 0;
     }
 
     isFull() {
@@ -141,10 +144,17 @@ class ActiveTable {
         if (this.players[this.currentTurnIndex] !== playerId) {
             return { success: false, error: "Not your turn." };
         }
-        if (player.hasActed) return { success: false, error: "You have already acted this round." };
+        if (player.hasActed && action !== "Raise") return { success: false, error: "You have already acted this round." };
 
         if (action === "Fold") {
             player.folded = true;
+            if (this.players.indexOf(playerId) === this.aggressorIndex) {
+                let idx = this.aggressorIndex;
+                do {
+                    idx = (idx + 1) % this.players.length;
+                } while (this.playerObjects.get(this.players[idx]).folded);
+                this.aggressorIndex = idx;
+            }
         } else if (action === "Check") {
             if (player.currentBet < this.currentHighestBet) {
                 return { success: false, error: "Cannot check; must call the current bet." };
@@ -169,6 +179,15 @@ class ActiveTable {
             player.currentBet = amount;
             this.currentHighestBet = amount;
             this.pot += diff;
+            // Update aggressor on raise
+            this.aggressorIndex = this.players.indexOf(playerId);
+            // Reset hasActed for others so they can respond to the raise
+            for (const id of this.players) {
+                if (id !== playerId) {
+                    const p = this.playerObjects.get(id);
+                    if (p && !p.folded) p.hasActed = false;
+                }
+            }
         }
 
         player.hasActed = true;
@@ -179,13 +198,15 @@ class ActiveTable {
             return { success: true, roundAdvanced: true, winnerData };
         }
 
-        if (this.allPlayersHaveActedAndMatched()) {
+        // Advance turn
+        do {
+            this.currentTurnIndex = (this.currentTurnIndex + 1) % this.players.length;
+        } while (this.playerObjects.get(this.players[this.currentTurnIndex]).folded);
+
+        // Next round logic triggers only when it is the turn of the aggressor and all have acted/matched
+        if (this.allPlayersHaveActedAndMatched() && this.currentTurnIndex === this.aggressorIndex) {
             const roundResult = this.nextRound();
             return { success: true, roundAdvanced: true, ...roundResult };
-        } else {
-            do {
-                this.currentTurnIndex = (this.currentTurnIndex + 1) % this.players.length;
-            } while (this.playerObjects.get(this.players[this.currentTurnIndex]).folded);
         }
 
         return { success: true, roundAdvanced: false };
@@ -215,6 +236,7 @@ class ActiveTable {
             }
         }
         this.currentHighestBet = 0;
+        this.currentTurnIndex = this.aggressorIndex;
     }
 
     nextRound() {
@@ -245,11 +267,6 @@ class ActiveTable {
             this.displayedCards.push(this.deck.showTurn(totalP));
         } else if (this.displayedCards.length === 4) {
             this.displayedCards.push(this.deck.showRiver(totalP));
-        }
-
-        this.currentTurnIndex = 0;
-        while (this.currentTurnIndex < this.players.length && this.playerObjects.get(this.players[this.currentTurnIndex]).folded) {
-            this.currentTurnIndex++;
         }
 
         return {
@@ -284,7 +301,15 @@ class ActiveTable {
         this.players = this.queue.slice(0, this.maxPlayers);
         this.spectators = this.queue.slice(this.maxPlayers);
         this.roundPlayerCount = this.players.length;
-        this.currentTurnIndex = 0;
+
+        if (this.gameCount > 0 && this.players.length > 0) {
+            this.dealerIndex = (this.dealerIndex + 1) % this.players.length;
+        }
+        this.gameCount++;
+
+        // Aggressor defaults to the left of the dealer
+        this.aggressorIndex = (this.dealerIndex + 1) % this.players.length;
+        this.currentTurnIndex = this.aggressorIndex;
 
         for (const playerId of this.players) {
             const p = this.playerObjects.get(playerId);

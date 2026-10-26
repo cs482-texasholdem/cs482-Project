@@ -29,16 +29,19 @@ function getTableStatus(req, res) {
     }
 
     const currentTurnPlayer = (mainTable.gameInProgress && mainTable.players.length > 0) ? mainTable.players[mainTable.currentTurnIndex] : null;
+    const dealerPlayerId = (mainTable.gameInProgress && mainTable.players.length > 0) ? mainTable.players[mainTable.dealerIndex] : null;
     const isCurrentTurn = playerId === currentTurnPlayer;
     const buttonsBlocked = !isPlayer || isSpectator || !mainTable.gameInProgress || !isCurrentTurn || playerHasActed;
 
     const allPlayersData = mainTable.players.map(id => {
         const p = mainTable.playerObjects.get(id);
+        const isDealer = id === dealerPlayerId;
         return {
             id,
             chips: p ? p.chips : 1000,
             status: p && p.folded ? "Folded" : (p && p.hasActed ? "Acted" : "Active"),
-            isCurrent: id === playerId
+            isCurrent: id === playerId,
+            isDealer
         };
     });
 
