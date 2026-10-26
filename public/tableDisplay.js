@@ -48,6 +48,7 @@ const yourChipsElem = document.getElementById("your-chips");
 const availableChipsElem = document.getElementById("available-chips");
 const yourBetElem = document.getElementById("your-bet");
 const currentBetElem = document.getElementById("current-bet");
+const actionButtons = document.querySelectorAll("[data-action]");
 
 let modalTimeout = null;
 
@@ -99,7 +100,22 @@ function renderActivePlayers(status) {
     yourChipsElem.textContent = (status.playerChips || 0).toLocaleString();
     availableChipsElem.textContent = (status.playerChips || 0).toLocaleString();
     yourBetElem.textContent = status.playerBet || 0;
-    currentBetElem.textContent = status.currentHighestBet || 20;
+    currentBetElem.textContent = status.currentHighestBet || 0;
+
+    // Deactivate action buttons if player has already acted or game is not started/in progress
+    if (status.playerHasActed || !status.gameStarted) {
+        actionButtons.forEach(btn => {
+            btn.disabled = true;
+            btn.style.opacity = "0.5";
+            btn.style.cursor = "not-allowed";
+        });
+    } else {
+        actionButtons.forEach(btn => {
+            btn.disabled = false;
+            btn.style.opacity = "1";
+            btn.style.cursor = "pointer";
+        });
+    }
 
     if (status.communityCards) {
         renderCards("community-cards", status.communityCards);
@@ -137,7 +153,7 @@ function showJoinPrompt(isSpectator = false) {
         joinModalElem.innerHTML = `
             <div class="modal-content">
                 <h2>Texas Hold'em Table</h2>
-                <p>${isSpectator ? "Game in progress! You have joined as a spectator and will enter the game next round." : "Welcome! Click below to join the table."}</p>
+                <p>${isSpectator ? "Game in progress! You have joined as an inactive spectator and will be able to play when the next game starts." : "Welcome! Click below to join the table."}</p>
                 <button type="button" id="join-table-btn">Join / Enter</button>
             </div>
         `;
@@ -248,7 +264,7 @@ raiseAmount.addEventListener("input", () => {
     }
 });
 
-document.querySelectorAll("[data-action]").forEach((button) => {
+actionButtons.forEach((button) => {
     button.addEventListener("click", async () => {
         const action = button.dataset.action;
         let amount = 0;

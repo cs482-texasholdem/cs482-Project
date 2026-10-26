@@ -12,11 +12,13 @@ function getTableStatus(req, res) {
     let playerChips = 1000;
     let playerBet = 0;
     let playerHand = [];
+    let playerHasActed = false;
 
     if (playerId && mainTable.playerObjects.has(playerId)) {
         const p = mainTable.playerObjects.get(playerId);
         playerChips = p.chips;
         playerBet = p.currentBet;
+        playerHasActed = p.hasActed;
     }
 
     if (playerId && isPlayer && mainTable.gameInProgress) {
@@ -31,7 +33,7 @@ function getTableStatus(req, res) {
         return {
             id,
             chips: p ? p.chips : 1000,
-            status: p && p.folded ? "Folded" : "Active",
+            status: p && p.folded ? "Folded" : (p && p.hasActed ? "Acted" : "Active"),
             isCurrent: id === playerId
         };
     });
@@ -54,6 +56,7 @@ function getTableStatus(req, res) {
         pot: mainTable.pot,
         playerChips,
         playerBet,
+        playerHasActed,
         currentHighestBet: mainTable.currentHighestBet,
         communityCards: mainTable.displayCards(),
         playerHand
@@ -157,10 +160,9 @@ function nextRound(req, res) {
         }
     }
 
-    // If game is over, reset table back to initial lobby state after returning winner data
     const winnerData = result.winnerData;
     if (winnerData && winnerData.winners) {
-        mainTable.newGame();
+        mainTable.resetToLobby();
     }
 
     return res.status(200).json({
