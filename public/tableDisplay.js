@@ -51,8 +51,38 @@ const currentBetElem = document.getElementById("current-bet");
 const currentTurnPlayerElem = document.getElementById("current-turn-player");
 const timerText = document.getElementById("turn-timer-text");
 const timerCircle = document.getElementById("turn-timer-circle");
-const leaveTableBtn = document.getElementById("leave-table-btn");
 const actionButtons = document.querySelectorAll("[data-action]");
+
+// Dynamic Leave Button Injection to guarantee it loads without manual page refresh
+let leaveTableBtn = document.getElementById("leave-table-btn");
+if (!leaveTableBtn) {
+    const nav = document.querySelector(".navigation");
+    if (nav) {
+        leaveTableBtn = document.createElement("button");
+        leaveTableBtn.id = "leave-table-btn";
+        leaveTableBtn.textContent = "Leave Table";
+        leaveTableBtn.style.background = "#d42c25";
+        leaveTableBtn.style.borderColor = "#961e19";
+        nav.insertBefore(leaveTableBtn, nav.firstChild);
+    }
+}
+
+if (leaveTableBtn) {
+    leaveTableBtn.addEventListener("click", async () => {
+        if (confirm("Are you sure you want to leave the table?")) {
+            try {
+                await fetch("/api/table/leave", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ playerId: currentPlayerId })
+                });
+                window.location.href = "index.html";
+            } catch (error) {
+                console.error("Failed to leave table:", error);
+            }
+        }
+    });
+}
 
 let modalTimeout = null;
 let currentTimerRemaining = 30;
@@ -182,21 +212,6 @@ async function joinTable() {
         tableMessage.textContent = "Could not join table.";
     }
 }
-
-leaveTableBtn.addEventListener("click", async () => {
-    if (confirm("Are you sure you want to leave the table?")) {
-        try {
-            await fetch("/api/table/leave", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ playerId: currentPlayerId })
-            });
-            window.location.href = "index.html";
-        } catch (error) {
-            console.error("Failed to leave table:", error);
-        }
-    }
-});
 
 function showJoinPrompt(isSpectator = false) {
     let joinModalElem = document.getElementById("join-modal");
