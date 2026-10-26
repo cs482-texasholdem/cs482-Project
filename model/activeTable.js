@@ -20,21 +20,6 @@ class ActiveTable {
     constructor(tableId = "main", skillLevel = "general", timeLimit = 30) {
         this.tableId = tableId;
         this.skillLevel = skillLevel;
-        // Set the blind amounts for this table.
-        if (skillLevel === "beginner") {
-            this.smallBlindAmount = 1;
-            this.bigBlindAmount = 2;
-        } else if (skillLevel === "intermediate") {
-            this.smallBlindAmount = 25;
-            this.bigBlindAmount = 50;
-        } else if (skillLevel === "advanced") {
-            this.smallBlindAmount = 5;
-            this.bigBlindAmount = 10;
-        } else {
-            throw new Error("Unknown skill level.");
-        }
-
-
         this.timeLimit = timeLimit;
         this.maxPlayers = 10;
         this.queue = []; 
@@ -76,10 +61,6 @@ class ActiveTable {
 
     addPlayer(playerId) {
         if (typeof playerId !== "string" || !playerId.trim()) {
-            return false;
-        }
-
-        if (!Number.isInteger(chips) || chips <= 0) {
             return false;
         }
 

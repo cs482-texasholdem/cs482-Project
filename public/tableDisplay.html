@@ -150,42 +150,6 @@
 
                 <div class="player-side left-side" id="left-player-side"></div>
 
-<<<<<<< HEAD
-                    <div class="player-seat active">
-                        <span class="player-name">Player 1</span>
-                        <span class="player-status">Inactive</span>
-                        <span class="player-chips">1,000 chips</span>
-                    </div>
-
-                    <div class="player-seat active">
-                        <span class="player-name">Player 2</span>
-                        <span class="player-status">Inactive</span>
-                        <span class="player-chips">1,500 chips</span>
-                    </div>
-
-                    <div class="player-seat active">
-                        <span class="player-name">Player 3</span>
-                        <span class="player-status">Inactive</span>
-                        <span class="player-chips">850 chips</span>
-                    </div>
-
-                    <div class="player-seat active">
-                        <span class="player-name">Player 4</span>
-                        <span class="player-status">Inactive</span>
-                        <span class="player-chips">2,100 chips</span>
-                    </div>
-
-                    <div class="player-seat active">
-                        <span class="player-name">Player 5</span>
-                        <span class="player-status">Inactive</span>
-                        <span class="player-chips">1,200 chips</span>
-                    </div>
-
-                </div>
-
-                <!-- Pot and five community cards -->
-=======
->>>>>>> next_round_testing
                 <div class="table-center">
                     <div class="pot-display">
                         <span>Total Pot</span>
@@ -206,77 +170,10 @@
                     </p>
                 </div>
 
-<<<<<<< HEAD
-                <!-- Right five player seats -->
-                <div class="player-side right-side">
-
-                    <div class="player-seat active">
-                        <span class="player-name">Player 6</span>
-                        <span class="player-status">Inactive</span>
-                        <span class="player-chips">950 chips</span>
-                    </div>
-
-                    <div class="player-seat active">
-                        <span class="player-name">Player 7</span>
-                        <span class="player-status">Inactive</span>
-                        <span class="player-chips"></span>
-                    </div>
-
-                    <div class="player-seat disconnected">
-                        <span class="player-name">Player 8</span>
-                        <span class="player-status">Inactive</span>
-                        <span class="player-chips"></span>
-                    </div>
-
-                    <div class="player-seat active">
-                        <span class="player-name">Player 9</span>
-                        <span class="player-status">Inactive</span>
-                        <span class="player-chips"></span>
-                    </div>
-
-                    <div class="player-seat active">
-                        <span class="player-name">Player 10</span>
-                        <span class="player-status">Inactive</span>
-                        <span class="player-chips"></span>
-                    </div>
-
-                </div>
-=======
                 <div class="player-side right-side" id="right-player-side"></div>
->>>>>>> next_round_testing
-
-                <!-- Current player's turn indicator and countdown timer -->
-                <div id="turn-status" class="turn-status">
-                    <div class="turn-player">
-                        <div class="turn-avatar" aria-hidden="true">♠</div>
-
-                        <div class="turn-player-info">
-                            <span class="turn-label">CURRENT TURN</span>
-                            <strong id="current-player">Waiting...</strong>
-                        </div>
-                    </div>
-
-                    <div
-                        class="timer-ring"
-                        id="timer-ring"
-                        role="timer"
-                        aria-label="Time remaining"
-                        style="--timer-progress: 100%"
-                    >
-                        <div class="timer-ring-inner">
-                            <span id="turn-timer">30</span>
-                            <span class="timer-unit">SEC</span>
-                        </div>
-                    </div>
-                </div>
 
             </section>
 
-<<<<<<< HEAD
-
-            <!-- Your hand and personal chip information -->
-=======
->>>>>>> next_round_testing
             <section class="panel your-hand">
                 <div>
                     <h3>Your Hand (<span id="display-player-id">Player123</span>)</h3>
@@ -337,141 +234,6 @@
         </section>
     </main>
 
-<<<<<<< HEAD
-    <script>
-        // Keep the raise amount input synchronized with the slider.
-        const betScale = document.getElementById("bet-scale");
-        const raiseAmount = document.getElementById("raise-amount");
-        
-        const tableMessage = document.getElementById("table-message");
-        
-        // Load test cards from the backend.
-        async function loadTestCards() {
-            try {
-                const response = await fetch("/api/tables/table1/test-cards");
-
-                if (!response.ok) {
-                    throw new Error("Failed to load test cards.");
-                }
-
-                const game = await response.json();
-
-                renderCards("player-cards", game.playerHands[0]);
-                renderCards("community-cards", game.communityCards);
-            } catch (error) {
-                console.error("Error loading cards:", error);
-                tableMessage.textContent = "Could not load cards.";
-            }
-        }
-
-        // Display the cards inside an HTML container.
-        function renderCards(containerId, cards) {
-            const container = document.getElementById(containerId);
-            container.innerHTML = "";
-
-            cards.forEach((cardText) => {
-                const card = document.createElement("div");
-                card.className = "card";
-
-                if (cardText.includes("♥") || cardText.includes("♦")) {
-                    card.classList.add("red-suit");
-                }
-
-                card.textContent = cardText;
-                container.appendChild(card);
-            });
-        }
-
-        //loadTestCards();
-
-        betScale.addEventListener("input", () => {
-            raiseAmount.value = betScale.value;
-        });
-
-        raiseAmount.addEventListener("input", () => {
-            const amount = Number(raiseAmount.value);
-
-            if (amount >= 20 && amount <= 1000) {
-                betScale.value = amount;
-            }
-        });
-
-        // Display a demo message when a poker action button is clicked.
-        document.querySelectorAll("[data-action]").forEach((button) => {
-            button.addEventListener("click", () => {
-                const action = button.dataset.action;
-
-                if (action === "Raise") {
-                    const amount = Number(raiseAmount.value);
-
-                    if (
-                        !Number.isFinite(amount) ||
-                        amount < 20 ||
-                        amount > 1000
-                    ) {
-                        tableMessage.textContent =
-                            "Choose a raise amount between 20 and 1,000.";
-                        return;
-                    }
-
-                    tableMessage.textContent =
-                        `Raise selected: ${amount} chips (demo only).`;
-                    return;
-                }
-
-                tableMessage.textContent =
-                    `${action} selected (demo only).`;
-            });
-        });
-
-        // Add a sample chat message locally.
-        document.getElementById("chat-form").addEventListener(
-            "submit",
-            (event) => {
-                event.preventDefault();
-
-                const input = document.getElementById("chat-input");
-                const message = input.value.trim();
-
-                if (!message) {
-                    return;
-                }
-
-                const messageElement = document.createElement("div");
-                messageElement.className = "chat-message";
-
-                const sender = document.createElement("strong");
-                sender.textContent = "Player123";
-
-                messageElement.append(
-                    sender,
-                    document.createTextNode(message)
-                );
-
-                const chatMessages =
-                    document.getElementById("chat-messages");
-
-                chatMessages.appendChild(messageElement);
-                chatMessages.scrollTop = chatMessages.scrollHeight;
-                input.value = "";
-            }
-        );
-
-        // Settings button placeholder.
-        document.getElementById("settings-button").addEventListener(
-            "click",
-            () => {
-                tableMessage.textContent =
-                    "Settings are not implemented yet.";
-            }
-        );
-        
-        async function startDemo() {
-            try {
-                const response = await fetch("/api/tables/table1/start-demo", {
-                    method: "POST"
-                });
-=======
     <div id="winner-modal" class="modal-overlay">
         <div class="modal-content">
             <h2>Showdown</h2>
@@ -481,49 +243,6 @@
     </div>
 
     <script src="tableDisplay.js"></script>
->>>>>>> next_round_testing
 
-                if (!response.ok) {
-                    throw new Error("Failed to start the demo.");
-                }
-
-                const data = await response.json();
-
-                // Find all 10 player name elements.
-                const playerNames = document.querySelectorAll(".player-name");
-
-                // Display the six names returned by the backend.
-                data.players.forEach((name, index) => {
-                    playerNames[index].textContent = name;
-                });
-
-                // Display placeholders for the remaining four seats.
-                for (let i = data.players.length; i < playerNames.length; i++) {
-                    playerNames[i].textContent = "Empty Seat";
-                }
-
-                // Update the current player's turn.
-                document.getElementById("current-player").textContent =
-                    data.currentPlayer;
-
-                // Update the countdown display.
-                document.getElementById("turn-timer").textContent =
-                    data.timeRemaining;
-
-            } catch (error) {
-                console.error("Error starting demo:", error);
-                document.getElementById("table-message").textContent =
-                    "Could not start the demo.";
-            }
-        }
-
-        document.addEventListener("DOMContentLoaded", () => {
-            startDemo();
-        });
-    </script>
-    
-
-     <script src="tableDisplay.js"></script>
-    
 </body>
 </html>
