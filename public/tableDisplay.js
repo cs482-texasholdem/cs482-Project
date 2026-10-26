@@ -54,6 +54,32 @@ const timerCircle = document.getElementById("turn-timer-circle");
 const actionButtons = document.querySelectorAll("[data-action]");
 
 let modalTimeout = null;
+let currentTimerRemaining = 30;
+
+function updateTimerDisplay(rem) {
+    currentTimerRemaining = rem;
+    if (timerText) timerText.textContent = rem + "s";
+    if (timerCircle) {
+        if (rem > 15) {
+            timerCircle.style.backgroundColor = "#3c8d79"; // green
+            timerCircle.style.borderColor = "#2e6d5e";
+        } else if (rem > 5) {
+            timerCircle.style.backgroundColor = "#f1c40f"; // yellow
+            timerCircle.style.borderColor = "#d4ac0d";
+        } else {
+            timerCircle.style.backgroundColor = "#d42c25"; // red
+            timerCircle.style.borderColor = "#961e19";
+        }
+    }
+}
+
+// Local 1s countdown tick for smooth client experience
+setInterval(() => {
+    if (currentTimerRemaining > 0) {
+        currentTimerRemaining--;
+        updateTimerDisplay(currentTimerRemaining);
+    }
+}, 1000);
 
 async function fetchTableStatus() {
     try {
@@ -109,19 +135,8 @@ function renderActivePlayers(status) {
         currentTurnPlayerElem.textContent = status.currentTurnPlayer || "None";
     }
 
-    if (timerText && timerCircle && status.turnTimeRemaining !== undefined) {
-        const rem = status.turnTimeRemaining;
-        timerText.textContent = rem + "s";
-        if (rem > 15) {
-            timerCircle.style.backgroundColor = "#3c8d79"; // green
-            timerCircle.style.borderColor = "#2e6d5e";
-        } else if (rem > 5) {
-            timerCircle.style.backgroundColor = "#f1c40f"; // yellow
-            timerCircle.style.borderColor = "#d4ac0d";
-        } else {
-            timerCircle.style.backgroundColor = "#d42c25"; // red
-            timerCircle.style.borderColor = "#961e19";
-        }
+    if (status.turnTimeRemaining !== undefined) {
+        updateTimerDisplay(status.turnTimeRemaining);
     }
 
     if (status.buttonsBlocked) {
@@ -231,6 +246,12 @@ async function startGame() {
         renderCards("community-cards", data.communityCards);
         if (data.playerHand) {
             renderCards("player-cards", data.playerHand);
+        }
+        if (currentTurnPlayerElem && data.currentTurnPlayer) {
+            currentTurnPlayerElem.textContent = data.currentTurnPlayer;
+        }
+        if (data.turnTimeRemaining !== undefined) {
+            updateTimerDisplay(data.turnTimeRemaining);
         }
         tableMessage.textContent = "Game started! Place your bets or check.";
         refreshUI();

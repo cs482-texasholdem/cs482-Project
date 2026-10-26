@@ -133,11 +133,16 @@ function startGame(req, res) {
 
     const playerId = req.body.playerId || req.query.playerId || mainTable.players[0];
     const playerHand = mainTable.dealHandToPlayer(playerId);
+    const currentTurnPlayer = mainTable.players[mainTable.currentTurnIndex];
+    const elapsed = mainTable.turnStartTime ? Math.floor((Date.now() - mainTable.turnStartTime) / 1000) : 0;
+    const turnTimeRemaining = Math.max(0, 30 - elapsed);
 
     return res.status(200).json({
         message: "Game started successfully.",
         communityCards: mainTable.displayCards(),
-        playerHand: playerHand ? playerHand.map(card => Deck.cardToText(card)) : []
+        playerHand: playerHand ? playerHand.map(card => Deck.cardToText(card)) : [],
+        currentTurnPlayer,
+        turnTimeRemaining
     });
 }
 
