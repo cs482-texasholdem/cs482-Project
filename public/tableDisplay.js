@@ -1,208 +1,231 @@
-const tableController = require('./controllers/tableController'); // Adjust path as needed
+function getPlayerIdFromUrl() {
+    const urlParams = new URLSearchParams(window.location.search);
+    let id = urlParams.get("playerId");
+    
+    if (!id) {
+        const keys = Array.from(urlParams.keys());
+        if (keys.length > 0) {
+            id = keys[0];
+        }
+    }
+    
+    return id ? decodeURIComponent(id.trim()) : "";
+}
 
-/**
- * Temporary sample player data for the poker table frontend.
- * This data is for demonstration only and is not connected to the backend.
- */
-const samplePlayers = [
-    { name: "PokerPro", chips: 1250 },
-    { name: "LuckyAce", chips: 980 },
-    { name: "CardShark", chips: 2010 },
-    { name: "BlueMoon", chips: 1430 },
-    { name: "RiverRat", chips: 860 },
-    { name: "Player123", chips: 1980, current: true }
-];
+let currentPlayerId = getPlayerIdFromUrl();
 
-// Get the HTML elements used to display the players and table messages.
-const playersContainer = document.getElementById("players");
+function checkBlankName() {
+    if (!currentPlayerId) {
+        const name = prompt("Enter your Player ID to join the table:");
+        if (name && name.trim()) {
+            window.location.href = `tableDisplay.html?playerId=${encodeURIComponent(name.trim())}`;
+            return false;
+        } else {
+            alert("A valid Player ID is required to play.");
+            return checkBlankName();
+        }
+    }
+    return true;
+}
+
+if (!checkBlankName()) {
+    // halts execution until redirection
+}
+
+document.getElementById("header-player-name").textContent = currentPlayerId;
+document.getElementById("display-player-id").textContent = currentPlayerId;
+
+const betScale = document.getElementById("bet-scale");
+const raiseAmount = document.getElementById("raise-amount");
 const tableMessage = document.getElementById("table-message");
+const winnerModal = document.getElementById("winner-modal");
+const winnerModalText = document.getElementById("winner-modal-text");
+const modalCloseBtn = document.getElementById("modal-close-btn");
+const leftSideContainer = document.getElementById("left-player-side");
+const rightSideContainer = document.getElementById("right-player-side");
+const totalPotElem = document.getElementById("total-pot");
+const yourChipsElem = document.getElementById("your-chips");
+const availableChipsElem = document.getElementById("available-chips");
+const yourBetElem = document.getElementById("your-bet");
+const currentBetElem = document.getElementById("current-bet");
 
-/**
- * Displays the sample players and their information on the poker table.
- * Creates a seat for each player, including their name, cards, and chip count.
- * Highlights the local demo player.
- * 
- * @returns {void}
- */
-function displayPlayers() {
-    // Clear existing player seats before displaying the sample players.
-    if (playersContainer) {
-        playersContainer.replaceChildren();
+let modalTimeout = null;
 
-        // Create a seat for each player in the sample data.
-        samplePlayers.forEach((player) => {
-            const seat = document.createElement("div");
-            seat.classList.add("player-seat");
-
-            // Highlight the local demo player's seat.
-            if (player.current) {
-                seat.classList.add("current-player");
-            }
-
-            // Display the player's name.
-            const name = document.createElement("p");
-            name.textContent = player.name;
-
-            // Display sample cards for the local player and face-down cards for others.
-            const cards = document.createElement("p");
-            cards.classList.add("player-cards");
-            cards.textContent = player.current ? "A♠ K♥" : "🂠 🂠";
-
-            // Display the player's chip count.
-            const chips = document.createElement("p");
-            chips.textContent = `${player.chips.toLocaleString()} chips`;
-
-            // Add the player's information to the seat.
-            seat.append(name, cards, chips);
-
-            // Add the completed seat to the poker table.
-            playersContainer.appendChild(seat);
-        });
+async function fetchTableStatus() {
+    try {
+        const response = await fetch(`/api/table/status?playerId=${encodeURIComponent(currentPlayerId)}`);
+        if (!response.ok) throw new Error("Failed to fetch table status.");
+        return await response.json();
+    } catch (error) {
+        console.error("Error fetching table status:", error);
+        return null;
     }
 }
 
-// Display the sample players when the page loads.
-displayPlayers();
+function renderActivePlayers(status) {
+    if (!leftSideContainer || !rightSideContainer) return;
+    leftSideContainer.innerHTML = "";
+    rightSideContainer.innerHTML = "";
 
-/**
- * Handles clicks on the Fold, Check, Call, and Raise buttons.
- * Displays a demo message for the selected action and advances the round.
- * 
- * @param {Event} event The click event triggered by the button.
- * @returns {void}
- */
-async function handlePokerAction(event) {
-    // Get the selected action from the clicked button.
-    const action = event.currentTarget.dataset.action;
-    
-    // Handle the Raise action separately to validate its amount.
-    if (action === "Raise") {
-        const amount = Number(
-            document.getElementById("raise-amount").value
-        );
+    const players = status.players || [];
+    const half = Math.ceil(players.length / 2);
 
-        if (!Number.isFinite(amount) || amount < 20) {
-            tableMessage.textContent =
-                "Enter a raise amount of at least 20.";
-            return;
+    players.forEach((p, index) => {
+        const seat = document.createElement("div");
+        seat.className = `player-seat active ${p.isCurrent ? "current-player" : ""}`;
+
+        const nameSpan = document.createElement("span");
+        nameSpan.className = "player-name";
+        nameSpan.textContent = p.id + (p.isCurrent ? " (You)" : "");
+
+        const statusSpan = document.createElement("span");
+        statusSpan.className = "player-status";
+        statusSpan.textContent = p.status;
+
+        const chipsSpan = document.createElement("span");
+        chipsSpan.className = "player-chips";
+        chipsSpan.textContent = `${p.chips.toLocaleString()} chips`;
+
+        seat.append(nameSpan, statusSpan, chipsSpan);
+
+        if (index < half) {
+            leftSideContainer.appendChild(seat);
+        } else {
+            rightSideContainer.appendChild(seat);
         }
+    });
+
+    totalPotElem.textContent = status.pot || 0;
+    yourChipsElem.textContent = (status.playerChips || 0).toLocaleString();
+    availableChipsElem.textContent = (status.playerChips || 0).toLocaleString();
+    yourBetElem.textContent = status.playerBet || 0;
+    currentBetElem.textContent = status.currentHighestBet || 20;
+
+    if (status.communityCards) {
+        renderCards("community-cards", status.communityCards);
     }
-    
+    if (status.playerHand && status.playerHand.length > 0) {
+        renderCards("player-cards", status.playerHand);
+    }
+}
+
+async function joinTable() {
     try {
-        const response = await fetch("/api/next-round");
-        if (!response.ok) {
-            throw new Error("Failed to advance round.");
+        const response = await fetch("/api/table/join", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ playerId: currentPlayerId })
+        });
+        if (!response.ok) throw new Error("Failed to join table.");
+        const data = await response.json();
+        tableMessage.textContent = data.message;
+        hideJoinPrompt();
+        refreshUI();
+    } catch (error) {
+        console.error("Error joining table:", error);
+        tableMessage.textContent = "Could not join table.";
+    }
+}
+
+function showJoinPrompt(isSpectator = false) {
+    let joinModalElem = document.getElementById("join-modal");
+    if (!joinModalElem) {
+        joinModalElem = document.createElement("div");
+        joinModalElem.id = "join-modal";
+        joinModalElem.className = "modal-overlay";
+        joinModalElem.style.display = "flex";
+        joinModalElem.innerHTML = `
+            <div class="modal-content">
+                <h2>Texas Hold'em Table</h2>
+                <p>${isSpectator ? "Game in progress! You have joined as a spectator and will enter the game next round." : "Welcome! Click below to join the table."}</p>
+                <button type="button" id="join-table-btn">Join / Enter</button>
+            </div>
+        `;
+        document.body.appendChild(joinModalElem);
+        document.getElementById("join-table-btn").addEventListener("click", joinTable);
+    } else {
+        joinModalElem.style.display = "flex";
+    }
+}
+
+function hideJoinPrompt() {
+    const joinModalElem = document.getElementById("join-modal");
+    if (joinModalElem) {
+        joinModalElem.style.display = "none";
+    }
+}
+
+function renderStartGameButton(status) {
+    let startBtnContainer = document.getElementById("start-game-container");
+    if (!status.gameStarted && status.isPlayer) {
+        if (!startBtnContainer) {
+            startBtnContainer = document.createElement("div");
+            startBtnContainer.id = "start-game-container";
+            startBtnContainer.style.textAlign = "center";
+            startBtnContainer.style.margin = "10px 0";
+            startBtnContainer.innerHTML = `
+                <button type="button" id="start-game-btn" class="action-button raise" style="width: auto; height: auto; padding: 10px 20px; border-radius: 8px;">Start Game (Need 2+ Players)</button>
+            `;
+            const gameHeading = document.querySelector(".game-heading");
+            if (gameHeading) gameHeading.appendChild(startBtnContainer);
+            document.getElementById("start-game-btn").addEventListener("click", startGame);
         }
-        
+    } else if (startBtnContainer) {
+        startBtnContainer.remove();
+    }
+}
+
+async function startGame() {
+    try {
+        const response = await fetch("/api/table/start", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ playerId: currentPlayerId })
+        });
+        if (!response.ok) {
+            const err = await response.json();
+            throw new Error(err.error || "Failed to start game.");
+        }
         const data = await response.json();
         renderCards("community-cards", data.communityCards);
-
-        // Check if winner data was returned at showdown
-        if (data.winnerData && data.winnerData.winners) {
-            const winnersText = data.winnerData.winners.join(", ");
-            tableMessage.textContent = 
-                `🏆 Round Over! Winner(s): ${winnersText} (Score: ${data.winnerData.maxScore})`;
-            return;
+        if (data.playerHand) {
+            renderCards("player-cards", data.playerHand);
         }
-
-        if (action === "Raise") {
-            const amount = Number(document.getElementById("raise-amount").value);
-            tableMessage.textContent = `Raise selected: ${amount} chips (demo only).`;
-        } else {
-            tableMessage.textContent = `${action} selected (demo only).`;
-        }
+        tableMessage.textContent = "Game started! Place your bets or check.";
+        refreshUI();
     } catch (error) {
-        console.error("Error advancing round:", error);
+        alert(error.message);
     }
 }
 
-// Attach the action handler to each poker action button.
-document.querySelectorAll("[data-action]").forEach((button) => {
-    button.addEventListener("click", handlePokerAction);
-});
+async function refreshUI() {
+    const status = await fetchTableStatus();
+    if (!status) return;
 
-/**
- * Handles chat form submissions on the poker table page.
- * Adds a non-empty message to the local chat panel without reloading the page.
- * 
- * @param {SubmitEvent} event The chat form submission event.
- * @returns {void}
- */
-function handleChatSubmit(event) {
-    // Prevent the form from reloading the page.
-    event.preventDefault();
-
-    // Get the message and remove surrounding whitespace.
-    const input = document.getElementById("chat-input");
-    const message = input.value.trim();
-
-    // Ignore empty messages.
-    if (!message) {
+    if (!status.inTable) {
+        showJoinPrompt(status.gameInProgress);
         return;
     }
 
-    // Create the chat message using text content to avoid interpreting
-    // user-entered text as HTML.
-    const messageElement = document.createElement("p");
-    const sender = document.createElement("strong");
-
-    sender.textContent = "Player123: ";
-    messageElement.append(sender, document.createTextNode(message));
-
-    // Add the message to the chat panel.
-    const chatMessages = document.getElementById("chat-messages");
-    if (chatMessages) {
-        chatMessages.appendChild(messageElement);
-        chatMessages.scrollTop = chatMessages.scrollHeight;
+    if (status.isSpectator) {
+        tableMessage.textContent = "You are spectating. You will join active players when the next game starts.";
     }
 
-    // Clear the input after adding the message.
-    input.value = "";
+    renderActivePlayers(status);
+    renderStartGameButton(status);
 }
 
-// Attach the chat handler to the chat form.
-const chatForm = document.getElementById("chat-form");
-if (chatForm) {
-    chatForm.addEventListener("submit", handleChatSubmit);
-}
+// Initial refresh & automatic real-time polling every 2.5 seconds
+refreshUI();
+setInterval(refreshUI, 2500);
 
-/**
- * Loads test cards from the backend for the current player.
- */
-async function loadTestCards() {
-    try {
-        const playerId = "Player123";
-        const response = await fetch(`/api/test-cards?playerId=${encodeURIComponent(playerId)}`);
-
-        if (!response.ok) {
-            throw new Error("Failed to load cards");
-        }
-
-        const game = await response.json();
-
-        renderCards("player-cards", game.playerHand);
-        renderCards("community-cards", game.communityCards);
-    } catch (error) {
-        console.error("Error loading cards:", error);
-        if (tableMessage) {
-            tableMessage.textContent = "Could not load cards.";
-        }
-    }
-}
-
-/**
- * Displays the cards inside an HTML container.
- * 
- * @param {string} containerId ID of the container element.
- * @param {Array<string>} cards Array of card text representations.
- */
 function renderCards(containerId, cards) {
     const container = document.getElementById(containerId);
     if (!container) return;
     
     container.innerHTML = "";
 
-    cards.forEach(cardText => {
+    cards.forEach((cardText) => {
         const card = document.createElement("div");
         card.className = "card";
 
@@ -215,5 +238,109 @@ function renderCards(containerId, cards) {
     });
 }
 
-// Initial load of test cards when the script runs.
-loadTestCards();
+betScale.addEventListener("input", () => {
+    raiseAmount.value = betScale.value;
+});
+
+raiseAmount.addEventListener("input", () => {
+    const amount = Number(raiseAmount.value);
+    if (amount >= 20 && amount <= 1000) {
+        betScale.value = amount;
+    }
+});
+
+document.querySelectorAll("[data-action]").forEach((button) => {
+    button.addEventListener("click", async () => {
+        const action = button.dataset.action;
+        let amount = 0;
+
+        if (action === "Raise") {
+            amount = Number(raiseAmount.value);
+            if (!Number.isFinite(amount) || amount < 20) {
+                tableMessage.textContent = "Enter a valid raise amount.";
+                return;
+            }
+        }
+
+        try {
+            const res = await fetch("/api/table/action", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ playerId: currentPlayerId, action, amount })
+            });
+
+            if (!res.ok) {
+                const err = await res.json();
+                tableMessage.textContent = err.error || "Action failed.";
+                return;
+            }
+
+            tableMessage.textContent = `${action} successful. Click Next Round when ready.`;
+            refreshUI();
+        } catch (error) {
+            console.error("Error executing action:", error);
+        }
+    });
+});
+
+async function handleNextRound() {
+    try {
+        const response = await fetch(`/api/table/next-round?playerId=${encodeURIComponent(currentPlayerId)}`);
+        if (!response.ok) {
+            const err = await response.json();
+            tableMessage.textContent = err.error || "Failed to advance round.";
+            return;
+        }
+        
+        const data = await response.json();
+        renderCards("community-cards", data.communityCards);
+        if (data.playerHand && data.playerHand.length > 0) {
+            renderCards("player-cards", data.playerHand);
+        }
+
+        if (data.winnerData && data.winnerData.winners) {
+            const winnersText = data.winnerData.winners.join(", ");
+            winnerModalText.innerHTML = `Winner(s):<br><strong>${winnersText}</strong><br>Pot Won: ${data.winnerData.pot}`;
+            winnerModal.style.display = "flex";
+            tableMessage.textContent = "Round complete. Showing winner...";
+
+            if (modalTimeout) clearTimeout(modalTimeout);
+            modalTimeout = setTimeout(() => {
+                winnerModal.style.display = "none";
+                refreshUI();
+            }, 3500);
+            return;
+        }
+
+        tableMessage.textContent = "Round advanced. Waiting for player actions.";
+        refreshUI();
+    } catch (error) {
+        console.error("Error advancing round:", error);
+    }
+}
+
+document.querySelector(".table-center").addEventListener("click", handleNextRound);
+
+modalCloseBtn.addEventListener("click", () => {
+    if (modalTimeout) clearTimeout(modalTimeout);
+    winnerModal.style.display = "none";
+    refreshUI();
+});
+
+document.getElementById("chat-form").addEventListener("submit", (event) => {
+    event.preventDefault();
+    const input = document.getElementById("chat-input");
+    const message = input.value.trim();
+    if (!message) return;
+
+    const messageElement = document.createElement("div");
+    messageElement.className = "chat-message";
+    const sender = document.createElement("strong");
+    sender.textContent = currentPlayerId + ": ";
+    messageElement.append(sender, document.createTextNode(message));
+
+    const chatMessages = document.getElementById("chat-messages");
+    chatMessages.appendChild(messageElement);
+    chatMessages.scrollTop = chatMessages.scrollHeight;
+    input.value = "";
+});

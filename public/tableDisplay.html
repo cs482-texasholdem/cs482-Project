@@ -6,7 +6,6 @@
     <title>Texas Hold'em Poker</title>
     <link rel="stylesheet" href="style.css">
     <style>
-        /* Poker Chip Modal Popup Styles */
         .modal-overlay {
             display: none;
             position: fixed;
@@ -69,7 +68,6 @@
 
 <body class="table-page">
 
-    <!-- Navigation and account information -->
     <header class="top-bar">
         <h1>♠ Texas Hold'em</h1>
 
@@ -89,14 +87,13 @@
 
     <main class="page-layout">
 
-        <!-- Chat on the left -->
         <aside class="panel chat-panel">
             <h2>Table Chat</h2>
 
             <div class="chat-messages" id="chat-messages" aria-live="polite">
                 <div class="chat-message">
                     <strong>Dealer</strong>
-                    Welcome to Table 1!
+                    Welcome to the table!
                 </div>
             </div>
 
@@ -112,30 +109,20 @@
             </form>
         </aside>
 
-        <!-- Main game area -->
         <section class="game-area">
 
             <div class="game-heading">
                 <div>
-                    <h2>Table 1</h2>
-                    <p>No Limit Texas Hold'em · Blinds 10 / 20</p>
+                    <h2>Main Table</h2>
+                    <p>No Limit Texas Hold'em · Blinds 10 / 20 (Click community cards or table status to advance round)</p>
                 </div>
             </div>
 
-            <!-- Rectangular table with five players on each side -->
             <section class="poker-table" aria-label="Poker table">
 
-                <!-- Left five player seats -->
-                <div class="player-side left-side">
-                    <div class="player-seat active">
-                        <span class="player-name">Player 1</span>
-                        <span class="player-status">Active</span>
-                        <span class="player-chips">1,000 chips</span>
-                    </div>
-                </div>
+                <div class="player-side left-side" id="left-player-side"></div>
 
-                <!-- Pot and five community cards -->
-                <div class="table-center">
+                <div class="table-center" style="cursor: pointer;" title="Click here to advance round after all actions">
                     <div class="pot-display">
                         <span>Total Pot</span>
                         <strong id="total-pot">600</strong>
@@ -144,22 +131,14 @@
                     <div class="community-cards" id="community-cards" aria-label="Community cards"></div>
 
                     <p class="table-status" id="table-message">
-                        Waiting for the next action.
+                        Waiting for action.
                     </p>
                 </div>
 
-                <!-- Right five player seats -->
-                <div class="player-side right-side">
-                    <div class="player-seat active">
-                        <span class="player-name">Player 10</span>
-                        <span class="player-status">Active</span>
-                        <span class="player-chips">1,300 chips</span>
-                    </div>
-                </div>
+                <div class="player-side right-side" id="right-player-side"></div>
 
             </section>
 
-            <!-- Your hand and personal chip information -->
             <section class="panel your-hand">
                 <div>
                     <h3>Your Hand (<span id="display-player-id">Player123</span>)</h3>
@@ -170,7 +149,6 @@
                 <div id="player-cards" class="player-hand" aria-label="Your two cards"></div>
             </section>
 
-            <!-- Betting scale and round action buttons at the bottom -->
             <section class="panel betting-panel">
                 <h3>Your Turn</h3>
 
@@ -221,7 +199,6 @@
         </section>
     </main>
 
-    <!-- Poker Chip Winner Popup Modal Overlay -->
     <div id="winner-modal" class="modal-overlay">
         <div class="modal-content">
             <h2>Showdown</h2>
@@ -230,201 +207,7 @@
         </div>
     </div>
 
-    <script>
-        // Extract Player ID from URL (supports ?playerId=Name or shorthand ?Name)
-        function getPlayerIdFromUrl() {
-            const urlParams = new URLSearchParams(window.location.search);
-            let id = urlParams.get("playerId");
-            
-            if (!id) {
-                const keys = Array.from(urlParams.keys());
-                if (keys.length > 0) {
-                    id = keys[0];
-                }
-            }
-            
-            return id ? decodeURIComponent(id.trim()) : "Player123";
-        }
-
-        const currentPlayerId = getPlayerIdFromUrl();
-
-        // Update UI elements with the dynamic player ID
-        document.getElementById("header-player-name").textContent = currentPlayerId;
-        document.getElementById("display-player-id").textContent = currentPlayerId;
-
-        // DOM Elements
-        const betScale = document.getElementById("bet-scale");
-        const raiseAmount = document.getElementById("raise-amount");
-        const tableMessage = document.getElementById("table-message");
-        const winnerModal = document.getElementById("winner-modal");
-        const winnerModalText = document.getElementById("winner-modal-text");
-        const modalCloseBtn = document.getElementById("modal-close-btn");
-        
-        let modalTimeout = null;
-
-        // Load initial test cards from backend using the dynamic player ID
-        async function loadTestCards() {
-            try {
-                const response = await fetch(`/api/test-cards?playerId=${encodeURIComponent(currentPlayerId)}`);
-
-                if (!response.ok) {
-                    throw new Error("Failed to load test cards.");
-                }
-
-                const game = await response.json();
-
-                renderCards("player-cards", game.playerHand);
-                renderCards("community-cards", game.communityCards);
-            } catch (error) {
-                console.error("Error loading cards:", error);
-                tableMessage.textContent = "Could not load cards.";
-            }
-        }
-
-        // Display cards inside a container
-        function renderCards(containerId, cards) {
-            const container = document.getElementById(containerId);
-            if (!container) return;
-            
-            container.innerHTML = "";
-
-            cards.forEach((cardText) => {
-                const card = document.createElement("div");
-                card.className = "card";
-
-                if (cardText.includes("♥") || cardText.includes("♦")) {
-                    card.classList.add("red-suit");
-                }
-
-                card.textContent = cardText;
-                container.appendChild(card);
-            });
-        }
-
-        loadTestCards();
-
-        // Slider and number input synchronization
-        betScale.addEventListener("input", () => {
-            raiseAmount.value = betScale.value;
-        });
-
-        raiseAmount.addEventListener("input", () => {
-            const amount = Number(raiseAmount.value);
-
-            if (amount >= 20 && amount <= 1000) {
-                betScale.value = amount;
-            }
-        });
-
-        // Function to start a new game automatically
-        async function startNewGameAutomatically() {
-            winnerModal.style.display = "none";
-            try {
-                const response = await fetch(`/api/new-game?playerId=${encodeURIComponent(currentPlayerId)}`);
-                if (!response.ok) {
-                    throw new Error("Failed to start new game.");
-                }
-                const game = await response.json();
-                renderCards("player-cards", game.playerHand);
-                renderCards("community-cards", game.communityCards);
-                tableMessage.textContent = "New game started. Waiting for next action.";
-            } catch (error) {
-                console.error("Error starting new game:", error);
-                tableMessage.textContent = "Could not start new game.";
-            }
-        }
-
-        // Handle action buttons and advance round
-        document.querySelectorAll("[data-action]").forEach((button) => {
-            button.addEventListener("click", async () => {
-                const action = button.dataset.action;
-
-                try {
-                    const response = await fetch("/api/next-round");
-                    if (!response.ok) {
-                        throw new Error("Failed to advance round.");
-                    }
-                    
-                    const data = await response.json();
-                    renderCards("community-cards", data.communityCards);
-
-                    // Check if winner data was returned at showdown
-                    if (data.winnerData && data.winnerData.winners) {
-                        const winnersText = data.winnerData.winners.join(", ");
-                        winnerModalText.innerHTML = `Winner(s):<br><strong>${winnersText}</strong><br>Score: ${data.winnerData.maxScore}`;
-                        winnerModal.style.display = "flex";
-                        tableMessage.textContent = "Round complete. Showing winner chip...";
-
-                        // Clear any existing timeout to avoid overlaps
-                        if (modalTimeout) clearTimeout(modalTimeout);
-
-                        // Automatically move on to the next game after 3.5 seconds
-                        modalTimeout = setTimeout(() => {
-                            startNewGameAutomatically();
-                        }, 3500);
-
-                        return;
-                    }
-
-                    if (action === "Raise") {
-                        const amount = Number(raiseAmount.value);
-
-                        if (
-                            !Number.isFinite(amount) ||
-                            amount < 20 ||
-                            amount > 1000
-                        ) {
-                            tableMessage.textContent =
-                                "Choose a raise amount between 20 and 1,000.";
-                            return;
-                        }
-
-                        tableMessage.textContent =
-                            `Raise selected: ${amount} chips (demo only).`;
-                        return;
-                    }
-
-                    tableMessage.textContent = `${action} selected (demo only).`;
-
-                } catch (error) {
-                    console.error("Error advancing round:", error);
-                }
-            });
-        });
-
-        // Allow manual skip via the button as well
-        modalCloseBtn.addEventListener("click", () => {
-            if (modalTimeout) clearTimeout(modalTimeout);
-            startNewGameAutomatically();
-        });
-
-        // Chat submission
-        document.getElementById("chat-form").addEventListener("submit", (event) => {
-            event.preventDefault();
-
-            const input = document.getElementById("chat-input");
-            const message = input.value.trim();
-
-            if (!message) return;
-
-            const messageElement = document.createElement("div");
-            messageElement.className = "chat-message";
-
-            const sender = document.createElement("strong");
-            sender.textContent = currentPlayerId + ": ";
-
-            messageElement.append(sender, document.createTextNode(message));
-
-            const chatMessages = document.getElementById("chat-messages");
-            chatMessages.appendChild(messageElement);
-            chatMessages.scrollTop = chatMessages.scrollHeight;
-            input.value = "";
-        });
-
-        document.getElementById("settings-button").addEventListener("click", () => {
-            tableMessage.textContent = "Settings are not implemented yet.";
-        });
-    </script>
+    <script src="tableDisplay.js"></script>
 
 </body>
 </html>

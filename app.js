@@ -3,7 +3,7 @@ const express = require('express'); // import express server
 const morgan = require('morgan'); // import morgan for logging
 const session = require('express-session'); // generic session handling for express
 const cors = require('cors'); // to avoid cors errors with react
-const mongostore = require('connect-mongo').default; // <-- Added .default here
+const mongostore = require('connect-mongo').default;
 
 const app = express(); // creates a new Express Application
 app.use(morgan('dev')); // For better logging, we use morgan
@@ -19,8 +19,6 @@ const sessionOptions = {
     cookie: {maxAge: 1000 * 60 * 60 * 24}
 };
 
-// Use MongoDB sessions during normal application startup.
-// Jest uses Express's default in-memory session store.
 if (process.env.NODE_ENV !== "test") {
     sessionOptions.store = mongostore.create({
         mongoUrl: process.env.DB_URI,
@@ -40,14 +38,13 @@ app.get('/loggeduser', UserCont.loggedUser);
 app.get('/logout', UserCont.logout); 
 app.get('/deluser/:id', UserCont.deleteOne); 
 
-
-// Table Actions
-const {joinTable, leaveTable, dealTestHand, nextRound, startNewGame} = require("./controller/tableController");
-app.post("/api/tables/:tableId/join", joinTable);
-app.post("/api/tables/:tableId/leave", leaveTable);
-// Temporary route to test pokerLogic
-app.get("/api/test-cards", dealTestHand);
-app.get("/api/next-round", nextRound);
-app.get("/api/new-game", startNewGame);
+// Table Actions (Single Table Architecture)
+const {joinTable, leaveTable, playerAction, startGame, nextRound, getTableStatus} = require("./controller/tableController");
+app.get("/api/table/status", getTableStatus);
+app.post("/api/table/join", joinTable);
+app.post("/api/table/leave", leaveTable);
+app.post("/api/table/action", playerAction);
+app.post("/api/table/start", startGame);
+app.get("/api/table/next-round", nextRound);
 
 exports.app = app;
