@@ -349,7 +349,7 @@ describe("ActiveTable", () => {
         });
 
         test("rejects starting a turn for a folded player", () => {
-            table.foldedPlayers.push("Bubbles");
+            table.foldedPlayers.add("Bubbles");
             expect(table.startTurn(1)).toBe(false);
         });
 
@@ -386,7 +386,7 @@ describe("ActiveTable", () => {
 
         test("skips folded players when advancing", () => {
             table.startTurn(0);
-            table.foldedPlayers.push("Bubbles");
+            table.foldedPlayers.add("Bubbles");
             expect(table.advanceTurn()).toBe(true);
             expect(table.currentPlayerIndex).toBe(2);
         });
@@ -410,7 +410,7 @@ describe("ActiveTable", () => {
 
         test("clears the turn when every player has folded", () => {
             table.startTurn(0);
-            table.foldedPlayers = ["Blossom", "Bubbles", "Buttercup"];
+            table.foldedPlayers = new Set(["Blossom", "Bubbles", "Buttercup"]);
             expect(table.advanceTurn()).toBe(false);
             expect(table.currentPlayerIndex).toBe(null);
             expect(table.turnEndsAt).toBe(null);
