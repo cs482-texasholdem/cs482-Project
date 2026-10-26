@@ -121,6 +121,7 @@ describe("dealTestHand", () => {
         expect(response.body).toEqual({
             players: expect.any(Array),
             pot: expect.any(Number),
+            currentBet: expect.any(Number),
             dealerIndex: expect.any(Number),
             smallBlindIndex: expect.any(Number),
             bigBlindIndex: expect.any(Number),
