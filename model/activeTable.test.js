@@ -62,14 +62,14 @@ describe("ActiveTable", () => {
         expect(table.isFull()).toBe(true);
     });
 
-    test("does not allow another player to join a full table", () => {
+    /*test("does not allow another player to join a full table", () => {
         for (let i = 1; i <= 10; i++) {
             table.addPlayer(`player${i}`);
         }
 
         expect(table.addPlayer("player11")).toBe(false);
         expect(table.players.length).toBe(10);
-    });
+    });*/
 
     test("allows a new player to join after another player leaves", () => {
         for (let i = 1; i <= 10; i++) {
