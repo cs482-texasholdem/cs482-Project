@@ -179,9 +179,7 @@ class ActiveTable {
             player.currentBet = amount;
             this.currentHighestBet = amount;
             this.pot += diff;
-            // Update aggressor on raise
             this.aggressorIndex = this.players.indexOf(playerId);
-            // Reset hasActed for others so they can respond to the raise
             for (const id of this.players) {
                 if (id !== playerId) {
                     const p = this.playerObjects.get(id);
@@ -198,16 +196,16 @@ class ActiveTable {
             return { success: true, roundAdvanced: true, winnerData };
         }
 
-        // Advance turn
-        do {
-            this.currentTurnIndex = (this.currentTurnIndex + 1) % this.players.length;
-        } while (this.playerObjects.get(this.players[this.currentTurnIndex]).folded);
-
-        // Next round logic triggers only when it is the turn of the aggressor and all have acted/matched
-        if (this.allPlayersHaveActedAndMatched() && this.currentTurnIndex === this.aggressorIndex) {
+        // Check if betting round is complete
+        if (this.allPlayersHaveActedAndMatched()) {
             const roundResult = this.nextRound();
             return { success: true, roundAdvanced: true, ...roundResult };
         }
+
+        // Advance to the next active (non-folded) player
+        do {
+            this.currentTurnIndex = (this.currentTurnIndex + 1) % this.players.length;
+        } while (this.playerObjects.get(this.players[this.currentTurnIndex]).folded);
 
         return { success: true, roundAdvanced: false };
     }
@@ -236,7 +234,11 @@ class ActiveTable {
             }
         }
         this.currentHighestBet = 0;
-        this.currentTurnIndex = this.aggressorIndex;
+        // Start post-flop turn rotation from the first active player left of the dealer
+        this.currentTurnIndex = (this.dealerIndex + 1) % this.players.length;
+        while (this.playerObjects.get(this.players[this.currentTurnIndex]).folded) {
+            this.currentTurnIndex = (this.currentTurnIndex + 1) % this.players.length;
+        }
     }
 
     nextRound() {
@@ -307,10 +309,6 @@ class ActiveTable {
         }
         this.gameCount++;
 
-        // Aggressor defaults to the left of the dealer
-        this.aggressorIndex = (this.dealerIndex + 1) % this.players.length;
-        this.currentTurnIndex = this.aggressorIndex;
-
         for (const playerId of this.players) {
             const p = this.playerObjects.get(playerId);
             if (p) {
@@ -318,6 +316,36 @@ class ActiveTable {
                 p.currentBet = 0; 
                 p.hasActed = false;
             }
+        }
+
+        const n = this.players.length;
+        if (n >= 2) {
+            let sbIndex = (n === 2) ? this.dealerIndex : (this.dealerIndex + 1) % n;
+            let bbIndex = (n === 2) ? (this.dealerIndex + 1) % n : (this.dealerIndex + 2) % n;
+
+            const sbPlayer = this.playerObjects.get(this.players[sbIndex]);
+            const bbPlayer = this.playerObjects.get(this.players[bbIndex]);
+
+            // Manually posting Small Blind (10)
+            const sbAmount = Math.min(10, sbPlayer.chips);
+            sbPlayer.chips -= sbAmount;
+            sbPlayer.currentBet = sbAmount;
+            this.pot += sbAmount;
+
+            // Manually posting Big Blind (20)
+            const bbAmount = Math.min(20, bbPlayer.chips);
+            bbPlayer.chips -= bbAmount;
+            bbPlayer.currentBet = bbAmount;
+            this.currentHighestBet = bbAmount;
+            this.pot += bbAmount;
+
+            // Set initial turn pre-flop (left of Big Blind)
+            if (n > 2) {
+                this.currentTurnIndex = (this.dealerIndex + 3) % n;
+            } else {
+                this.currentTurnIndex = sbIndex;
+            }
+            this.aggressorIndex = bbIndex;
         }
     }
 
