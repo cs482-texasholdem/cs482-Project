@@ -133,10 +133,17 @@ exports.postCreateOrUpdate = async function(req, res){
 exports.register = async function(req, res){
     try {
         let userData = {};
+<<<<<<< HEAD
         userData.login = req.body.txt_login;     // Username handle
         userData.email = req.body.txt_email;     // Email address
         userData.permission = 2;                  // New signups are always standard players
         userData.points = 1000;                   // Starting chip points
+=======
+        userData.username = req.body.txt_username;
+        userData.email = req.body.txt_login;
+        userData.permission = 2; // New signups are always standard players
+        userData.points = 1000; // Starting points
+>>>>>>> next_round_testing
 
         if(req.body.txt_pass) {
             userData.password = passUtil.hashPassword(req.body.txt_pass);
@@ -145,6 +152,7 @@ exports.register = async function(req, res){
         // Save new user to MongoDB Atlas
         await dao.create(userData);
 
+<<<<<<< HEAD
         // Establish session object matching login format
         req.session.user = {
             login: userData.login,
@@ -152,6 +160,11 @@ exports.register = async function(req, res){
             permission: userData.permission,
             points: userData.points
         };
+=======
+        // Automatically log them in or redirect them straight to home
+        req.session.user = userData.email;
+        req.session.permission = 2;
+>>>>>>> next_round_testing
 
         res.redirect('/index.html');
     } catch (error) {

@@ -1,104 +1,131 @@
-/**
- * Table Controller
- * Handles API requests for joining and leaving poker tables.
- * @module tableController
- */
-
 const ActiveTable = require("../model/activeTable");
 const Deck = require("../util/pokerLogic");
 
-// Stores active tables in memory.
-const tables = new Map([
-    ["table1", new ActiveTable("table1", "beginner")],
-    ["table2", new ActiveTable("table2", "intermediate")],
-    ["table3", new ActiveTable("table3", "advanced")]
-]);
+const mainTable = new ActiveTable("main", "general");
 
-/**
- * Handles a request to join a poker table.
- * @param {Object} req - Express request object.
- * @param {Object} res - Express response object.
- * @returns {Object} HTTP response containing the result of the request.
- */
-function joinTable(req, res) {
-    const { tableId } = req.params;
-    const playerId = req.body.playerId;
+function getTableStatus(req, res) {
+    mainTable.checkTimeout(); // Check if current player's turn has timed out
 
-    if (typeof playerId !== "string" || !playerId.trim()) {
-        return res.status(400).json({
-            error: "Player ID is required."
-        });
+    const playerId = req.query.playerId;
+    const inTable = playerId ? mainTable.hasPlayer(playerId) : false;
+    const isPlayer = playerId ? mainTable.players.includes(playerId) : false;
+    const isSpectator = playerId ? mainTable.spectators.includes(playerId) : false;
+    
+    let playerChips = 1000;
+    let playerBet = 0;
+    let playerHand = [];
+    let playerHasActed = false;
+
+    if (playerId && mainTable.playerObjects.has(playerId)) {
+        const p = mainTable.playerObjects.get(playerId);
+        playerChips = p.chips;
+        playerBet = p.currentBet;
+        playerHasActed = p.hasActed;
     }
 
-    const table = tables.get(tableId);
+    if (playerId && isPlayer && mainTable.gameInProgress) {
+        let hand = mainTable.dealHandToPlayer(playerId);
+        if (hand) {
+            playerHand = hand.map(card => Deck.cardToText(card));
+        }
+    }
 
-    if (!table) {
-        return res.status(404).json({
-            error: "Table not found."
-        });
+    const currentTurnPlayer = (mainTable.gameInProgress && mainTable.players.length > 0) ? mainTable.players[mainTable.currentTurnIndex] : null;
+    const dealerPlayerId = (mainTable.gameInProgress && mainTable.players.length > 0) ? mainTable.players[mainTable.dealerIndex] : null;
+    const isCurrentTurn = playerId === currentTurnPlayer;
+    const buttonsBlocked = !isPlayer || isSpectator || !mainTable.gameInProgress || !isCurrentTurn || playerHasActed;
+
+    const elapsed = mainTable.turnStartTime ? Math.floor((Date.now() - mainTable.turnStartTime) / 1000) : 0;
+    const turnTimeRemaining = Math.max(0, 30 - elapsed);
+
+    const allPlayersData = mainTable.players.map(id => {
+        const p = mainTable.playerObjects.get(id);
+        const isDealer = id === dealerPlayerId;
+        return {
+            id,
+            chips: p ? p.chips : 1000,
+            status: p && p.folded ? "Folded" : (p && p.hasActed ? "Acted" : "Active"),
+            isCurrent: id === playerId,
+            isDealer
+        };
+    });
+
+    const spectatorsData = mainTable.spectators;
+
+    return res.status(200).json({
+        tableId: mainTable.tableId,
+        skillLevel: mainTable.skillLevel,
+        playerCount: mainTable.getPlayerCount(),
+        spectatorCount: mainTable.getSpectatorCount(),
+        maxPlayers: mainTable.maxPlayers,
+        players: allPlayersData,
+        spectators: spectatorsData,
+        inTable,
+        isPlayer,
+        isSpectator,
+        gameStarted: mainTable.gameStarted,
+        gameInProgress: mainTable.gameInProgress,
+        pot: mainTable.pot,
+        playerChips,
+        playerBet,
+        playerHasActed,
+        currentTurnPlayer,
+        isCurrentTurn,
+        buttonsBlocked,
+        turnTimeRemaining,
+        currentHighestBet: mainTable.currentHighestBet,
+        communityCards: mainTable.displayCards(),
+        playerHand
+    });
+}
+
+function joinTable(req, res) {
+    const playerId = req.body.playerId || req.query.playerId;
+
+    if (typeof playerId !== "string" || !playerId.trim()) {
+        return res.status(400).json({ error: "Player ID is required." });
     }
 
     const id = playerId.trim();
 
-    if (table.hasPlayer(id)) {
-        return res.status(409).json({
-            error: "Player has already joined this table."
+    if (mainTable.hasPlayer(id)) {
+        return res.status(200).json({
+            message: "Player is already at the table.",
+            isPlayer: mainTable.players.includes(id)
         });
     }
 
-    if (!table.addPlayer(id)) {
-        return res.status(409).json({
-            error: "Table is full."
-        });
+    if (!mainTable.addPlayer(id)) {
+        return res.status(409).json({ error: "Could not add player to table." });
     }
+
+    const isPlayer = mainTable.players.includes(id);
 
     return res.status(200).json({
-        message: "Successfully joined the table.",
-        tableId: table.tableId,
-        skillLevel: table.skillLevel,
-        playerCount: table.getPlayerCount(),
-        maxPlayers: table.maxPlayers
+        message: isPlayer ? "Successfully joined the table as a player." : "Game in progress. Added to spectator queue.",
+        isPlayer,
+        playerCount: mainTable.getPlayerCount()
     });
 }
 
-/**
- * Handles a request to leave a poker table.
- * @param {Object} req - Express request object.
- * @param {Object} res - Express response object.
- * @returns {Object} HTTP response containing the result of the request.
- */
 function leaveTable(req, res) {
-    const { tableId } = req.params;
-    const playerId = req.body.playerId;
+    const playerId = req.body.playerId || req.query.playerId;
 
     if (typeof playerId !== "string" || !playerId.trim()) {
-        return res.status(400).json({
-            error: "Player ID is required."
-        });
+        return res.status(400).json({ error: "Player ID is required." });
     }
 
-    const table = tables.get(tableId);
-
-    if (!table) {
-        return res.status(404).json({
-            error: "Table not found."
-        });
-    }
-
-    if (!table.removePlayer(playerId.trim())) {
-        return res.status(404).json({
-            error: "Player is not in this table."
-        });
+    if (!mainTable.removePlayer(playerId.trim())) {
+        return res.status(404).json({ error: "Player is not in this table." });
     }
 
     return res.status(200).json({
         message: "Successfully left the table.",
-        tableId: table.tableId,
-        playerCount: table.getPlayerCount(),
-        maxPlayers: table.maxPlayers
+        playerCount: mainTable.getPlayerCount()
     });
 }
 
+<<<<<<< HEAD
 /**
  * Handles folding logic
  * @param {Object} req - Express request object.
@@ -388,3 +415,83 @@ function startDemoHand(req, res) {
 
 
 module.exports = { joinTable, leaveTable, dealTestHand, getTableState, startDemoHand, foldPlayer, checkPlayer, callPlayer, raisePlayer };
+=======
+function startGame(req, res) {
+    const result = mainTable.startGame();
+    if (!result.success) {
+        return res.status(400).json({ error: result.error });
+    }
+
+    const playerId = req.body.playerId || req.query.playerId || mainTable.players[0];
+    const playerHand = mainTable.dealHandToPlayer(playerId);
+    const currentTurnPlayer = mainTable.players[mainTable.currentTurnIndex];
+    const elapsed = mainTable.turnStartTime ? Math.floor((Date.now() - mainTable.turnStartTime) / 1000) : 0;
+    const turnTimeRemaining = Math.max(0, 30 - elapsed);
+
+    return res.status(200).json({
+        message: "Game started successfully.",
+        communityCards: mainTable.displayCards(),
+        playerHand: playerHand ? playerHand.map(card => Deck.cardToText(card)) : [],
+        currentTurnPlayer,
+        turnTimeRemaining
+    });
+}
+
+function playerAction(req, res) {
+    const { playerId, action, amount } = req.body;
+    if (!playerId || !action) {
+        return res.status(400).json({ error: "Player ID and action are required." });
+    }
+
+    const result = mainTable.recordAction(playerId, action, Number(amount) || 0);
+    if (!result.success) {
+        return res.status(400).json({ error: result.error });
+    }
+
+    const p = mainTable.playerObjects.get(playerId);
+    const winnerData = result.winnerData;
+    if (winnerData && winnerData.winners) {
+        mainTable.resetToLobby();
+    }
+
+    return res.status(200).json({
+        message: `Action ${action} recorded successfully.`,
+        chips: p.chips,
+        currentBet: p.currentBet,
+        pot: mainTable.pot,
+        winnerData,
+        communityCards: mainTable.displayCards()
+    });
+}
+
+function nextRound(req, res) {
+    const result = mainTable.nextRound();
+    if (result.error) {
+        return res.status(400).json({ error: result.error });
+    }
+
+    const playerId = req.query.playerId;
+    let playerHand = [];
+    if (playerId && mainTable.players.includes(playerId)) {
+        let hand = mainTable.dealHandToPlayer(playerId);
+        if (hand) {
+            playerHand = hand.map(card => Deck.cardToText(card));
+        }
+    }
+
+    const winnerData = result.winnerData;
+    if (winnerData && winnerData.winners) {
+        mainTable.resetToLobby();
+    }
+
+    return res.status(200).json({
+        message: "Advanced to the next round.",
+        communityCards: result.communityCards,
+        winnerData: winnerData,
+        pot: result.pot,
+        playerHand
+    });
+}
+
+module.exports = { joinTable, leaveTable, startGame, playerAction, nextRound, getTableStatus };
+>>>>>>> next_round_testing

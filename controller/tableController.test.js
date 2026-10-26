@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 const ActiveTable = require("../model/activeTable");
 const request = require("supertest");
 const { app } = require("../app");
@@ -78,18 +79,90 @@ describe("Leave Table", () => {
         const response = await request(app).post("/api/tables/table1/leave").send({});
         expect(response.status).toBe(400);
         expect(response.body.error).toBe("Player ID is required.");
+=======
+const { getTableStatus, joinTable, leaveTable, startGame, playerAction, nextRound } = require('../controller/tableController.js');
+
+describe('Table Controller Unit Tests', () => {
+    let req, res;
+
+    beforeEach(() => {
+        req = {
+            query: {},
+            body: {}
+        };
+        res = {
+            status: jest.fn().mockReturnThis(),
+            json: jest.fn().mockReturnThis()
+        };
     });
 
-    test("rejects a player who is not at the table", async () => {
-        const response = await request(app)
-            .post("/api/tables/table1/leave")
-            .send({ playerId: "notJoinedPlayer" });
+    test('joinTable validates missing player ID and successfully joins table', () => {
+        // Missing ID
+        req.body = { playerId: '' };
+        joinTable(req, res);
+        expect(res.status).toHaveBeenCalledWith(400);
 
-        expect(response.status).toBe(404);
-        expect(response.body.error).toBe(
-            "Player is not in this table."
-        );
+        // Valid Join
+        req.body = { playerId: 'ControllerPlayer1' };
+        joinTable(req, res);
+        expect(res.status).toHaveBeenCalledWith(200);
+
+        // Duplicate Join
+        joinTable(req, res);
+        expect(res.status).toHaveBeenCalledWith(200);
     });
+
+    test('getTableStatus returns complete table status data', () => {
+        req.query = { playerId: 'ControllerPlayer1' };
+        getTableStatus(req, res);
+        expect(res.status).toHaveBeenCalledWith(200);
+        expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
+            tableId: 'main',
+            inTable: true
+        }));
+    });
+
+    test('startGame handles insufficient players and successful start', () => {
+        // Try starting with only 1 player
+        startGame(req, res);
+        expect(res.status).toHaveBeenCalledWith(400);
+
+        // Add second player to meet minimum requirement
+        req.body = { playerId: 'ControllerPlayer2' };
+        joinTable(req, res);
+
+        startGame(req, res);
+        expect(res.status).toHaveBeenCalledWith(200);
+    });
+
+    test('playerAction validates required fields and executes action', () => {
+        req.body = {};
+        playerAction(req, res);
+        expect(res.status).toHaveBeenCalledWith(400);
+
+        req.body = { playerId: 'ControllerPlayer1', action: 'Call' };
+        playerAction(req, res);
+        expect(res.status).toHaveBeenCalledWith(200);
+    });
+
+    test('nextRound advances round or errors appropriately', () => {
+        req.query = { playerId: 'ControllerPlayer1' };
+        nextRound(req, res);
+        expect(res.status).toHaveBeenCalledWith(200);
+>>>>>>> next_round_testing
+    });
+
+    test('leaveTable validates and removes player', () => {
+        req.body = { playerId: 'ControllerPlayer1' };
+        leaveTable(req, res);
+        expect(res.status).toHaveBeenCalledWith(200);
+
+        // Leave non-existent player
+        req.body = { playerId: 'Ghost' };
+        leaveTable(req, res);
+        expect(res.status).toHaveBeenCalledWith(404);
+    });
+<<<<<<< HEAD
 });
 
 describe("dealTestHand", () => {
@@ -132,3 +205,6 @@ describe("dealTestHand", () => {
 
 });    
 
+=======
+});
+>>>>>>> next_round_testing
