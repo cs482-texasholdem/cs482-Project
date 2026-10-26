@@ -28,6 +28,10 @@ function getTableStatus(req, res) {
         }
     }
 
+    const currentTurnPlayer = (mainTable.gameInProgress && mainTable.players.length > 0) ? mainTable.players[mainTable.currentTurnIndex] : null;
+    const isCurrentTurn = playerId === currentTurnPlayer;
+    const buttonsBlocked = !isPlayer || isSpectator || !mainTable.gameInProgress || !isCurrentTurn || playerHasActed;
+
     const allPlayersData = mainTable.players.map(id => {
         const p = mainTable.playerObjects.get(id);
         return {
@@ -57,6 +61,9 @@ function getTableStatus(req, res) {
         playerChips,
         playerBet,
         playerHasActed,
+        currentTurnPlayer,
+        isCurrentTurn,
+        buttonsBlocked,
         currentHighestBet: mainTable.currentHighestBet,
         communityCards: mainTable.displayCards(),
         playerHand
@@ -137,11 +144,18 @@ function playerAction(req, res) {
     }
 
     const p = mainTable.playerObjects.get(playerId);
+    const winnerData = result.winnerData;
+    if (winnerData && winnerData.winners) {
+        mainTable.resetToLobby();
+    }
+
     return res.status(200).json({
         message: `Action ${action} recorded successfully.`,
         chips: p.chips,
         currentBet: p.currentBet,
-        pot: mainTable.pot
+        pot: mainTable.pot,
+        winnerData,
+        communityCards: mainTable.displayCards()
     });
 }
 

@@ -35,6 +35,7 @@ class ActiveTable {
         this.gameInProgress = false; 
         this.pot = 0;
         this.currentHighestBet = 0; 
+        this.currentTurnIndex = 0;
     }
 
     isFull() {
@@ -76,7 +77,6 @@ class ActiveTable {
             this.players = this.queue.slice(0, this.maxPlayers);
             this.spectators = this.queue.slice(this.maxPlayers);
         } else {
-            // Mid-game join semaphore: lock active players, put new joiners strictly in spectators
             const activeSet = new Set(this.players);
             this.spectators = this.queue.filter(id => !activeSet.has(id));
         }
@@ -138,6 +138,9 @@ class ActiveTable {
         if (!player || player.folded || !this.players.includes(playerId)) {
             return { success: false, error: "Invalid player or inactive in this round." };
         }
+        if (this.players[this.currentTurnIndex] !== playerId) {
+            return { success: false, error: "Not your turn." };
+        }
         if (player.hasActed) return { success: false, error: "You have already acted this round." };
 
         if (action === "Fold") {
@@ -169,7 +172,23 @@ class ActiveTable {
         }
 
         player.hasActed = true;
-        return { success: true };
+
+        const activeNonFolded = this.players.map(id => this.playerObjects.get(id)).filter(p => p && !p.folded);
+        if (activeNonFolded.length <= 1) {
+            const winnerData = this.handleWinner();
+            return { success: true, roundAdvanced: true, winnerData };
+        }
+
+        if (this.allPlayersHaveActedAndMatched()) {
+            const roundResult = this.nextRound();
+            return { success: true, roundAdvanced: true, ...roundResult };
+        } else {
+            do {
+                this.currentTurnIndex = (this.currentTurnIndex + 1) % this.players.length;
+            } while (this.playerObjects.get(this.players[this.currentTurnIndex]).folded);
+        }
+
+        return { success: true, roundAdvanced: false };
     }
 
     allPlayersHaveActedAndMatched() {
@@ -216,12 +235,6 @@ class ActiveTable {
             };
         }
 
-        if (!this.allPlayersHaveActedAndMatched()) {
-            return {
-                error: "Not all active players have acted or matched the current bet."
-            };
-        }
-
         this.resetPlayerActions();
 
         const totalP = this.roundPlayerCount;
@@ -232,6 +245,11 @@ class ActiveTable {
             this.displayedCards.push(this.deck.showTurn(totalP));
         } else if (this.displayedCards.length === 4) {
             this.displayedCards.push(this.deck.showRiver(totalP));
+        }
+
+        this.currentTurnIndex = 0;
+        while (this.currentTurnIndex < this.players.length && this.playerObjects.get(this.players[this.currentTurnIndex]).folded) {
+            this.currentTurnIndex++;
         }
 
         return {
@@ -266,6 +284,7 @@ class ActiveTable {
         this.players = this.queue.slice(0, this.maxPlayers);
         this.spectators = this.queue.slice(this.maxPlayers);
         this.roundPlayerCount = this.players.length;
+        this.currentTurnIndex = 0;
 
         for (const playerId of this.players) {
             const p = this.playerObjects.get(playerId);
@@ -287,6 +306,7 @@ class ActiveTable {
         this.gameInProgress = false;
         this.pot = 0;
         this.currentHighestBet = 0;
+        this.currentTurnIndex = 0;
         this._updateQueueDistribution();
         for (const [_, p] of this.playerObjects) {
             p.folded = false;

@@ -114,7 +114,7 @@
             <div class="game-heading">
                 <div>
                     <h2>Main Table</h2>
-                    <p>No Limit Texas Hold'em · Blinds 10 / 20 (Click community cards or table status to advance round)</p>
+                    <p>No Limit Texas Hold'em · Blinds 10 / 20</p>
                 </div>
             </div>
 
@@ -122,13 +122,17 @@
 
                 <div class="player-side left-side" id="left-player-side"></div>
 
-                <div class="table-center" style="cursor: pointer;" title="Click here to advance round after all actions">
+                <div class="table-center">
                     <div class="pot-display">
                         <span>Total Pot</span>
                         <strong id="total-pot">0</strong>
                     </div>
 
                     <div class="community-cards" id="community-cards" aria-label="Community cards"></div>
+
+                    <div class="current-turn-box" id="current-turn-box" style="margin-top: 6px; padding: 6px 14px; background: rgba(16, 28, 58, 0.75); border: 1px solid var(--button-hover-blue); border-radius: 8px; font-size: 13px; color: var(--secondary-text);">
+                        Current turn: <strong id="current-turn-player" style="color: var(--main-text);">--</strong>
+                    </div>
 
                     <p class="table-status" id="table-message">
                         Waiting for action.

@@ -48,6 +48,7 @@ const yourChipsElem = document.getElementById("your-chips");
 const availableChipsElem = document.getElementById("available-chips");
 const yourBetElem = document.getElementById("your-bet");
 const currentBetElem = document.getElementById("current-bet");
+const currentTurnPlayerElem = document.getElementById("current-turn-player");
 const actionButtons = document.querySelectorAll("[data-action]");
 
 let modalTimeout = null;
@@ -102,8 +103,12 @@ function renderActivePlayers(status) {
     yourBetElem.textContent = status.playerBet || 0;
     currentBetElem.textContent = status.currentHighestBet || 0;
 
-    // Block action buttons for spectating players, players who already acted, or when game is not started
-    if (status.isSpectator || !status.isPlayer || status.playerHasActed || !status.gameStarted) {
+    if (currentTurnPlayerElem) {
+        currentTurnPlayerElem.textContent = status.currentTurnPlayer || "None";
+    }
+
+    // Bulletproof buttonsBlocked enforcement from server
+    if (status.buttonsBlocked) {
         actionButtons.forEach(btn => {
             btn.disabled = true;
             btn.style.opacity = "0.5";
@@ -122,6 +127,10 @@ function renderActivePlayers(status) {
     }
     if (status.playerHand && status.playerHand.length > 0) {
         renderCards("player-cards", status.playerHand);
+    }
+
+    if (status.currentTurnPlayer) {
+        tableMessage.textContent = `Current turn: ${status.currentTurnPlayer}`;
     }
 }
 
@@ -290,51 +299,29 @@ actionButtons.forEach((button) => {
                 return;
             }
 
-            tableMessage.textContent = `${action} successful. Click Next Round when ready.`;
+            const data = await res.json();
+
+            if (data.winnerData && data.winnerData.winners) {
+                const winnersText = data.winnerData.winners.join(", ");
+                winnerModalText.innerHTML = `Winner(s):<br><strong>${winnersText}</strong><br>Pot Won: ${data.winnerData.pot}`;
+                winnerModal.style.display = "flex";
+                tableMessage.textContent = "Round complete. Showing winner...";
+
+                if (modalTimeout) clearTimeout(modalTimeout);
+                modalTimeout = setTimeout(() => {
+                    winnerModal.style.display = "none";
+                    refreshUI();
+                }, 3500);
+                return;
+            }
+
+            tableMessage.textContent = `${action} successful. Round automatically advanced/updated.`;
             refreshUI();
         } catch (error) {
             console.error("Error executing action:", error);
         }
     });
 });
-
-async function handleNextRound() {
-    try {
-        const response = await fetch(`/api/table/next-round?playerId=${encodeURIComponent(currentPlayerId)}`);
-        if (!response.ok) {
-            const err = await response.json();
-            tableMessage.textContent = err.error || "Failed to advance round.";
-            return;
-        }
-        
-        const data = await response.json();
-        renderCards("community-cards", data.communityCards);
-        if (data.playerHand && data.playerHand.length > 0) {
-            renderCards("player-cards", data.playerHand);
-        }
-
-        if (data.winnerData && data.winnerData.winners) {
-            const winnersText = data.winnerData.winners.join(", ");
-            winnerModalText.innerHTML = `Winner(s):<br><strong>${winnersText}</strong><br>Pot Won: ${data.winnerData.pot}`;
-            winnerModal.style.display = "flex";
-            tableMessage.textContent = "Round complete. Showing winner...";
-
-            if (modalTimeout) clearTimeout(modalTimeout);
-            modalTimeout = setTimeout(() => {
-                winnerModal.style.display = "none";
-                refreshUI();
-            }, 3500);
-            return;
-        }
-
-        tableMessage.textContent = "Round advanced. Waiting for player actions.";
-        refreshUI();
-    } catch (error) {
-        console.error("Error advancing round:", error);
-    }
-}
-
-document.querySelector(".table-center").addEventListener("click", handleNextRound);
 
 modalCloseBtn.addEventListener("click", () => {
     if (modalTimeout) clearTimeout(modalTimeout);
