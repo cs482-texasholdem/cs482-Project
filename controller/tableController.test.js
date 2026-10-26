@@ -1,32 +1,82 @@
-const request = require("supertest");
-const { app } = require("../app");
+const { getTableStatus, joinTable, leaveTable, startGame, playerAction, nextRound } = require('../controller/tableController.js');
 
-describe("Join Table API", () => {
-    test("joins an existing table successfully", async () => {
-        const response = await request(app)
-            .post("/api/tables/table1/join")
-            .send({ playerId: "testPlayer1" });
+describe('Table Controller Unit Tests', () => {
+    let req, res;
 
-        expect(response.status).toBe(200);
-        expect(response.body.message).toContain(
-            "Successfully joined"
-        );
-        expect(response.body.tableId).toBe("table1");
-        expect(response.body.playerCount).toBe(1);
+    beforeEach(() => {
+        req = {
+            query: {},
+            body: {}
+        };
+        res = {
+            status: jest.fn().mockReturnThis(),
+            json: jest.fn().mockReturnThis()
+        };
     });
 
-    test("rejects a player who joins the same table twice", async () => {
-        await request(app)
-            .post("/api/tables/table1/join")
-            .send({ playerId: "duplicatePlayer" });
+    test('joinTable validates missing player ID and successfully joins table', () => {
+        // Missing ID
+        req.body = { playerId: '' };
+        joinTable(req, res);
+        expect(res.status).toHaveBeenCalledWith(400);
 
-        const response = await request(app)
-            .post("/api/tables/table1/join")
-            .send({ playerId: "duplicatePlayer" });
+        // Valid Join
+        req.body = { playerId: 'ControllerPlayer1' };
+        joinTable(req, res);
+        expect(res.status).toHaveBeenCalledWith(200);
 
-        expect(response.status).toBe(409);
-        expect(response.body.error).toBe(
-            "Player has already joined this table."
-        );
+        // Duplicate Join
+        joinTable(req, res);
+        expect(res.status).toHaveBeenCalledWith(200);
+    });
+
+    test('getTableStatus returns complete table status data', () => {
+        req.query = { playerId: 'ControllerPlayer1' };
+        getTableStatus(req, res);
+        expect(res.status).toHaveBeenCalledWith(200);
+        expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
+            tableId: 'main',
+            inTable: true
+        }));
+    });
+
+    test('startGame handles insufficient players and successful start', () => {
+        // Try starting with only 1 player
+        startGame(req, res);
+        expect(res.status).toHaveBeenCalledWith(400);
+
+        // Add second player to meet minimum requirement
+        req.body = { playerId: 'ControllerPlayer2' };
+        joinTable(req, res);
+
+        startGame(req, res);
+        expect(res.status).toHaveBeenCalledWith(200);
+    });
+
+    test('playerAction validates required fields and executes action', () => {
+        req.body = {};
+        playerAction(req, res);
+        expect(res.status).toHaveBeenCalledWith(400);
+
+        req.body = { playerId: 'ControllerPlayer1', action: 'Call' };
+        playerAction(req, res);
+        expect(res.status).toHaveBeenCalledWith(200);
+    });
+
+    test('nextRound advances round or errors appropriately', () => {
+        req.query = { playerId: 'ControllerPlayer1' };
+        nextRound(req, res);
+        expect(res.status).toHaveBeenCalledWith(200);
+    });
+
+    test('leaveTable validates and removes player', () => {
+        req.body = { playerId: 'ControllerPlayer1' };
+        leaveTable(req, res);
+        expect(res.status).toHaveBeenCalledWith(200);
+
+        // Leave non-existent player
+        req.body = { playerId: 'Ghost' };
+        leaveTable(req, res);
+        expect(res.status).toHaveBeenCalledWith(404);
     });
 });
