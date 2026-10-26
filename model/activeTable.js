@@ -148,7 +148,7 @@ class ActiveTable {
                 return { success: false, error: "Not enough chips to call." };
             }
             player.chips -= diff;
-            player.currentBet = this.currentHighestBet;
+            player.currentBet += diff;
             this.pot += diff;
         } else if (action === "Raise") {
             if (amount <= this.currentHighestBet) {
@@ -165,12 +165,19 @@ class ActiveTable {
         }
 
         player.hasActed = true;
+
+        // Check if only one non-folded player remains after a fold
+        const activeNonFolded = this.players.map(id => this.playerObjects.get(id)).filter(p => p && !p.folded);
+        if (activeNonFolded.length === 1) {
+            this.gameOver = true;
+        }
+
         return { success: true };
     }
 
     allPlayersHaveActedAndMatched() {
         const activeNonFolded = this.players.map(id => this.playerObjects.get(id)).filter(p => p && !p.folded);
-        if (activeNonFolded.length === 0) return true;
+        if (activeNonFolded.length <= 1) return true;
 
         for (const p of activeNonFolded) {
             if (!p.hasActed || p.currentBet !== this.currentHighestBet) {
@@ -192,6 +199,15 @@ class ActiveTable {
     }
 
     nextRound() {
+        if (this.gameOver) {
+            const winnerData = this.handleWinner();
+            return {
+                communityCards: this.displayCards(),
+                winnerData: winnerData,
+                pot: this.pot
+            };
+        }
+
         if (!this.allPlayersHaveActedAndMatched()) {
             return {
                 error: "Not all active players have acted or matched the current bet."
@@ -203,13 +219,18 @@ class ActiveTable {
         }
 
         let winnerData = null;
-
-        if (this.gameOver) {
-            this.newGame();
-            this.roundPlayerCount = this.players.length;
-        }
-
         this.resetPlayerActions();
+
+        const activeNonFolded = this.players.map(id => this.playerObjects.get(id)).filter(p => p && !p.folded);
+        if (activeNonFolded.length <= 1) {
+            winnerData = this.handleWinner();
+            this.gameOver = true;
+            return {
+                communityCards: this.displayCards(),
+                winnerData: winnerData,
+                pot: this.pot
+            };
+        }
 
         if (this.displayedCards.length === 0) {
             this.displayedCards = this.deck.showFlop(this.roundPlayerCount);
@@ -217,10 +238,9 @@ class ActiveTable {
             this.displayedCards.push(this.deck.showTurn(this.roundPlayerCount));
         } else if (this.displayedCards.length === 4) {
             this.displayedCards.push(this.deck.showRiver(this.roundPlayerCount));
-        } else if (this.displayedCards.length === 5) {
+        } else if (this.displayedCards.length >= 5) {
             winnerData = this.handleWinner();
             this.gameOver = true;
-            this.gameInProgress = false; 
         }
 
         return {
@@ -245,13 +265,14 @@ class ActiveTable {
     }
 
     newGame() {
-        this.deck.shuffleCards();
+        this.deck = new Deck();
         this.displayedCards = [];
         this.roundPlayerCount = null;
         this.playerHands.clear();
         this.gameOver = false;
-        this.gameInProgress = true;
-        this.pot = 600; 
+        this.gameStarted = false;
+        this.gameInProgress = false;
+        this.pot = 0;
         this.currentHighestBet = 20;
 
         this._updateQueueDistribution();
@@ -259,32 +280,37 @@ class ActiveTable {
             const p = this.playerObjects.get(playerId);
             if (p) {
                 p.folded = false;
-                p.currentBet = 20; 
+                p.currentBet = 0;
                 p.hasActed = false;
             }
         }
     }
 
     handleWinner() {
-        const commonCards = this.deck.commonCards(this.roundPlayerCount);
-        
-        let maxScore = -1;
+        const activeNonFolded = this.players.map(id => this.playerObjects.get(id)).filter(p => p && !p.folded);
         let winners = [];
 
-        for (const playerId of this.players) {
-            const p = this.playerObjects.get(playerId);
-            if (!p || p.folded) continue;
+        if (activeNonFolded.length === 1) {
+            winners = [activeNonFolded[0].id];
+        } else {
+            const commonCards = this.deck.commonCards(this.roundPlayerCount);
+            let maxScore = -1;
 
-            const hand = this.playerHands.get(playerId);
-            if (!hand) continue;
+            for (const playerId of this.players) {
+                const p = this.playerObjects.get(playerId);
+                if (!p || p.folded) continue;
 
-            const score = Deck.bestHand(hand, commonCards);
+                const hand = this.playerHands.get(playerId);
+                if (!hand) continue;
 
-            if (score > maxScore) {
-                maxScore = score;
-                winners = [playerId];
-            } else if (score === maxScore) {
-                winners.push(playerId);
+                const score = Deck.bestHand(hand, commonCards);
+
+                if (score > maxScore) {
+                    maxScore = score;
+                    winners = [playerId];
+                } else if (score === maxScore) {
+                    winners.push(playerId);
+                }
             }
         }
 
@@ -298,7 +324,8 @@ class ActiveTable {
             }
         }
 
-        return { winners, maxScore, pot: this.pot };
+        const resultPot = this.pot;
+        return { winners, maxScore: 0, pot: resultPot };
     }
 }
 

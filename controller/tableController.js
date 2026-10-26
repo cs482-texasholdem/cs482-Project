@@ -157,10 +157,16 @@ function nextRound(req, res) {
         }
     }
 
+    // If game is over, reset table back to initial lobby state after returning winner data
+    const winnerData = result.winnerData;
+    if (winnerData && winnerData.winners) {
+        mainTable.newGame();
+    }
+
     return res.status(200).json({
         message: "Advanced to the next round.",
         communityCards: result.communityCards,
-        winnerData: result.winnerData,
+        winnerData: winnerData,
         pot: result.pot,
         playerHand
     });

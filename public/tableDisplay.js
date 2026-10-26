@@ -215,7 +215,6 @@ async function refreshUI() {
     renderStartGameButton(status);
 }
 
-// Initial refresh & automatic real-time polling every 2.5 seconds
 refreshUI();
 setInterval(refreshUI, 2500);
 
