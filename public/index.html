@@ -33,37 +33,20 @@
         </div>
 
 
-        <!-- Navbar
-        <nav class="navbar navbar-expand-sm custom-navbar" data-bs-theme="dark"> 
-            <div class="container-fluid">
-                <ul class="navbar-nav me-auto">
-                    <li class="nav-item">
-                        <a class="nav-link active" href="index.html"><span class="bi-house-fill"></span> Lobby</a>
-                    </li>
-                </ul>
-                <ul class="navbar-nav">
-                    <li class="nav-item">
-                        <a class="nav-link" href="login.html"><span class="bi-box-arrow-right"></span> Logout</a>
-                    </li>
-                </ul>
-            </div>
-        </nav> -->
-
         <!-- Navbar -->
         <nav class="navbar navbar-expand-sm custom-navbar" data-bs-theme="dark"> 
             <div class="container-fluid">
                 <ul class="navbar-nav me-auto">
                     <li class="nav-item">
                         <a class="nav-link active" href="index.html"><span class="bi-house-fill"></span> Lobby</a>
-<<<<<<< HEAD
+
                     </li>
                     <!-- Added Friends Link to Trigger Pop-Up -->
                     <li class="nav-item">
                         <a class="nav-link" href="#friendsSidebar" data-bs-toggle="offcanvas" role="button" aria-controls="friendsSidebar">
                             <span class="bi bi-people-fill"></span> Friends
                         </a>
-=======
->>>>>>> next_round_testing
+
                     </li>
                 </ul>
                 <ul class="navbar-nav">
@@ -152,15 +135,15 @@
                 </div>
 
             </div>
-        </div>
+        </div> 
 
-       <!-- Pop-Up Sidebar (Bootstrap Offcanvas) -->
-        <div class="offcanvas offcanvas-end" tabindex="-1" id="joinGameSidebar" aria-labelledby="joinGameSidebarLabel">
+        <!-- Pop-Up Sidebar (Table Seating) -->
+        <div class="offcanvas offcanvas-end midnight-offcanvas border-start" tabindex="-1" id="joinGameSidebar" aria-labelledby="joinGameSidebarLabel">
             
             <!-- Offcanvas Header -->
-            <div class="offcanvas-header">
-                <h5 class="offcanvas-title fw-bold" id="joinGameSidebarLabel">
-                    <i class="bi bi-suit-spade-fill"></i> Table Seating
+            <div class="offcanvas-header border-bottom">
+                <h5 class="offcanvas-title fw-bold text-white" id="joinGameSidebarLabel">
+                    <i class="bi bi-suit-spade-fill text-primary"></i> Table Seating
                 </h5>
                 <button type="button" class="btn-close btn-close-white shadow-none" data-bs-dismiss="offcanvas" aria-label="Close"></button>
             </div>
@@ -171,37 +154,37 @@
                     
                     <!-- Selected Table -->
                     <div class="mb-3">
-                        <label class="form-label small fw-semibold">Selected Table</label>
-                        <input type="text" class="form-control" id="sidebarTableName" readonly>
+                        <label class="form-label small fw-semibold text-info opacity-75">Selected Table</label>
+                        <input type="text" class="form-control midnight-input text-white" id="sidebarTableName" readonly>
                     </div>
                     
                     <!-- Table Blinds -->
                     <div class="mb-3">
-                        <label class="form-label small fw-semibold">Table Blinds</label>
-                        <input type="text" class="form-control" id="sidebarTableBlinds" readonly>
+                        <label class="form-label small fw-semibold text-info opacity-75">Table Blinds</label>
+                        <input type="text" class="form-control midnight-input text-white" id="sidebarTableBlinds" readonly>
                     </div>
                     
                     <!-- Minimum Buy-in Required -->
                     <div class="mb-3">
-                        <label class="form-label small fw-semibold">Minimum Buy-in Required</label>
-                        <input type="text" class="form-control" id="sidebarTableMinBuyin" readonly>
+                        <label class="form-label small fw-semibold text-info opacity-75">Minimum Buy-in Required</label>
+                        <input type="text" class="form-control midnight-input text-white" id="sidebarTableMinBuyin" readonly>
                     </div>
                     
                     <!-- Your Buy-in Amount -->
                     <div class="mb-3">
-                        <label for="buyInAmount" class="form-label small fw-semibold">Your Buy-in Amount ($)</label>
-                        <input type="number" class="form-control" id="buyInAmount" name="buyInAmount" value="1000" required>
+                        <label for="buyInAmount" class="form-label small fw-semibold text-info opacity-75">Your Buy-in Amount ($)</label>
+                        <input type="number" class="form-control midnight-input text-white shadow-none" id="buyInAmount" name="buyInAmount" value="1000" required>
                     </div>
                     
                     <!-- Preferred Seat Position -->
                     <div class="mb-3">
-                        <label for="seatPreference" class="form-label small fw-semibold">Preferred Seat Position</label>
-                        <select class="form-select" id="seatPreference" name="seat">
-                            <option value="random">Auto-Assign (Random Open Seat)</option>
-                            <option value="1">Seat 1 (Dealer)</option>
-                            <option value="2">Seat 2</option>
-                            <option value="3">Seat 3</option>
-                            <option value="4">Seat 4</option>
+                        <label for="seatPreference" class="form-label small fw-semibold text-info opacity-75">Preferred Seat Position</label>
+                        <select class="form-select midnight-input text-white shadow-none" id="seatPreference" name="seat">
+                            <option value="random" class="midnight-option">Auto-Assign (Random Open Seat)</option>
+                            <option value="1" class="midnight-option">Seat 1 (Dealer)</option>
+                            <option value="2" class="midnight-option">Seat 2</option>
+                            <option value="3" class="midnight-option">Seat 3</option>
+                            <option value="4" class="midnight-option">Seat 4</option>
                         </select>
                     </div>
 
@@ -212,15 +195,15 @@
                 </form>
             </div>
         </div> 
-<<<<<<< HEAD
 
-        <!-- Friends Pop-Up Sidebar (Bootstrap Offcanvas) -->
-        <div class="offcanvas offcanvas-end" tabindex="-1" id="friendsSidebar" aria-labelledby="friendsSidebarLabel">
+
+        <!-- Friends Pop-Up Sidebar (Friends & Social) -->
+        <div class="offcanvas offcanvas-end midnight-offcanvas border-start" tabindex="-1" id="friendsSidebar" aria-labelledby="friendsSidebarLabel">
             
             <!-- Offcanvas Header -->
-            <div class="offcanvas-header border-bottom border-secondary">
-                <h5 class="offcanvas-title fw-bold" id="friendsSidebarLabel">
-                    <i class="bi bi-people-fill"></i> Friends & Social
+            <div class="offcanvas-header border-bottom">
+                <h5 class="offcanvas-title fw-bold text-white" id="friendsSidebarLabel">
+                    <i class="bi bi-people-fill text-primary"></i> Friends & Social
                 </h5>
                 <button type="button" class="btn-close btn-close-white shadow-none" data-bs-dismiss="offcanvas" aria-label="Close"></button>
             </div>
@@ -230,39 +213,38 @@
                 
                 <!-- Search & Add Friends Section -->
                 <div>
-                    <label for="userSearchInput" class="form-label small fw-semibold">Find Players by Username</label>
+                    <label for="userSearchInput" class="form-label small fw-semibold text-info opacity-75">Find Players by Username</label>
                     <div class="input-group">
-                        <input type="text-light" id="userSearchInput" class="form-control shadow-none" placeholder="Enter username...">
+                        <input type="text" id="userSearchInput" class="form-control midnight-input text-white shadow-none" placeholder="Enter username...">
                         <button class="btn btn-primary fw-semibold shadow-none" type="button" id="searchBtn">Search</button>
                     </div>
                     <!-- Search Results Container -->
                     <div id="searchResults" class="list-group mt-2"></div>
                 </div>
 
-                <hr class="border-secondary my-0">
+                <hr class="midnight-divider my-0">
 
                 <!-- Pending Friend Requests Section -->
                 <div>
-                    <h6 class="fw-bold mb-2 small text-uppercase opacity-75">Pending Requests</h6>
+                    <h6 class="fw-bold mb-2 small text-uppercase text-info opacity-75">Pending Requests</h6>
                     <div id="pendingRequestsList" class="list-group">
-                        <div class="p-2 small opacity-75">No pending friend requests.</div>
+                        <div class="p-2 small text-muted">No pending friend requests.</div>
                     </div>
                 </div>
 
-                <hr class="border-secondary my-0">
+                <hr class="midnight-divider my-0">
 
                 <!-- Friends List Section -->
                 <div class="flex-grow-1">
-                    <h6 class="fw-bold mb-2 small text-uppercase opacity-75">My Friends List</h6>
+                    <h6 class="fw-bold mb-2 small text-uppercase text-info opacity-75">My Friends List</h6>
                     <div id="friendListContainer" class="list-group">
-                        <div class="p-2 small opacity-75">No friends added yet.</div>
+                        <div class="p-2 small text-muted">No friends added yet.</div>
                     </div>
                 </div>
 
             </div>
         </div>
-=======
->>>>>>> next_round_testing
+
 
         <!-- Footer -->
         <div class="mt-5 p-4 custom-footer text-white text-center">

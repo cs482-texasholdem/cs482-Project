@@ -3,11 +3,11 @@
   File Name: login.html
   Author: Bonita Rodrigues
   Purpose: User authentication and login interface for the Texas Hold'em web 
-           application. Collects credentials, submits them securely to the 
-           backend login controller, and displays error messaging upon failure.
+             application. Collects credentials, submits them securely to the 
+             backend login controller, and displays error messaging upon failure.
   ============================================================================
 -->
-  
+ 
 <!DOCTYPE html>
 <html>
     <head>
@@ -100,16 +100,16 @@
 
                                 <form class="was-validated" method="post" action="loginuser">
 
-                                    <!-- Username Input -->
+                                    <!-- Email Input (Updated to match backend txt_email) -->
                                     <div class="mb-4">
-                                        <label for="txt_login" class="form-label text-muted small mb-1">user name</label>
-                                        <input class="form-control input-line" type="text" name="txt_login" id="txt_login" placeholder="Enter username" required />
+                                        <label for="txt_email" class="form-label text-muted small mb-1">Email</label>
+                                        <input class="form-control input-line" type="email" name="txt_email" id="txt_email" placeholder="Enter email" required />
                                     </div>
 
                                     <!-- Password Input -->
                                     <div class="mb-4">
-                                        <label for="txt_pass" class="form-label text-muted small mb-1">password</label>
-                                        <input class="form-control input-line" type="password" name="txt_pass" id="txt_pass" placeholder="enter password" minlength="6" required />
+                                        <label for="txt_pass" class="form-label text-muted small mb-1">Password</label>
+                                        <input class="form-control input-line" type="password" name="txt_pass" id="txt_pass" placeholder="Enter password" minlength="6" required />
                                     </div>
 
                                     <!-- Remember Me & Forgot Password -->
@@ -120,7 +120,7 @@
                                                 Remember me
                                             </label>
                                         </div>
-                                        <a href="#" class="text-muted small text-decoration-none">forgot password?</a>
+                                        <a href="#" class="text-muted small text-decoration-none">Forgot password?</a>
                                     </div>
 
                                     <!-- Action Buttons -->

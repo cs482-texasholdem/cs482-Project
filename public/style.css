@@ -556,3 +556,45 @@ body.table-page {
 .table-page .action-button.raise {
     background: var(--button-hover-blue);
 }
+
+/* ============================================================================
+   Midnight Theme Styling for Offcanvas Sidebars (Blueberry Milk Accents)
+   ============================================================================ */
+
+.midnight-offcanvas {
+    background-color: #0b132b !important;
+    color: #e0e6ed !important;
+}
+
+.midnight-offcanvas .offcanvas-header {
+    border-color: #1c2541 !important;
+}
+
+/* Soft blueberry milk color for labels and subheadings */
+.midnight-offcanvas .form-label,
+.midnight-offcanvas h6 {
+    color: #e2eafc !important; /* Soft blueberry milk pale blue */
+    opacity: 0.85;
+}
+
+.midnight-offcanvas .midnight-input {
+    background-color: #131b2e !important;
+    border-color: #3a506b !important;
+    color: #ffffff !important;
+}
+
+.midnight-offcanvas .midnight-input:focus {
+    background-color: #131b2e !important;
+    border-color: #6c757d !important;
+    color: #ffffff !important;
+    box-shadow: 0 0 0 0.25rem rgba(226, 234, 252, 0.15) !important;
+}
+
+.midnight-offcanvas .midnight-option {
+    background-color: #0b132b !important;
+    color: #ffffff !important;
+}
+
+.midnight-offcanvas .midnight-divider {
+    border-color: #1c2541 !important;
+}

@@ -4,12 +4,11 @@
  * Author: Bonita Rodrigues
  * Purpose: Data Access Object (DAO) layer for user management. Defines the Mongoose 
  *          schema and database interaction methods (CRUD operations, querying, 
- *          social lookups, and login lookups) connecting MongoDB Atlas to the 
+ *          social lookups, and authentication lookups) connecting MongoDB Atlas to the 
  *          application controllers.
  * ============================================================================
  */
 
-// Call DBConnection on the Server.js
 const mongoose = require('mongoose');
 
 /**
@@ -18,10 +17,10 @@ const mongoose = require('mongoose');
  * active status, and social arrays for friends and requests.
  */
 const userSchema = new mongoose.Schema({
-    login: { type: String, required: true },
-    username: { type: String, required: false, trim: true }, // Optional or auto-mapped to login
-    password: String,
-    permission: Number,
+    username: { type: String, required: true, trim: true },
+    email: { type: String, required: true, unique: true, trim: true },
+    password: { type: String, required: true },
+    permission: { type: Number, default: 2 },
     creation: { type: Date, default: Date.now },
     points: { type: Number, default: 1000 },
     isActive: { type: Boolean, default: true },
@@ -50,7 +49,7 @@ exports.readAll = async function(){
 /**
  * Finds and returns a single user record by their unique MongoDB ID.
  * 
- * @param {string} id - The unique MongoDB user ID
+ * @param {string} id The unique MongoDB user ID
  * @returns {Promise<Object|null>} The matching user document or null
  */
 exports.read = async function(id){
@@ -61,14 +60,10 @@ exports.read = async function(id){
 /**
  * Creates and saves a new user document to the database.
  * 
- * @param {Object} newuser - Object containing user creation data
+ * @param {Object} newuser Object containing user creation data
  * @returns {Promise<Object>} The newly saved user document including generated ID
  */
 exports.create = async function(newuser){
-    // Ensure username is populated if only login is provided
-    if (newuser.login && !newuser.username) {
-        newuser.username = newuser.login;
-    }
     const user = new userModel(newuser);
     await user.save();
     return user;
@@ -77,7 +72,7 @@ exports.create = async function(newuser){
 /**
  * Deletes a user record by their unique MongoDB ID.
  * 
- * @param {string} id - The unique MongoDB user ID
+ * @param {string} id The unique MongoDB user ID
  * @returns {Promise<Object|null>} The deleted user document or null
  */
 exports.del = async function(id){
@@ -92,20 +87,18 @@ exports.del = async function(id){
  * @returns {Promise<void>}
  */
 exports.deleteAll = async function(){
-    // should only be used on testing
     await userModel.deleteMany();
 };
 
 /**
  * Updates a user record. Supports updating either by MongoDB ID (string) 
- * or by a query condition object (e.g., { login: "username" }).
+ * or by a query condition object (e.g., { email: "user@example.com" }).
  * 
- * @param {string|Object} idOrQuery - The unique MongoDB user ID or a query condition object
- * @param {Object} updateData - Object containing fields to update or MongoDB operators (like $push, $pull)
+ * @param {string|Object} idOrQuery The unique MongoDB user ID or a query condition object
+ * @param {Object} updateData Object containing fields to update or MongoDB operators ($push, $pull)
  * @returns {Promise<Object|null>} The updated user document or null
  */
 exports.update = async function(idOrQuery, updateData){
-    // Check if the first argument is a query object (like { login: '...' }) or an ID string
     if (typeof idOrQuery === 'object') {
         let updatedUser = await userModel.findOneAndUpdate(idOrQuery, updateData, { new: true, runValidators: true });
         return updatedUser;
@@ -115,17 +108,15 @@ exports.update = async function(idOrQuery, updateData){
     }
 };
 
-
 // ============================================================================
 // Custom Query & Social Search Methods
 // ============================================================================
 
 /**
  * Finds and returns multiple user records matching a dynamic query condition.
- * Used for searching users by username/login.
  * 
- * @param {Object} query - Mongoose query conditions
- * @param {Object} [projection] - Optional fields to include/exclude
+ * @param {Object} query Mongoose query conditions
+ * @param {Object} [projection] Optional fields to include/exclude
  * @returns {Promise<Array>} Array of matching user documents
  */
 exports.find = async function(query, projection = null){
@@ -135,9 +126,8 @@ exports.find = async function(query, projection = null){
 
 /**
  * Finds and returns a single user document matching a dynamic query condition.
- * Used for looking up users by login/username or email.
  * 
- * @param {Object} query - Mongoose query conditions
+ * @param {Object} query Mongoose query conditions
  * @returns {Promise<Object|null>} The matching user document or null
  */
 exports.findOne = async function(query){
@@ -146,13 +136,12 @@ exports.findOne = async function(query){
 };
 
 /**
- * Finds and returns a single user record by their login name.
+ * Finds and returns a single user record by their email address for login.
  * 
- * @param {string} plogin - The login name of the user
+ * @param {string} pemail The email address of the user
  * @returns {Promise<Object|null>} The matching user document or null
  */
-exports.findLogin = async function(plogin){
-    // Since the passwords are hashed, they need to be checked on the controller
-    let user = await userModel.findOne({ login: plogin });
+exports.findLogin = async function(pemail){
+    let user = await userModel.findOne({ email: pemail });
     return user;
 };

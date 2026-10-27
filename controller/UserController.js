@@ -14,15 +14,14 @@ const passUtil = require('../util/PasswordUtil');
 
 
 /**
- * Helper utility to safely extract the current username string from session state,
- * supporting both object-based sessions (from login) and string-based sessions.
+ * Helper utility to safely extract the current username string from session state.
  * 
- * @param {Object} req - Express request object containing session state
+ * @param {Object} req request object containing session state
  * @returns {string|null} The username string or null if unauthenticated
  */
 function getCurrentUsername(req) {
     if (!req.session.user) return null;
-    return typeof req.session.user === 'object' ? req.session.user.login : req.session.user;
+    return typeof req.session.user === 'object' ? req.session.user.username : req.session.user;
 }
 
 
@@ -30,16 +29,16 @@ function getCurrentUsername(req) {
  * Retrieves and sends all user records to the client. 
  * Enforces administrative security (requires permission level 1).
  * 
- * @param {Object} req - Express request object containing session state
- * @param {Object} res - Express response object
+ * @param {Object} req request object containing session state
+ * @param {Object} res response object
  */
 exports.getAll = async function(req, res){
-    if(exports.adminCheck(req) === true){ // Security check
-        res.status(200); // 200 = Ok
-        res.send(await dao.readAll()); // Send all users back to the client
+    if(exports.adminCheck(req) === true){ 
+        res.status(200); 
+        res.send(await dao.readAll()); 
         res.end();
-    }else{  // Not admin, should not be able to see all users
-        res.status(403); // Forbidden
+    }else{  
+        res.status(403); 
         res.end();
     } 
 };
@@ -49,11 +48,11 @@ exports.getAll = async function(req, res){
  * Deletes a specific user record by ID. 
  * Enforces administrative privileges before executing deletion.
  * 
- * @param {Object} req - Express request object containing URL parameters and session
- * @param {Object} res - Express response object
+ * @param {Object} req request object containing URL parameters and session
+ * @param {Object} res response object
  */
 exports.deleteOne = async function(req, res){
-    let id = req.params.id; // Get param with id from URL
+    let id = req.params.id; 
     
     if(exports.adminCheck(req)){ 
         await dao.del(id);
@@ -69,18 +68,19 @@ exports.deleteOne = async function(req, res){
  * Handles both creating new users and updating existing user records from form submissions.
  * Manages conditional password hashing and permission assignments.
  * 
- * @param {Object} req - Express request object containing form body and session
- * @param {Object} res - Express response object
+ * @param {Object} req request object containing form body and session
+ * @param {Object} res response object
  */
 exports.postCreateOrUpdate = async function(req, res){
     let userData = {};
-    userData.login = req.body.txt_login;
+    userData.email = req.body.txt_email;
+    userData.username = req.body.txt_username;
 
     // Check permissions
     if(exports.adminCheck(req) === true && req.body.txt_perm){  
         userData.permission = parseInt(req.body.txt_perm);
     } else { 
-        userData.permission = 2; // Default to common user permission
+        userData.permission = 2; 
     }
 
     // Capture points if provided
@@ -92,14 +92,12 @@ exports.postCreateOrUpdate = async function(req, res){
     let userId = req.body.txt_id || req.body.id;
 
     if(userId){
-        // update user record
         console.log('Update user ID:', userId);
         
         // Safety check: only update password if a new one was actually typed in
         if(req.body.txt_pass && req.body.txt_pass.trim() !== "") {
             userData.password = passUtil.hashPassword(req.body.txt_pass);
         } else {
-            // Fetch existing user to retain their current hashed password
             let existingUser = await dao.read(userId);
             if(existingUser) {
                 userData.password = existingUser.password;
@@ -109,13 +107,12 @@ exports.postCreateOrUpdate = async function(req, res){
         await dao.update(userId, userData); 
     }
     else {
-        // insert new user record
         if(req.body.txt_pass) {
             userData.password = passUtil.hashPassword(req.body.txt_pass);
         }
         await dao.create(userData);        
     }
-    // Redirect based on user role after successful creation or update
+    
     if(exports.adminCheck(req) === true)
         res.redirect("/admin.html");
     else 
@@ -127,16 +124,16 @@ exports.postCreateOrUpdate = async function(req, res){
  * Registers a new player account with default player permissions and starting chip stack,
  * hashes their password, establishes their session, and redirects to the lobby.
  * 
- * @param {Object} req - Express request object containing registration body data
- * @param {Object} res - Express response object
+ * @param {Object} req request object containing registration body data
+ * @param {Object} res response object
  */
 exports.register = async function(req, res){
     try {
         let userData = {};
-        userData.login = req.body.txt_login;     // Username handle
-        userData.email = req.body.txt_email;     // Email address
-        userData.permission = 2;                  // New signups are always standard players
-        userData.points = 1000;                   // Starting chip points
+        userData.email = req.body.txt_email;         // Email address
+        userData.username = req.body.txt_username;   // Username handle
+        userData.permission = 2;                     // Standard player
+        userData.points = 1000;                      // Starting points
 
         if(req.body.txt_pass) {
             userData.password = passUtil.hashPassword(req.body.txt_pass);
@@ -145,10 +142,10 @@ exports.register = async function(req, res){
         // Save new user to MongoDB Atlas
         await dao.create(userData);
 
-        // Establish session object matching login format
+        // Establish session object
         req.session.user = {
-            login: userData.login,
             email: userData.email,
+            username: userData.username,
             permission: userData.permission,
             points: userData.points
         };
@@ -162,25 +159,23 @@ exports.register = async function(req, res){
 
 
 /**
- * Authenticates user credentials against the database, verifies hashed passwords,
+ * Authenticates user credentials against the database using email, verifies hashed passwords,
  * sets up the active session, and redirects based on permission level.
  * 
- * @param {Object} req - Express request object containing login credentials
- * @param {Object} res - Express response object
+ * @param {Object} req request object containing login credentials
+ * @param {Object} res response object
  */
 exports.login = async function(req, res){
-    let plogin = req.body.txt_login;
-    let user = await dao.findLogin(plogin);
+    let pemail = req.body.txt_email;
+    let user = await dao.findLogin(pemail);
 
     if(user == null){ 
         res.redirect('login.html?error=1');
     } else {
-        // Verify the provided password against the stored hashed password
         if(passUtil.comparePassword(req.body.txt_pass, user.password)){
             console.log("Login successful");
             req.session.user = user;
 
-            // check for admin
             if(exports.adminCheck(req)){
                 res.redirect('admin.html'); 
             } else {
@@ -195,68 +190,56 @@ exports.login = async function(req, res){
 
 
 // ============================================================================
-// Social & Friend System Controllers
+// Social & Friend System Controllers (Cleaned up for Username & Email)
 // ============================================================================
 
 /**
  * Helper utility to safely extract the user's username handle from session state.
- * Falls back to login if username is unpopulated.
- * 
- * @param {Object} req - Express request object containing session state
- * @returns {string|null} The username handle or null if unauthenticated
  */
 function getCurrentUserHandle(req) {
     if (!req.session.user) return null;
     if (typeof req.session.user === 'object') {
-        return req.session.user.username || req.session.user.login;
+        return req.session.user.username;
     }
     return req.session.user;
 }
 
-
 /**
- * Helper to resolve any stored string (email or username) to its actual username.
+ * Helper to resolve any stored identifier into its clean username.
  */
 async function resolveToUsername(identifier) {
     if (!identifier) return "";
     const found = await dao.findOne({ 
-        $or: [{ login: identifier }, { username: identifier }] 
+        $or: [{ email: identifier }, { username: identifier }] 
     });
     if (found) {
-        return found.username || found.login.split('@')[0];
+        return found.username || found.email.split('@')[0];
     }
     return identifier.includes('@') ? identifier.split('@')[0] : identifier;
 }
 
-
 /**
- * Searches for users by username or login query, returning their clean username handles.
- * 
- * @param {Object} req - Express request object containing search query parameters
- * @param {Object} res - Express response object returning JSON array of users
+ * Searches for users by username or email query, returning their clean username handles.
  */
 exports.searchUsers = async function(req, res) {
     try {
         const query = req.query.q;
         const currentUsername = getCurrentUserHandle(req);
 
-        // Find matching users
         const rawUsers = await dao.find({
             $and: [
                 {
                     $or: [
-                        { login: { $regex: query, $options: 'i' } },
+                        { email: { $regex: query, $options: 'i' } },
                         { username: { $regex: query, $options: 'i' } }
                     ]
                 },
-                { login: { $ne: currentUsername } },
                 { username: { $ne: currentUsername } }
             ]
-        }, { login: 1, username: 1, _id: 0 });
+        }, { email: 1, username: 1, _id: 0 });
 
-        // Map them so the frontend ALWAYS receives a clean username handle
         const users = rawUsers.map(u => ({
-            username: u.username || (u.login ? u.login.split('@')[0] : u.login)
+            username: u.username || (u.email ? u.email.split('@')[0] : u.email)
         }));
 
         res.json(users);
@@ -266,45 +249,32 @@ exports.searchUsers = async function(req, res) {
     }
 };
 
-
 /**
- * Sends a friend request using the sender's and recipient's clean username handles.
- * 
- * @param {Object} req - Express request object containing target user data
- * @param {Object} res - Express response object
+ * Sends a friend request using clean username handles.
  */
 exports.sendFriendRequest = async function(req, res) {
     try {
         const sessionUser = req.session.user;
         if (!sessionUser) return res.status(401).send("Unauthorized");
 
-        const senderLogin = typeof sessionUser === 'object' ? sessionUser.login : sessionUser;
-        const senderDoc = await dao.findOne({ 
-            $or: [{ login: senderLogin }, { username: senderLogin }] 
-        });
-        
-        const senderUsername = senderDoc ? (senderDoc.username || senderDoc.login.split('@')[0]) : senderLogin;
-        
-        // Target user passed from the search result form
+        const senderHandle = typeof sessionUser === 'object' ? sessionUser.username : sessionUser;
         const targetInput = req.body.targetUser;
 
-        // Find the target user's document to get their real username
         const targetDoc = await dao.findOne({
-            $or: [{ username: targetInput }, { login: targetInput }]
+            $or: [{ username: targetInput }, { email: targetInput }]
         });
 
-        const recipientUsername = targetDoc ? (targetDoc.username || targetDoc.login.split('@')[0]) : targetInput;
+        const recipientUsername = targetDoc ? (targetDoc.username || targetDoc.email.split('@')[0]) : targetInput;
 
-        if (!senderUsername || senderUsername === recipientUsername) return res.status(400).send("Invalid request");
+        if (!senderHandle || senderHandle === recipientUsername) return res.status(400).send("Invalid request");
 
-        // Add sender's clean username handle to recipient's friendRequests array
         await dao.update(
             { 
-                $or: [{ login: recipientUsername }, { username: recipientUsername }],
-                friendRequests: { $ne: senderUsername }, 
-                friends: { $ne: senderUsername } 
+                $or: [{ email: recipientUsername }, { username: recipientUsername }],
+                friendRequests: { $ne: senderHandle }, 
+                friends: { $ne: senderHandle } 
             },
-            { $push: { friendRequests: senderUsername } }
+            { $push: { friendRequests: senderHandle } }
         );
 
         res.redirect('/index.html');
@@ -314,55 +284,31 @@ exports.sendFriendRequest = async function(req, res) {
     }
 };
 
-
 /**
- * Fetches the active user's friends list and pending requests, automatically 
- * resolving any stored identifiers into clean usernames for display.
- * 
- * @param {Object} req - Express request object containing session state
- * @param {Object} res - Express response object returning JSON data
+ * Fetches the active user's friends list and pending requests.
  */
 exports.getFriendsData = async function(req, res) {
     try {
-        const currentLogin = getCurrentUsername(req);
-        if (!currentLogin) {
+        const currentHandle = getCurrentUserHandle(req);
+        if (!currentHandle) {
             return res.status(401).json({ error: "Unauthorized" });
         }
 
-        // Find the currently logged-in user record
         const user = await dao.findOne({ 
-            $or: [{ login: currentLogin }, { username: currentLogin }] 
+            $or: [{ email: currentHandle }, { username: currentHandle }] 
         });
         if (!user) return res.status(404).json({ error: "User not found" });
 
-        /**
-         * Helper to resolve any stored string (email or username) to its actual username.
-         */
-        async function resolveToUsername(identifier) {
-            if (!identifier) return "";
-            const found = await dao.findOne({ 
-                $or: [{ login: identifier }, { username: identifier }] 
-            });
-            if (found) {
-                return found.username || found.login.split('@')[0];
-            }
-            // Fallback if string is already a clean username or email
-            return identifier.includes('@') ? identifier.split('@')[0] : identifier;
-        }
-
-        // Resolve active friends list to usernames
         const resolvedFriends = [];
         for (const f of (user.friends || [])) {
             resolvedFriends.push(await resolveToUsername(f));
         }
 
-        // Resolve pending requests list to usernames
         const resolvedRequests = [];
         for (const r of (user.friendRequests || [])) {
             resolvedRequests.push(await resolveToUsername(r));
         }
 
-        // Return their resolved friends and pending requests lists
         res.json({
             friends: resolvedFriends,
             friendRequests: resolvedRequests
@@ -373,12 +319,8 @@ exports.getFriendsData = async function(req, res) {
     }
 };
 
-
 /**
- * Accepts an incoming friend request, linking both users by their username handles.
- * 
- * @param {Object} req - Express request object containing requester username
- * @param {Object} res - Express response object
+ * Accepts an incoming friend request.
  */
 exports.acceptFriendRequest = async function(req, res) {
     try {
@@ -387,14 +329,12 @@ exports.acceptFriendRequest = async function(req, res) {
 
         if (!currentHandle) return res.status(401).send("Unauthorized");
 
-        // Remove from pending requests and add to current user's friends list
-        await dao.update({ $or: [{ login: currentHandle }, { username: currentHandle }] }, { 
+        await dao.update({ $or: [{ email: currentHandle }, { username: currentHandle }] }, { 
             $pull: { friendRequests: requester },
             $push: { friends: requester }
         });
 
-        // Add current user's handle to requester's friends list
-        await dao.update({ $or: [{ login: requester }, { username: requester }] }, { 
+        await dao.update({ $or: [{ email: requester }, { username: requester }] }, { 
             $push: { friends: currentHandle }
         });
 
@@ -405,12 +345,8 @@ exports.acceptFriendRequest = async function(req, res) {
     }
 };
 
-
 /**
- * Declines and removes an incoming friend request from the user's pending list.
- * 
- * @param {Object} req - Express request object containing requester username
- * @param {Object} res - Express response object
+ * Declines and removes an incoming friend request.
  */
 exports.declineFriendRequest = async function(req, res) {
     try {
@@ -419,8 +355,7 @@ exports.declineFriendRequest = async function(req, res) {
 
         if (!currentHandle) return res.status(401).send("Unauthorized");
 
-        // Remove requester from the user's incoming requests array
-        await dao.update({ $or: [{ login: currentHandle }, { username: currentHandle }] }, { 
+        await dao.update({ $or: [{ email: currentHandle }, { username: currentHandle }] }, { 
             $pull: { friendRequests: requester }
         });
 
@@ -439,8 +374,8 @@ exports.declineFriendRequest = async function(req, res) {
 /**
  * Returns the currently active session user data as JSON to the client.
  * 
- * @param {Object} req - Express request object containing session state
- * @param {Object} res - Express response object
+ * @param {Object} req request object containing session state
+ * @param {Object} res response object
  */
 exports.loggedUser = function(req, res){
     res.status(200); 
@@ -453,10 +388,10 @@ exports.loggedUser = function(req, res){
 
 
 /**
- * Destroys the active user session by clearing session user data and redirects to lobby.
+ * Destroys the active user session and redirects to lobby.
  * 
- * @param {Object} req - Express request object containing session state
- * @param {Object} res - Express response object
+ * @param {Object} req request object containing session state
+ * @param {Object} res response object
  */
 exports.logout = function(req, res){
     req.session.user = null; 
@@ -467,7 +402,7 @@ exports.logout = function(req, res){
 /**
  * Helper utility to verify if the currently sessioned user holds administrator privileges.
  * 
- * @param {Object} req - Express request object containing session state
+ * @param {Object} req request object containing session state
  * @returns {boolean} True if user is logged in and permission equals 1 (Admin)
  */
 exports.adminCheck = function(req){ 

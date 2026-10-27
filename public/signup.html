@@ -3,12 +3,12 @@
   File Name: signup.html
   Author: Bonita Rodrigues
   Purpose: New user account registration interface for the Texas Hold'em web 
-           application. Collects account creation credentials (login username 
-           and password) and securely submits them to the registration backend 
-           controller.
+             application. Collects account creation credentials (email, username 
+             and password) and securely submits them to the registration backend 
+             controller.
   ============================================================================
 -->
-  
+ 
 <!DOCTYPE html>
 <html>
     <head>
@@ -105,26 +105,26 @@
                                 <form class="was-validated" method="post" action="register" id="signupForm">
                                     <!--Email Input -->
                                     <div class="mb-4">
-                                        <label for="txt_login" class="form-label text-muted small mb-1">username / email</label>
-                                        <input class="form-control input-line" type="text" name="txt_login" id="txt_login" placeholder="Enter email" required />
+                                        <label for="txt_email" class="form-label text-muted small mb-1">Email</label>
+                                        <input class="form-control input-line" type="email" name="txt_email" id="txt_email" placeholder="Enter Email" required />
                                     </div>
 
                                     <!-- Username Input -->
                                     <div class="mb-3">
                                         <label for="txt_username" class="form-label text-muted small mb-1">Username</label>
-                                        <input type="text" class="form-control input-line" id="txt_username" name="txt_username" placeholder="Enter username" required>
+                                        <input type="text" class="form-control input-line" id="txt_username" name="txt_username" placeholder="Enter Username" required>
                                     </div>
 
                                     <!-- Password Input -->
                                     <div class="mb-4">
-                                        <label for="txt_pass" class="form-label text-muted small mb-1">password</label>
-                                        <input class="form-control input-line" type="password" name="txt_pass" id="txt_pass" placeholder="Enter password" minlength="6" required />
+                                        <label for="txt_pass" class="form-label text-muted small mb-1">Password</label>
+                                        <input class="form-control input-line" type="password" name="txt_pass" id="txt_pass" placeholder="Enter Password" minlength="6" required />
                                     </div>
 
                                     <!-- Confirm Password Input -->
                                     <div class="mb-4">
-                                        <label for="txt_pass_confirm" class="form-label text-muted small mb-1">confirm password</label>
-                                        <input class="form-control input-line" type="password" id="txt_pass_confirm" placeholder="Enter confirm password" minlength="6" required />
+                                        <label for="txt_pass_confirm" class="form-label text-muted small mb-1">Confirm Password</label>
+                                        <input class="form-control input-line" type="password" id="txt_pass_confirm" placeholder="Enter Confirm Password" minlength="6" required />
                                     </div>
 
                                     <!-- Action Buttons -->
