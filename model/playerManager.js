@@ -105,7 +105,7 @@ class PlayerManager {
     }
 
     /**
-     * Handles immediate or deferred player removal.
+     * Handles immediate or deferred player removal, ensuring the player folds if a game is in progress.
      * @param {string} playerId The player ID to remove.
      * @param {boolean} gameInProgress Indicator of whether a game is currently running.
      * @returns {boolean} True if removal was registered or executed.
@@ -115,12 +115,14 @@ class PlayerManager {
             return false;
         }
 
+        // Always fold the player immediately before removal / deferral
+        const player = this.playerObjects.get(playerId);
+        if (player) {
+            player.folded = true;
+        }
+
         if (gameInProgress) {
             this.pendingRemovals.add(playerId);
-            const p = this.playerObjects.get(playerId);
-            if (p) {
-                p.folded = true;
-            }
             return true;
         }
 
