@@ -2,7 +2,81 @@ const Deck = require("../util/pokerLogic");
 const PlayerManager = require("./playerManager");
 
 /**
- * Represents a single global poker table, delegating player management to PlayerManager.
+ * Manages the table pot, chip wagers, bets, blinds, and pot distribution.
+ */
+class PotManager {
+    /**
+     * Initializes the pot manager.
+     */
+    constructor() {
+        this.pot = 0;
+        this.currentHighestBet = 0;
+    }
+
+    /**
+     * Resets the pot and highest bet for a new session or lobby reset.
+     */
+    reset() {
+        this.pot = 0;
+        this.currentHighestBet = 0;
+    }
+
+    /**
+     * Posts small and big blinds for the start of a game session.
+     * @param {Object[]} players Array of player IDs.
+     * @param {Map<string, Object>} playerObjects Map of player ID to Player instances.
+     * @param {number} dealerIndex Current dealer position index.
+     * @returns {number} The big blind amount set as the current highest bet.
+     */
+    postBlinds(players, playerObjects, dealerIndex) {
+        this.pot = 0;
+        this.currentHighestBet = 0;
+        const n = players.length;
+        if (n < 2) return 0;
+
+        let sbIndex = (n === 2) ? dealerIndex : (dealerIndex + 1) % n;
+        let bbIndex = (n === 2) ? (dealerIndex + 1) % n : (dealerIndex + 2) % n;
+
+        const sbPlayer = playerObjects.get(players[sbIndex]);
+        const bbPlayer = playerObjects.get(players[bbIndex]);
+
+        const sbAmount = Math.min(10, sbPlayer.chips);
+        sbPlayer.chips -= sbAmount;
+        sbPlayer.currentBet = sbAmount;
+        this.pot += sbAmount;
+
+        const bbAmount = Math.min(20, bbPlayer.chips);
+        bbPlayer.chips -= bbAmount;
+        bbPlayer.currentBet = bbAmount;
+        this.currentHighestBet = bbAmount;
+        this.pot += bbAmount;
+
+        return this.currentHighestBet;
+    }
+
+    /**
+     * Distributes the pot among the winning players.
+     * @param {string[]} winners Array of winning player IDs.
+     * @param {Map<string, Object>} playerObjects Map of player ID to Player instances.
+     * @returns {number} The total pot amount distributed.
+     */
+    distributePot(winners, playerObjects) {
+        if (winners.length > 0 && this.pot > 0) {
+            const share = Math.floor(this.pot / winners.length);
+            for (const winId of winners) {
+                const winnerPlayer = playerObjects.get(winId);
+                if (winnerPlayer) {
+                    winnerPlayer.chips += share;
+                }
+            }
+        }
+        const resultPot = this.pot;
+        return resultPot;
+    }
+}
+
+/**
+ * Represents a single global poker table, delegating player management to PlayerManager and pot management to PotManager.
  */
 class ActiveTable {
     /**
@@ -16,6 +90,7 @@ class ActiveTable {
         this.skillLevel = skillLevel;
         this.timeLimit = timeLimit;
         this.playerManager = new PlayerManager(10);
+        this.potManager = new PotManager();
         this.displayedCards = [];
         this.deck = new Deck();
         this.roundPlayerCount = null; 
@@ -23,8 +98,6 @@ class ActiveTable {
         this.gameOver = false;
         this.gameStarted = false;
         this.gameInProgress = false; 
-        this.pot = 0;
-        this.currentHighestBet = 0; 
         this.currentTurnIndex = 0;
         this.dealerIndex = 0;
         this.aggressorIndex = 0;
@@ -32,24 +105,24 @@ class ActiveTable {
         this.turnStartTime = null;
     }
 
-    /** @returns {boolean} */
+    /** @returns {boolean} True if queue is full. */
     isFull() { return this.playerManager.isFull(); }
 
     /** 
-     * @param {string} playerId 
-     * @returns {boolean} 
+     * @param {string} playerId Player ID to check.
+     * @returns {boolean} True if present.
      */
     hasPlayer(playerId) { return this.playerManager.hasPlayer(playerId); }
 
-    /** @returns {number} */
+    /** @returns {number} Count of active players. */
     getPlayerCount() { return this.playerManager.getPlayerCount(); }
 
-    /** @returns {number} */
+    /** @returns {number} Count of spectators. */
     getSpectatorCount() { return this.playerManager.getSpectatorCount(); }
 
     /** 
-     * @param {string} playerId 
-     * @returns {boolean} 
+     * @param {string} playerId Player ID to add.
+     * @returns {boolean} True if successfully added.
      */
     addPlayer(playerId) { 
         const added = this.playerManager.addPlayer(playerId);
@@ -58,8 +131,8 @@ class ActiveTable {
     }
 
     /** 
-     * @param {string} playerId 
-     * @returns {boolean} 
+     * @param {string} playerId Player ID to remove.
+     * @returns {boolean} True if removal registered or executed.
      */
     removePlayer(playerId) {
         const pIndex = this.playerManager.players.indexOf(playerId);
@@ -100,7 +173,7 @@ class ActiveTable {
         return removed;
     }
 
-    // --- Proxy getters for backward compatibility with controllers ---
+    // --- Proxy getters/setters for backward compatibility ---
     get queue() { return this.playerManager.queue; }
     get players() { return this.playerManager.players; }
     set players(val) { this.playerManager.players = val; }
@@ -110,6 +183,11 @@ class ActiveTable {
     get maxPlayers() { return this.playerManager.maxPlayers; }
     get consecutiveTimeouts() { return this.playerManager.consecutiveTimeouts; }
     get pendingRemovals() { return this.playerManager.pendingRemovals; }
+    
+    get pot() { return this.potManager.pot; }
+    set pot(val) { this.potManager.pot = val; }
+    get currentHighestBet() { return this.potManager.currentHighestBet; }
+    set currentHighestBet(val) { this.potManager.currentHighestBet = val; }
 
     /**
      * Starts a new poker game session.
@@ -216,7 +294,7 @@ class ActiveTable {
             }
             player.chips -= diff;
             player.currentBet += diff;
-            this.pot += diff;
+            this.potManager.pot += diff;
         } else if (action === "Raise") {
             if (amount <= this.currentHighestBet) {
                 return { success: false, error: "Raise amount must exceed current highest bet." };
@@ -227,8 +305,8 @@ class ActiveTable {
             }
             player.chips -= diff;
             player.currentBet = amount;
-            this.currentHighestBet = amount;
-            this.pot += diff;
+            this.potManager.currentHighestBet = amount;
+            this.potManager.pot += diff;
             this.aggressorIndex = this.playerManager.players.indexOf(playerId);
             for (const id of this.playerManager.players) {
                 if (id !== playerId) {
@@ -281,7 +359,7 @@ class ActiveTable {
         return true;
     }
 
-    /** Resets player action states for the next betting round. */
+    /** Resets player action states and bets for the next betting round. */
     resetPlayerActions() {
         for (const playerId of this.playerManager.players) {
             const p = this.playerManager.playerObjects.get(playerId);
@@ -290,7 +368,7 @@ class ActiveTable {
                 p.currentBet = 0;
             }
         }
-        this.currentHighestBet = 0;
+        this.potManager.currentHighestBet = 0;
         this.currentTurnIndex = (this.dealerIndex + 1) % this.playerManager.players.length;
         let safety = 0;
         while (this.playerManager.playerObjects.get(this.playerManager.players[this.currentTurnIndex]).folded && safety < this.playerManager.players.length) {
@@ -366,8 +444,7 @@ class ActiveTable {
         this.displayedCards = [];
         this.gameStarted = true;
         this.gameInProgress = true;
-        this.pot = 0;
-        this.currentHighestBet = 0;
+        this.potManager.reset();
 
         this.playerManager.updateQueueDistribution(this.gameInProgress);
         this.roundPlayerCount = this.playerManager.players.length;
@@ -388,28 +465,15 @@ class ActiveTable {
 
         const n = this.playerManager.players.length;
         if (n >= 2) {
+            this.potManager.postBlinds(this.playerManager.players, this.playerManager.playerObjects, this.dealerIndex);
+
             let sbIndex = (n === 2) ? this.dealerIndex : (this.dealerIndex + 1) % n;
-            let bbIndex = (n === 2) ? (this.dealerIndex + 1) % n : (this.dealerIndex + 2) % n;
-
-            const sbPlayer = this.playerManager.playerObjects.get(this.playerManager.players[sbIndex]);
-            const bbPlayer = this.playerManager.playerObjects.get(this.playerManager.players[bbIndex]);
-
-            const sbAmount = Math.min(10, sbPlayer.chips);
-            sbPlayer.chips -= sbAmount;
-            sbPlayer.currentBet = sbAmount;
-            this.pot += sbAmount;
-
-            const bbAmount = Math.min(20, bbPlayer.chips);
-            bbPlayer.chips -= bbAmount;
-            bbPlayer.currentBet = bbAmount;
-            this.currentHighestBet = bbAmount;
-            this.pot += bbAmount;
-
             if (n > 2) {
                 this.currentTurnIndex = (this.dealerIndex + 3) % n;
             } else {
                 this.currentTurnIndex = sbIndex;
             }
+            let bbIndex = (n === 2) ? (this.dealerIndex + 1) % n : (this.dealerIndex + 2) % n;
             this.aggressorIndex = bbIndex;
         }
 
@@ -426,8 +490,7 @@ class ActiveTable {
         this.gameOver = false;
         this.gameStarted = false;
         this.gameInProgress = false;
-        this.pot = 0;
-        this.currentHighestBet = 0;
+        this.potManager.reset();
         this.currentTurnIndex = 0;
         this.turnStartTime = null;
         this.playerManager.consecutiveTimeouts.clear();
@@ -476,17 +539,7 @@ class ActiveTable {
             }
         }
 
-        if (winners.length > 0) {
-            const share = Math.floor(this.pot / winners.length);
-            for (const winId of winners) {
-                const winnerPlayer = this.playerManager.playerObjects.get(winId);
-                if (winnerPlayer) {
-                    winnerPlayer.chips += share;
-                }
-            }
-        }
-
-        const resultPot = this.pot;
+        const resultPot = this.potManager.distributePot(winners, this.playerManager.playerObjects);
         this.gameOver = true;
         this.playerManager.processPendingRemovals(this.gameInProgress);
         return { winners, maxScore, pot: resultPot };
@@ -494,4 +547,5 @@ class ActiveTable {
 }
 
 ActiveTable.Player = PlayerManager.Player;
+ActiveTable.PotManager = PotManager;
 module.exports = ActiveTable;
