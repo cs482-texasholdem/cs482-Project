@@ -1,31 +1,21 @@
 const Deck = require("../util/pokerLogic");
+const PlayerManager = require("./playerManager");
 
 /**
- * Represents an individual Player at the table.
- */
-class Player {
-    constructor(id, chips = 1000) {
-        this.id = id;
-        this.chips = chips;
-        this.folded = false;
-        this.currentBet = 0;
-        this.hasActed = false;
-    }
-}
-
-/**
- * Represents a single global poker table.
+ * Represents a single global poker table, delegating player management to PlayerManager.
  */
 class ActiveTable {
+    /**
+     * Initializes the active poker table.
+     * @param {string} [tableId="main"] Unique identifier for the table.
+     * @param {string} [skillLevel="general"] Skill tier of the table.
+     * @param {number} [timeLimit=30] Turn time limit in seconds.
+     */
     constructor(tableId = "main", skillLevel = "general", timeLimit = 30) {
         this.tableId = tableId;
         this.skillLevel = skillLevel;
         this.timeLimit = timeLimit;
-        this.maxPlayers = 10;
-        this.queue = []; 
-        this.players = []; 
-        this.spectators = []; 
-        this.playerObjects = new Map(); 
+        this.playerManager = new PlayerManager(10);
         this.displayedCards = [];
         this.deck = new Deck();
         this.roundPlayerCount = null; 
@@ -40,114 +30,93 @@ class ActiveTable {
         this.aggressorIndex = 0;
         this.gameCount = 0;
         this.turnStartTime = null;
-        this.consecutiveTimeouts = new Map();
     }
 
-    isFull() {
-        return this.queue.length >= this.maxPlayers;
+    /** @returns {boolean} */
+    isFull() { return this.playerManager.isFull(); }
+
+    /** 
+     * @param {string} playerId 
+     * @returns {boolean} 
+     */
+    hasPlayer(playerId) { return this.playerManager.hasPlayer(playerId); }
+
+    /** @returns {number} */
+    getPlayerCount() { return this.playerManager.getPlayerCount(); }
+
+    /** @returns {number} */
+    getSpectatorCount() { return this.playerManager.getSpectatorCount(); }
+
+    /** 
+     * @param {string} playerId 
+     * @returns {boolean} 
+     */
+    addPlayer(playerId) { 
+        const added = this.playerManager.addPlayer(playerId);
+        this.playerManager.updateQueueDistribution(this.gameInProgress);
+        return added;
     }
 
-    hasPlayer(playerId) {
-        return this.playerObjects.has(playerId) || this.queue.includes(playerId);
-    }
-
-    getPlayerCount() {
-        return this.players.length;
-    }
-
-    getSpectatorCount() {
-        return this.spectators.length;
-    }
-
-    addPlayer(playerId) {
-        if (typeof playerId !== "string" || !playerId.trim()) {
-            return false;
-        }
-
-        playerId = playerId.trim();
-
-        if (this.hasPlayer(playerId)) {
-            return false;
-        }
-
-        const player = new Player(playerId);
-        this.playerObjects.set(playerId, player);
-        this.queue.push(playerId);
-        this._updateQueueDistribution();
-        return true;
-    }
-
-    _updateQueueDistribution() {
-        if (!this.gameInProgress) {
-            this.players = this.queue.slice(0, this.maxPlayers);
-            this.spectators = this.queue.slice(this.maxPlayers);
-        } else {
-            const activeSet = new Set(this.players);
-            this.spectators = this.queue.filter(id => !activeSet.has(id));
-        }
-    }
-
+    /** 
+     * @param {string} playerId 
+     * @returns {boolean} 
+     */
     removePlayer(playerId) {
-        if (!this.playerObjects.has(playerId) && !this.queue.includes(playerId)) {
-            return false;
-        }
-
-        const pIndex = this.players.indexOf(playerId);
+        const pIndex = this.playerManager.players.indexOf(playerId);
         const isCurrentTurnPlayer = (this.gameInProgress && pIndex !== -1 && this.currentTurnIndex === pIndex);
 
-        this.playerObjects.delete(playerId);
-        this.consecutiveTimeouts.delete(playerId);
-        const index = this.queue.indexOf(playerId);
-        if (index !== -1) {
-            this.queue.splice(index, 1);
-        }
-
-        if (pIndex !== -1) {
-            this.players.splice(pIndex, 1);
-            if (this.players.length > 0) {
-                if (pIndex < this.currentTurnIndex) {
-                    this.currentTurnIndex--;
-                }
-                this.currentTurnIndex = (this.currentTurnIndex + this.players.length) % this.players.length;
-            } else {
-                this.currentTurnIndex = 0;
-            }
-        }
-
-        const sIndex = this.spectators.indexOf(playerId);
-        if (sIndex !== -1) {
-            this.spectators.splice(sIndex, 1);
-        }
-
-        this.playerHands.delete(playerId);
-        this._updateQueueDistribution();
-
         if (this.gameInProgress) {
-            const activeNonFolded = this.players.map(id => this.playerObjects.get(id)).filter(p => p && !p.folded);
-            if (activeNonFolded.length <= 1 || this.players.length < 2) {
-                this.handleWinner();
-                this.resetToLobby();
-            } else {
-                // Bulletproof turn adjustment: skip folded players securely
+            const res = this.playerManager.removePlayer(playerId, this.gameInProgress);
+            const p = this.playerManager.playerObjects.get(playerId);
+            if (p && this.players.indexOf(playerId) === this.aggressorIndex) {
+                let idx = this.aggressorIndex;
                 let safety = 0;
-                while (safety < this.players.length) {
-                    const currentId = this.players[this.currentTurnIndex];
-                    const pObj = this.playerObjects.get(currentId);
-                    if (pObj && !pObj.folded) {
-                        break;
-                    }
-                    this.currentTurnIndex = (this.currentTurnIndex + 1) % this.players.length;
+                do {
+                    idx = (idx + 1) % this.playerManager.players.length;
                     safety++;
-                }
-                this.turnStartTime = Date.now();
+                } while (this.playerManager.playerObjects.get(this.playerManager.players[idx]).folded && safety < this.playerManager.players.length);
+                this.aggressorIndex = idx;
             }
+
+            if (isCurrentTurnPlayer) {
+                let safety = 0;
+                do {
+                    this.currentTurnIndex = (this.currentTurnIndex + 1) % this.playerManager.players.length;
+                    safety++;
+                } while (this.playerManager.playerObjects.get(this.playerManager.players[this.currentTurnIndex]).folded && safety < this.playerManager.players.length);
+                this.turnStartTime = Date.now();
+
+                const activeNonFolded = this.playerManager.players.map(id => this.playerManager.playerObjects.get(id)).filter(p => p && !p.folded);
+                if (activeNonFolded.length <= 1) {
+                    this.handleWinner();
+                } else if (this.allPlayersHaveActedAndMatched()) {
+                    this.nextRound();
+                }
+            }
+            return res;
         }
 
-        return true;
+        const removed = this.playerManager.removePlayer(playerId, this.gameInProgress);
+        return removed;
     }
 
+    // --- Proxy getters for backward compatibility with controllers ---
+    get queue() { return this.playerManager.queue; }
+    get players() { return this.playerManager.players; }
+    set players(val) { this.playerManager.players = val; }
+    get spectators() { return this.playerManager.spectators; }
+    set spectators(val) { this.playerManager.spectators = val; }
+    get playerObjects() { return this.playerManager.playerObjects; }
+    get maxPlayers() { return this.playerManager.maxPlayers; }
+    get consecutiveTimeouts() { return this.playerManager.consecutiveTimeouts; }
+    get pendingRemovals() { return this.playerManager.pendingRemovals; }
+
+    /**
+     * Starts a new poker game session.
+     * @returns {Object} Success object or error details.
+     */
     startGame() {
-        if (this.players.length < 2) {
+        if (this.playerManager.players.length < 2) {
             return { success: false, error: "At least 2 players are required to start the game." };
         }
         this.gameStarted = true;
@@ -156,8 +125,13 @@ class ActiveTable {
         return { success: true };
     }
 
+    /**
+     * Deals hole cards to a specified player.
+     * @param {string} playerId The recipient player ID.
+     * @returns {number[]|false} Array of card numbers or false.
+     */
     dealHandToPlayer(playerId) {
-        if (typeof playerId !== "string" || !this.players.includes(playerId)) {
+        if (typeof playerId !== "string" || !this.playerManager.players.includes(playerId)) {
             return false;
         }
 
@@ -165,7 +139,7 @@ class ActiveTable {
             return this.playerHands.get(playerId);
         }
 
-        const playerIndex = this.players.indexOf(playerId);
+        const playerIndex = this.playerManager.players.indexOf(playerId);
         const totalPlayers = this.roundPlayerCount; 
 
         const hand = this.deck.hand(playerIndex, totalPlayers);
@@ -173,18 +147,22 @@ class ActiveTable {
         return hand;
     }
 
+    /**
+     * Checks and handles turn timeout conditions.
+     * @returns {boolean} True if a timeout action was triggered.
+     */
     checkTimeout() {
-        if (!this.gameInProgress || this.players.length === 0) return false;
+        if (!this.gameInProgress || this.playerManager.players.length === 0) return false;
         const now = Date.now();
         if (this.turnStartTime && (now - this.turnStartTime >= 30000)) {
-            const currentId = this.players[this.currentTurnIndex];
-            const player = this.playerObjects.get(currentId);
+            const currentId = this.playerManager.players[this.currentTurnIndex];
+            const player = this.playerManager.playerObjects.get(currentId);
             if (player && !player.folded && !player.hasActed) {
                 const canCheck = (player.currentBet === this.currentHighestBet);
                 const action = canCheck ? "Check" : "Fold";
                 
-                const timeouts = (this.consecutiveTimeouts.get(currentId) || 0) + 1;
-                this.consecutiveTimeouts.set(currentId, timeouts);
+                const timeouts = (this.playerManager.consecutiveTimeouts.get(currentId) || 0) + 1;
+                this.playerManager.consecutiveTimeouts.set(currentId, timeouts);
 
                 this.recordAction(currentId, action, 0);
 
@@ -197,27 +175,34 @@ class ActiveTable {
         return false;
     }
 
+    /**
+     * Records a player's betting action.
+     * @param {string} playerId The actor player ID.
+     * @param {string} action Action type (Fold, Check, Call, Raise).
+     * @param {number} [amount=0] Raise amount when applicable.
+     * @returns {Object} Action result status.
+     */
     recordAction(playerId, action, amount = 0) {
-        const player = this.playerObjects.get(playerId);
-        if (!player || player.folded || !this.players.includes(playerId)) {
+        const player = this.playerManager.playerObjects.get(playerId);
+        if (!player || player.folded || !this.playerManager.players.includes(playerId)) {
             return { success: false, error: "Invalid player or inactive in this round." };
         }
-        if (this.players[this.currentTurnIndex] !== playerId) {
+        if (this.playerManager.players[this.currentTurnIndex] !== playerId) {
             return { success: false, error: "Not your turn." };
         }
         if (player.hasActed && action !== "Raise") return { success: false, error: "You have already acted this round." };
 
-        this.consecutiveTimeouts.set(playerId, 0);
+        this.playerManager.consecutiveTimeouts.set(playerId, 0);
 
         if (action === "Fold") {
             player.folded = true;
-            if (this.players.indexOf(playerId) === this.aggressorIndex) {
+            if (this.playerManager.players.indexOf(playerId) === this.aggressorIndex) {
                 let idx = this.aggressorIndex;
                 let safety = 0;
                 do {
-                    idx = (idx + 1) % this.players.length;
+                    idx = (idx + 1) % this.playerManager.players.length;
                     safety++;
-                } while (this.playerObjects.get(this.players[idx]).folded && safety < this.players.length);
+                } while (this.playerManager.playerObjects.get(this.playerManager.players[idx]).folded && safety < this.playerManager.players.length);
                 this.aggressorIndex = idx;
             }
         } else if (action === "Check") {
@@ -244,10 +229,10 @@ class ActiveTable {
             player.currentBet = amount;
             this.currentHighestBet = amount;
             this.pot += diff;
-            this.aggressorIndex = this.players.indexOf(playerId);
-            for (const id of this.players) {
+            this.aggressorIndex = this.playerManager.players.indexOf(playerId);
+            for (const id of this.playerManager.players) {
                 if (id !== playerId) {
-                    const p = this.playerObjects.get(id);
+                    const p = this.playerManager.playerObjects.get(id);
                     if (p && !p.folded) p.hasActed = false;
                 }
             }
@@ -255,7 +240,7 @@ class ActiveTable {
 
         player.hasActed = true;
 
-        const activeNonFolded = this.players.map(id => this.playerObjects.get(id)).filter(p => p && !p.folded);
+        const activeNonFolded = this.playerManager.players.map(id => this.playerManager.playerObjects.get(id)).filter(p => p && !p.folded);
         if (activeNonFolded.length <= 1) {
             const winnerData = this.handleWinner();
             return { success: true, roundAdvanced: true, winnerData };
@@ -268,18 +253,22 @@ class ActiveTable {
 
         let safety = 0;
         do {
-            this.currentTurnIndex = (this.currentTurnIndex + 1) % this.players.length;
+            this.currentTurnIndex = (this.currentTurnIndex + 1) % this.playerManager.players.length;
             safety++;
-        } while (this.playerObjects.get(this.players[this.currentTurnIndex]).folded && safety < this.players.length);
+        } while (this.playerManager.playerObjects.get(this.playerManager.players[this.currentTurnIndex]).folded && safety < this.playerManager.players.length);
 
         this.turnStartTime = Date.now();
 
         return { success: true, roundAdvanced: false };
     }
 
+    /**
+     * Checks if all active non-folded players have acted and matched bets.
+     * @returns {boolean} True if round betting is balanced.
+     */
     allPlayersHaveActedAndMatched() {
-        const activeNonFolded = this.players
-            .map(id => this.playerObjects.get(id))
+        const activeNonFolded = this.playerManager.players
+            .map(id => this.playerManager.playerObjects.get(id))
             .filter(p => p && !p.folded);
 
         if (activeNonFolded.length <= 1) return true;
@@ -292,31 +281,36 @@ class ActiveTable {
         return true;
     }
 
+    /** Resets player action states for the next betting round. */
     resetPlayerActions() {
-        for (const playerId of this.players) {
-            const p = this.playerObjects.get(playerId);
+        for (const playerId of this.playerManager.players) {
+            const p = this.playerManager.playerObjects.get(playerId);
             if (p && !p.folded) {
                 p.hasActed = false;
                 p.currentBet = 0;
             }
         }
         this.currentHighestBet = 0;
-        this.currentTurnIndex = (this.dealerIndex + 1) % this.players.length;
+        this.currentTurnIndex = (this.dealerIndex + 1) % this.playerManager.players.length;
         let safety = 0;
-        while (this.playerObjects.get(this.players[this.currentTurnIndex]).folded && safety < this.players.length) {
-            this.currentTurnIndex = (this.currentTurnIndex + 1) % this.players.length;
+        while (this.playerManager.playerObjects.get(this.playerManager.players[this.currentTurnIndex]).folded && safety < this.playerManager.players.length) {
+            this.currentTurnIndex = (this.currentTurnIndex + 1) % this.playerManager.players.length;
             safety++;
         }
         this.turnStartTime = Date.now();
     }
 
+    /**
+     * Advances the betting street (Flop, Turn, River, Showdown).
+     * @returns {Object} Street progression results.
+     */
     nextRound() {
         if (!this.gameStarted || !this.gameInProgress) {
             return { error: "Game has not been started yet." };
         }
 
-        const activeNonFolded = this.players
-            .map(id => this.playerObjects.get(id))
+        const activeNonFolded = this.playerManager.players
+            .map(id => this.playerManager.playerObjects.get(id))
             .filter(p => p && !p.folded);
 
         if (activeNonFolded.length <= 1 || this.displayedCards.length >= 5) {
@@ -347,6 +341,10 @@ class ActiveTable {
         };
     }
 
+    /**
+     * Formats community cards into text representations.
+     * @returns {string[]} Formatted card strings.
+     */
     displayCards() {
         const placeholder = "🂠";
         return Array.from({ length: 5 }, (_, index) => {
@@ -361,7 +359,9 @@ class ActiveTable {
         });
     }
 
+    /** Initializes a new game session, posting blinds and resetting deck. */
     newGameSession() {
+        this.playerManager.processPendingRemovals(this.gameInProgress);
         this.deck = new Deck();
         this.displayedCards = [];
         this.gameStarted = true;
@@ -369,17 +369,16 @@ class ActiveTable {
         this.pot = 0;
         this.currentHighestBet = 0;
 
-        this.players = this.queue.slice(0, this.maxPlayers);
-        this.spectators = this.queue.slice(this.maxPlayers);
-        this.roundPlayerCount = this.players.length;
+        this.playerManager.updateQueueDistribution(this.gameInProgress);
+        this.roundPlayerCount = this.playerManager.players.length;
 
-        if (this.gameCount > 0 && this.players.length > 0) {
-            this.dealerIndex = (this.dealerIndex + 1) % this.players.length;
+        if (this.gameCount > 0 && this.playerManager.players.length > 0) {
+            this.dealerIndex = (this.dealerIndex + 1) % this.playerManager.players.length;
         }
         this.gameCount++;
 
-        for (const playerId of this.players) {
-            const p = this.playerObjects.get(playerId);
+        for (const playerId of this.playerManager.players) {
+            const p = this.playerManager.playerObjects.get(playerId);
             if (p) {
                 p.folded = false;
                 p.currentBet = 0; 
@@ -387,13 +386,13 @@ class ActiveTable {
             }
         }
 
-        const n = this.players.length;
+        const n = this.playerManager.players.length;
         if (n >= 2) {
             let sbIndex = (n === 2) ? this.dealerIndex : (this.dealerIndex + 1) % n;
             let bbIndex = (n === 2) ? (this.dealerIndex + 1) % n : (this.dealerIndex + 2) % n;
 
-            const sbPlayer = this.playerObjects.get(this.players[sbIndex]);
-            const bbPlayer = this.playerObjects.get(this.players[bbIndex]);
+            const sbPlayer = this.playerManager.playerObjects.get(this.playerManager.players[sbIndex]);
+            const bbPlayer = this.playerManager.playerObjects.get(this.playerManager.players[bbIndex]);
 
             const sbAmount = Math.min(10, sbPlayer.chips);
             sbPlayer.chips -= sbAmount;
@@ -417,7 +416,9 @@ class ActiveTable {
         this.turnStartTime = Date.now();
     }
 
+    /** Resets the table state back to the lobby. */
     resetToLobby() {
+        this.playerManager.processPendingRemovals(this.gameInProgress);
         this.deck = new Deck();
         this.displayedCards = [];
         this.roundPlayerCount = null;
@@ -429,18 +430,22 @@ class ActiveTable {
         this.currentHighestBet = 0;
         this.currentTurnIndex = 0;
         this.turnStartTime = null;
-        this.consecutiveTimeouts.clear();
-        this._updateQueueDistribution();
-        for (const [_, p] of this.playerObjects) {
+        this.playerManager.consecutiveTimeouts.clear();
+        this.playerManager.updateQueueDistribution(this.gameInProgress);
+        for (const [_, p] of this.playerManager.playerObjects) {
             p.folded = false;
             p.currentBet = 0;
             p.hasActed = false;
         }
     }
 
+    /**
+     * Determines hand winners and distributes the pot.
+     * @returns {Object} Winner details and pot share.
+     */
     handleWinner() {
-        const activeNonFolded = this.players
-            .map(id => this.playerObjects.get(id))
+        const activeNonFolded = this.playerManager.players
+            .map(id => this.playerManager.playerObjects.get(id))
             .filter(p => p && !p.folded);
 
         let winners = [];
@@ -452,8 +457,8 @@ class ActiveTable {
             const commonCards = this.deck.commonCards(this.roundPlayerCount);
             let highest = -1;
 
-            for (const playerId of this.players) {
-                const p = this.playerObjects.get(playerId);
+            for (const playerId of this.playerManager.players) {
+                const p = this.playerManager.playerObjects.get(playerId);
                 if (!p || p.folded) continue;
 
                 const hand = this.playerHands.get(playerId);
@@ -474,7 +479,7 @@ class ActiveTable {
         if (winners.length > 0) {
             const share = Math.floor(this.pot / winners.length);
             for (const winId of winners) {
-                const winnerPlayer = this.playerObjects.get(winId);
+                const winnerPlayer = this.playerManager.playerObjects.get(winId);
                 if (winnerPlayer) {
                     winnerPlayer.chips += share;
                 }
@@ -483,9 +488,10 @@ class ActiveTable {
 
         const resultPot = this.pot;
         this.gameOver = true;
+        this.playerManager.processPendingRemovals(this.gameInProgress);
         return { winners, maxScore, pot: resultPot };
     }
 }
 
-ActiveTable.Player = Player;
+ActiveTable.Player = PlayerManager.Player;
 module.exports = ActiveTable;
