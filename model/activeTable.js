@@ -1,8 +1,8 @@
 /**
  * ============================================================================
  * File Name: activeTable.js
- * Purpose: Manages table session, records action history, handles shuffle seeds, 
- *          and persists completed game sessions via GameDao.
+ * Purpose: Manages table session, records action history, tracks positional 
+ *          indices (dealer, blinds, seating order), and persists game records.
  * ============================================================================
  */
 
@@ -25,7 +25,7 @@ class PotManager {
         this.pot = 0;
         this.currentHighestBet = 0;
         const n = players.length;
-        if (n < 2) return 0;
+        if (n < 2) return { sbIndex: 0, bbIndex: 0 };
 
         let sbIndex = (n === 2) ? dealerIndex : (dealerIndex + 1) % n;
         let bbIndex = (n === 2) ? (dealerIndex + 1) % n : (dealerIndex + 2) % n;
@@ -48,7 +48,7 @@ class PotManager {
             this.pot += bbAmount;
         }
 
-        return this.currentHighestBet;
+        return { sbIndex, bbIndex };
     }
 
     distributePot(winners, playerManager) {
@@ -76,6 +76,9 @@ class ActiveTable {
         this.deck = new Deck();
         this.currentShuffleSeed = this.deck.seed;
         this.initialPlayersSnapshot = [];
+        this.recordedDealerIndex = 0;
+        this.recordedSbIndex = 0;
+        this.recordedBbIndex = 0;
         this.actionHistory = [];
         this.currentRoundName = "Pre-Flop";
         this.roundPlayerCount = null; 
@@ -151,7 +154,6 @@ class ActiveTable {
         return this.playerManager.removePlayer(playerId, this.gameInProgress);
     }
 
-    // Proxy getters/setters
     get queue() { return this.playerManager.queue; }
     get players() { return this.playerManager.players; }
     set players(val) { this.playerManager.players = val; }
@@ -275,7 +277,6 @@ class ActiveTable {
 
         player.hasActed = true;
 
-        // Log action into action history for database reconstruction
         this.actionHistory.push({
             playerId,
             action,
@@ -394,7 +395,7 @@ class ActiveTable {
 
     newGameSession() {
         this.playerManager.processPendingRemovals(this.gameInProgress);
-        this.deck = new Deck(); // Generates new randomized seed
+        this.deck = new Deck();
         this.currentShuffleSeed = this.deck.seed;
         this.displayedCards = [];
         this.actionHistory = [];
@@ -412,6 +413,8 @@ class ActiveTable {
         }
         this.gameCount++;
 
+        this.recordedDealerIndex = this.dealerIndex;
+
         for (const playerId of this.playerManager.players) {
             const p = this.playerManager.getPlayer(playerId);
             if (p) {
@@ -423,7 +426,9 @@ class ActiveTable {
 
         const n = this.playerManager.players.length;
         if (n >= 2) {
-            this.potManager.postBlinds(this.playerManager.players, this.playerManager, this.dealerIndex);
+            const blindIndices = this.potManager.postBlinds(this.playerManager.players, this.playerManager, this.dealerIndex);
+            this.recordedSbIndex = blindIndices.sbIndex;
+            this.recordedBbIndex = blindIndices.bbIndex;
 
             let sbIndex = (n === 2) ? this.dealerIndex : (this.dealerIndex + 1) % n;
             if (n > 2) {
@@ -494,10 +499,12 @@ class ActiveTable {
         const resultPot = this.potManager.distributePot(winners, this.playerManager);
         this.gameOver = true;
 
-        // Persist completed game record to MongoDB via GameDao asynchronously
         GameDao.create({
             tableId: this.tableId,
             initialPlayers: this.initialPlayersSnapshot,
+            dealerIndex: this.recordedDealerIndex,
+            smallBlindIndex: this.recordedSbIndex,
+            bigBlindIndex: this.recordedBbIndex,
             shuffleSeed: this.currentShuffleSeed,
             actions: this.actionHistory,
             potFinal: resultPot,

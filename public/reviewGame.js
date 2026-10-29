@@ -2,8 +2,8 @@
  * ============================================================================
  * File Name: reviewGame.js
  * Purpose: Frontend controller for reviewGame.html. Fetches reconstructed 
- *          game data from the server endpoint and dynamically renders player 
- *          hands, community card streets, and action logs.
+ *          game data and dynamically renders seating order, positional badges 
+ *          (Dealer, SB, BB), hole cards, hand scores, and action logs.
  * ============================================================================
  */
 
@@ -47,7 +47,7 @@ async function loadGameReconstruction(gameId) {
         const winnersText = game.winners && game.winners.length > 0 ? game.winners.join(', ') : 'None / Folded';
         document.getElementById("review-outcome").textContent = `${winnersText} won ${game.potFinal || 0} chips`;
 
-        // Render Community Cards (Flop, Turn, River)
+        // Render Community Cards
         const flopContainer = document.getElementById("review-flop");
         const turnContainer = document.getElementById("review-turn");
         const riverContainer = document.getElementById("review-river");
@@ -57,46 +57,66 @@ async function loadGameReconstruction(gameId) {
         riverContainer.innerHTML = "";
 
         if (game.communityCards) {
-            // Flop (3 cards)
             if (game.communityCards.flop && Array.isArray(game.communityCards.flop)) {
                 game.communityCards.flop.forEach(c => flopContainer.appendChild(createCardElement(c)));
             }
-            // Turn (1 card)
             if (game.communityCards.turn) {
                 turnContainer.appendChild(createCardElement(game.communityCards.turn));
             }
-            // River (1 card)
             if (game.communityCards.river) {
                 riverContainer.appendChild(createCardElement(game.communityCards.river));
             }
         }
 
-        // Render Player Hole Cards Table
+        // Render Player Seating Table with Hole Cards & Scores
         const handsTbody = document.getElementById("player-hands-tbody");
         handsTbody.innerHTML = "";
 
-        if (game.playerHands && Object.keys(game.playerHands).length > 0) {
-            for (const [playerId, cards] of Object.entries(game.playerHands)) {
+        if (game.initialPlayers && game.initialPlayers.length > 0) {
+            game.initialPlayers.forEach((playerId, index) => {
                 const tr = document.createElement("tr");
-                
+
+                // Seat number
+                const tdSeat = document.createElement("td");
+                tdSeat.className = "ps-3 text-secondary font-monospace";
+                tdSeat.textContent = `#${index + 1}`;
+
+                // Player ID
                 const tdName = document.createElement("td");
-                tdName.className = "ps-3 fw-bold text-warning";
+                tdName.className = "fw-bold text-warning";
                 tdName.textContent = playerId;
 
+                // Position badge
+                const tdPos = document.createElement("td");
+                let badgeHtml = '<span class="badge bg-secondary">Active</span>';
+                if (index === game.dealerIndex) {
+                    badgeHtml = '<span class="badge bg-warning text-dark">Dealer (D)</span>';
+                } else if (index === game.smallBlindIndex) {
+                    badgeHtml = '<span class="badge bg-info text-dark">Small Blind (SB)</span>';
+                } else if (index === game.bigBlindIndex) {
+                    badgeHtml = '<span class="badge bg-primary">Big Blind (BB)</span>';
+                }
+                tdPos.innerHTML = badgeHtml;
+
+                // Hole Cards
                 const tdCards = document.createElement("td");
                 const cardBox = document.createElement("div");
                 cardBox.className = "card-box justify-content-start";
-                
-                if (Array.isArray(cards)) {
-                    cards.forEach(c => cardBox.appendChild(createCardElement(c)));
-                }
+                const cards = game.playerHands && game.playerHands[playerId] ? game.playerHands[playerId] : [];
+                cards.forEach(c => cardBox.appendChild(createCardElement(c)));
                 tdCards.appendChild(cardBox);
 
-                tr.append(tdName, tdCards);
+                // Hand Score
+                const tdScore = document.createElement("td");
+                tdScore.className = "text-end pe-3 font-monospace text-info";
+                const scoreValue = game.playerScores && game.playerScores[playerId] !== undefined ? game.playerScores[playerId] : 0;
+                tdScore.textContent = scoreValue.toLocaleString();
+
+                tr.append(tdSeat, tdName, tdPos, tdCards, tdScore);
                 handsTbody.appendChild(tr);
-            }
+            });
         } else {
-            handsTbody.innerHTML = `<tr><td colspan="2" class="text-center text-muted py-3">No player hands available.</td></tr>`;
+            handsTbody.innerHTML = `<tr><td colspan="5" class="text-center text-muted py-3">No player seating data available.</td></tr>`;
         }
 
         // Populate chronological action log
@@ -110,7 +130,7 @@ async function loadGameReconstruction(gameId) {
 
         const initialPlayersDiv = document.createElement("div");
         initialPlayersDiv.className = "action-item text-info fw-bold mb-2";
-        initialPlayersDiv.textContent = `[Seating] Initial Players: ${game.initialPlayers ? game.initialPlayers.join(', ') : 'N/A'}`;
+        initialPlayersDiv.textContent = `[Seating Order] ${game.initialPlayers.join(' → ')}`;
         logContainer.appendChild(initialPlayersDiv);
 
         game.actions.forEach((act, index) => {

@@ -65,8 +65,12 @@ app.get('/api/games', async (req, res) => {
         res.status(500).json({ error: "Failed to fetch game history" });
     }
 });
-const Deck = require("./util/pokerLogic");
 
+const Deck = require("./util/pokerLogic");
+/**
+ * Reconstructs a game session server-side using the saved shuffle seed, 
+ * initial player array order, and evaluates each player's hand score.
+ */
 app.get('/api/games/:id/reconstruct', async (req, res) => {
     try {
         const game = await GameDao.read(req.params.id);
@@ -74,40 +78,42 @@ app.get('/api/games/:id/reconstruct', async (req, res) => {
             return res.status(404).json({ error: "Game record not found" });
         }
 
-        // Reconstruct the exact deck using the saved shuffle seed
-        const reconstructedDeck = new Deck(game.shuffleSeed);
+        const deck = new Deck(game.shuffleSeed);
         const totalPlayers = game.initialPlayers.length;
 
-        // Reconstruct each player's hole cards server-side
         const playerHands = {};
         game.initialPlayers.forEach((playerId, index) => {
-            const rawHand = reconstructedDeck.hand(index, totalPlayers);
-            playerHands[playerId] = rawHand.map(c => Deck.cardToText(c));
+            const rawCards = deck.hand(index, totalPlayers);
+            playerHands[playerId] = rawCards.map(c => Deck.cardToText(c));
         });
 
-        // Reconstruct community cards server-side (flop, turn, river)
-        const flopCards = reconstructedDeck.showFlop(totalPlayers).map(c => Deck.cardToText(c));
-        const turnCard = Deck.cardToText(reconstructedDeck.showTurn(totalPlayers));
-        const riverCard = Deck.cardToText(reconstructedDeck.showRiver(totalPlayers));
+        const flopRaw = deck.showFlop(totalPlayers);
+        const turnRaw = deck.showTurn(totalPlayers);
+        const riverRaw = deck.showRiver(totalPlayers);
+
+        const communityCards = {
+            flop: flopRaw.map(c => Deck.cardToText(c)),
+            turn: Deck.cardToText(turnRaw),
+            river: Deck.cardToText(riverRaw)
+        };
+
+        const commonCardsRaw = [...flopRaw, turnRaw, riverRaw];
+        const playerScores = {};
+
+        game.initialPlayers.forEach(playerId => {
+            const handRaw = deck.hand(game.initialPlayers.indexOf(playerId), totalPlayers);
+            const score = Deck.bestHand(handRaw, commonCardsRaw);
+            playerScores[playerId] = score;
+        });
 
         res.status(200).json({
-            gameId: game._id,
-            tableId: game.tableId,
-            timestamp: game.timestamp,
-            initialPlayers: game.initialPlayers,
+            ...game.toObject(),
             playerHands,
-            communityCards: {
-                flop: flopCards,
-                turn: turnCard,
-                river: riverCard,
-                all: [...flopCards, turnCard, riverCard]
-            },
-            potFinal: game.potFinal,
-            winners: game.winners,
-            actions: game.actions
+            communityCards,
+            playerScores
         });
     } catch (error) {
-        console.error("Error during server-side game reconstruction:", error);
+        console.error("Error during game reconstruction:", error);
         res.status(500).json({ error: "Server error during game reconstruction" });
     }
 });
