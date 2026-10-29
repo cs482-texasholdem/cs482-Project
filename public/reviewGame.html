@@ -1,8 +1,8 @@
 <!--
   ============================================================================
   File Name: reviewGame.html
-  Purpose: Game Review & Reconstruction Dashboard. Retrieves and visually 
-           replays a saved poker game session from the database using its game ID.
+  Purpose: Game Review & Reconstruction Dashboard. Displays server-reconstructed 
+           player hole cards, flop, turn, river, and chronological action logs.
   ============================================================================
 -->
 
@@ -17,11 +17,35 @@
     <link rel="stylesheet" href="style.css">
     <style>
         .review-container {
-            max-width: 900px;
+            max-width: 1000px;
             margin: 30px auto;
         }
+        .card-box {
+            display: flex;
+            gap: 6px;
+            justify-content: center;
+            align-items: center;
+        }
+        .playing-card {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            width: 42px;
+            height: 60px;
+            border: 2px solid var(--card-border);
+            border-radius: 6px;
+            background: var(--card-background);
+            color: var(--card-text);
+            font-size: 16px;
+            font-weight: bold;
+            box-shadow: 0 2px 4px var(--shadow);
+        }
+        .playing-card.red-suit {
+            color: var(--red-suit);
+        }
         .action-log-box {
-            max-height: 350px;
+            max-height: 300px;
             overflow-y: auto;
             background: #131b2e;
             border: 1px solid var(--border-blue);
@@ -31,28 +55,33 @@
             font-size: 13px;
         }
         .action-item {
-            padding: 6px 10px;
+            padding: 5px 8px;
             border-bottom: 1px solid rgba(255,255,255,0.05);
         }
-        .action-item:last-child {
-            border-bottom: none;
+        .street-section {
+            background: rgba(23, 61, 112, 0.4);
+            border: 1px solid var(--border-blue);
+            border-radius: 10px;
+            padding: 12px;
+            text-align: center;
         }
     </style>
 </head>
 <body class="table-page">
 
     <header class="top-bar">
-        <h1>♠ Texas Hold'em (Game Review)</h1>
+        <h1>♠ Texas Hold'em (Game Review & Reconstruction)</h1>
         <nav class="navigation" aria-label="Main navigation">
             <a href="admin.html">Back to Admin Console</a>
             <a href="index.html">Home / Lobby</a>
         </nav>
         <div class="account">
-            Mode: <strong class="text-warning">Game Reconstruction</strong>
+            Mode: <strong class="text-warning">Server-Side Reconstruction</strong>
         </div>
     </header>
 
     <main class="review-container">
+        <!-- Session Summary Panel -->
         <div class="panel mb-4">
             <h2>Session Summary</h2>
             <hr style="border-color: var(--border-blue);">
@@ -66,7 +95,7 @@
                     <strong id="review-timestamp" class="text-white">Loading...</strong>
                 </div>
                 <div class="col-md-6">
-                    <p class="mb-1 text-secondary">Table ID / Shuffle Seed:</p>
+                    <p class="mb-1 text-secondary">Table ID & Seed:</p>
                     <strong id="review-seed" class="text-white font-monospace">Loading...</strong>
                 </div>
                 <div class="col-md-6">
@@ -76,6 +105,58 @@
             </div>
         </div>
 
+        <!-- Community Cards & Board Breakdown -->
+        <div class="panel mb-4">
+            <h2>Board Breakdown (Community Cards)</h2>
+            <p class="text-secondary small mb-3">Server-reconstructed community cards across betting streets.</p>
+            <div class="row g-3">
+                <div class="col-md-4">
+                    <div class="street-section">
+                        <span class="d-block text-secondary small mb-2">FLOP</span>
+                        <div class="card-box" id="review-flop">
+                            <span class="text-muted">--</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="street-section">
+                        <span class="d-block text-secondary small mb-2">TURN</span>
+                        <div class="card-box" id="review-turn">
+                            <span class="text-muted">--</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="street-section">
+                        <span class="d-block text-secondary small mb-2">RIVER</span>
+                        <div class="card-box" id="review-river">
+                            <span class="text-muted">--</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Player Hole Cards -->
+        <div class="panel mb-4">
+            <h2>Player Hole Cards</h2>
+            <p class="text-secondary small mb-3">Reconstructed starting cards for each participant at the table.</p>
+            <div class="table-responsive">
+                <table class="table table-dark table-hover align-middle mb-0" style="background: transparent;">
+                    <thead>
+                        <tr>
+                            <th class="ps-3">Player ID</th>
+                            <th>Hole Cards</th>
+                        </tr>
+                    </thead>
+                    <tbody id="player-hands-tbody">
+                        <tr><td colspan="2" class="text-center text-muted py-3">Loading player hands...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Chronological Action Log -->
         <div class="panel">
             <h2>Chronological Action Log</h2>
             <p class="text-secondary small mb-3">Replaying recorded player actions and betting rounds for this session.</p>

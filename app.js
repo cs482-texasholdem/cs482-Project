@@ -65,16 +65,50 @@ app.get('/api/games', async (req, res) => {
         res.status(500).json({ error: "Failed to fetch game history" });
     }
 });
-app.get('/api/games/:id', async (req, res) => {
+const Deck = require("./util/pokerLogic");
+
+app.get('/api/games/:id/reconstruct', async (req, res) => {
     try {
         const game = await GameDao.read(req.params.id);
         if (!game) {
             return res.status(404).json({ error: "Game record not found" });
         }
-        res.status(200).json(game);
+
+        // Reconstruct the exact deck using the saved shuffle seed
+        const reconstructedDeck = new Deck(game.shuffleSeed);
+        const totalPlayers = game.initialPlayers.length;
+
+        // Reconstruct each player's hole cards server-side
+        const playerHands = {};
+        game.initialPlayers.forEach((playerId, index) => {
+            const rawHand = reconstructedDeck.hand(index, totalPlayers);
+            playerHands[playerId] = rawHand.map(c => Deck.cardToText(c));
+        });
+
+        // Reconstruct community cards server-side (flop, turn, river)
+        const flopCards = reconstructedDeck.showFlop(totalPlayers).map(c => Deck.cardToText(c));
+        const turnCard = Deck.cardToText(reconstructedDeck.showTurn(totalPlayers));
+        const riverCard = Deck.cardToText(reconstructedDeck.showRiver(totalPlayers));
+
+        res.status(200).json({
+            gameId: game._id,
+            tableId: game.tableId,
+            timestamp: game.timestamp,
+            initialPlayers: game.initialPlayers,
+            playerHands,
+            communityCards: {
+                flop: flopCards,
+                turn: turnCard,
+                river: riverCard,
+                all: [...flopCards, turnCard, riverCard]
+            },
+            potFinal: game.potFinal,
+            winners: game.winners,
+            actions: game.actions
+        });
     } catch (error) {
-        console.error("Error fetching game by ID:", error);
-        res.status(500).json({ error: "Server error fetching game details" });
+        console.error("Error during server-side game reconstruction:", error);
+        res.status(500).json({ error: "Server error during game reconstruction" });
     }
 });
 
