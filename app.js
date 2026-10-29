@@ -66,4 +66,56 @@ app.get('/api/games', async (req, res) => {
     }
 });
 
+const Deck = require("./util/pokerLogic");
+/**
+ * Reconstructs a game session server-side using the saved shuffle seed, 
+ * initial player array order, and evaluates each player's hand score.
+ */
+app.get('/api/games/:id/reconstruct', async (req, res) => {
+    try {
+        const game = await GameDao.read(req.params.id);
+        if (!game) {
+            return res.status(404).json({ error: "Game record not found" });
+        }
+
+        const deck = new Deck(game.shuffleSeed);
+        const totalPlayers = game.initialPlayers.length;
+
+        const playerHands = {};
+        game.initialPlayers.forEach((playerId, index) => {
+            const rawCards = deck.hand(index, totalPlayers);
+            playerHands[playerId] = rawCards.map(c => Deck.cardToText(c));
+        });
+
+        const flopRaw = deck.showFlop(totalPlayers);
+        const turnRaw = deck.showTurn(totalPlayers);
+        const riverRaw = deck.showRiver(totalPlayers);
+
+        const communityCards = {
+            flop: flopRaw.map(c => Deck.cardToText(c)),
+            turn: Deck.cardToText(turnRaw),
+            river: Deck.cardToText(riverRaw)
+        };
+
+        const commonCardsRaw = [...flopRaw, turnRaw, riverRaw];
+        const playerScores = {};
+
+        game.initialPlayers.forEach(playerId => {
+            const handRaw = deck.hand(game.initialPlayers.indexOf(playerId), totalPlayers);
+            const score = Deck.bestHand(handRaw, commonCardsRaw);
+            playerScores[playerId] = score;
+        });
+
+        res.status(200).json({
+            ...game.toObject(),
+            playerHands,
+            communityCards,
+            playerScores
+        });
+    } catch (error) {
+        console.error("Error during game reconstruction:", error);
+        res.status(500).json({ error: "Server error during game reconstruction" });
+    }
+});
+
 exports.app = app;

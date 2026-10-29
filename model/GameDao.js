@@ -2,8 +2,8 @@
  * ============================================================================
  * File Name: GameDao.js
  * Purpose: Data Access Object (DAO) layer for persistent game history tracking.
- *          Stores only non-derivable game metadata, initial player seating, 
- *          shuffle seed, and chronological action logs to allow full reconstruction.
+ *          Stores seating order, positional metadata (dealer, blinds), shuffle seed,
+ *          and chronological action logs to allow full reconstruction.
  * ============================================================================
  */
 
@@ -13,13 +13,16 @@ const gameSchema = new mongoose.Schema({
     tableId: { type: String, required: true },
     timestamp: { type: Date, default: Date.now },
     initialPlayers: [{ type: String, required: true }],
+    dealerIndex: { type: Number, required: true },
+    smallBlindIndex: { type: Number, required: true },
+    bigBlindIndex: { type: Number, required: true },
     shuffleSeed: { type: String, required: true },
     actions: [
         {
             playerId: { type: String, required: true },
             action: { type: String, required: true },
             amount: { type: Number, default: 0 },
-            round: { type: String, required: true } // e.g., "Pre-Flop", "Flop", "Turn", "River"
+            round: { type: String, required: true }
         }
     ],
     potFinal: { type: Number, required: true },
@@ -45,6 +48,7 @@ exports.create = async function(gameData) {
  * @returns {Promise<Object|null>} The matching game document or null.
  */
 exports.read = async function(id) {
+    if (!id || typeof id !== 'string') return null;
     return await gameModel.findById(id);
 };
 
@@ -53,7 +57,7 @@ exports.read = async function(id) {
  * @returns {Promise<Array>} Array of game documents.
  */
 exports.readAll = async function() {
-    return await gameModel.find();
+    return await gameModel.find().sort({ timestamp: -1 });
 };
 
 /**
@@ -62,5 +66,6 @@ exports.readAll = async function() {
  * @returns {Promise<Array>} Array of matching game documents.
  */
 exports.findByPlayer = async function(playerId) {
+    if (!playerId) return [];
     return await gameModel.find({ initialPlayers: playerId });
 };
