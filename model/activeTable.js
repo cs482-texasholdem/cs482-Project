@@ -1,13 +1,14 @@
 /**
  * ============================================================================
  * File Name: activeTable.js
- * Purpose: Manages table session, betting rounds, and poker rules using 
- *          safe player accessor wrappers (`playerManager.getPlayer`).
+ * Purpose: Manages table session, records action history, handles shuffle seeds, 
+ *          and persists completed game sessions via GameDao.
  * ============================================================================
  */
 
 const Deck = require("../util/pokerLogic");
 const PlayerManager = require("./playerManager");
+const GameDao = require("./GameDao");
 
 class PotManager {
     constructor() {
@@ -73,6 +74,10 @@ class ActiveTable {
         this.potManager = new PotManager();
         this.displayedCards = [];
         this.deck = new Deck();
+        this.currentShuffleSeed = this.deck.seed;
+        this.initialPlayersSnapshot = [];
+        this.actionHistory = [];
+        this.currentRoundName = "Pre-Flop";
         this.roundPlayerCount = null; 
         this.playerHands = new Map();
         this.gameOver = false;
@@ -89,6 +94,7 @@ class ActiveTable {
     hasPlayer(playerId) { return this.playerManager.hasPlayer(playerId); }
     getPlayerCount() { return this.playerManager.getPlayerCount(); }
     getSpectatorCount() { return this.playerManager.getSpectatorCount(); }
+    
     addPlayer(playerId) { 
         const added = this.playerManager.addPlayer(playerId);
         this.playerManager.updateQueueDistribution(this.gameInProgress);
@@ -269,6 +275,14 @@ class ActiveTable {
 
         player.hasActed = true;
 
+        // Log action into action history for database reconstruction
+        this.actionHistory.push({
+            playerId,
+            action,
+            amount: action === "Raise" ? amount : 0,
+            round: this.currentRoundName
+        });
+
         const activeNonFolded = this.playerManager.players
             .map(id => this.playerManager.getPlayer(id))
             .filter(p => p && !p.folded);
@@ -350,10 +364,13 @@ class ActiveTable {
 
         if (this.displayedCards.length === 0) {
             this.displayedCards = this.deck.showFlop(totalP);
+            this.currentRoundName = "Flop";
         } else if (this.displayedCards.length === 3) {
             this.displayedCards.push(this.deck.showTurn(totalP));
+            this.currentRoundName = "Turn";
         } else if (this.displayedCards.length === 4) {
             this.displayedCards.push(this.deck.showRiver(totalP));
+            this.currentRoundName = "River";
         }
 
         return {
@@ -377,14 +394,18 @@ class ActiveTable {
 
     newGameSession() {
         this.playerManager.processPendingRemovals(this.gameInProgress);
-        this.deck = new Deck();
+        this.deck = new Deck(); // Generates new randomized seed
+        this.currentShuffleSeed = this.deck.seed;
         this.displayedCards = [];
+        this.actionHistory = [];
+        this.currentRoundName = "Pre-Flop";
         this.gameStarted = true;
         this.gameInProgress = true;
         this.potManager.reset();
 
         this.playerManager.updateQueueDistribution(this.gameInProgress);
         this.roundPlayerCount = this.playerManager.players.length;
+        this.initialPlayersSnapshot = [...this.playerManager.players];
 
         if (this.gameCount > 0 && this.playerManager.players.length > 0) {
             this.dealerIndex = (this.dealerIndex + 1) % this.playerManager.players.length;
@@ -472,6 +493,19 @@ class ActiveTable {
 
         const resultPot = this.potManager.distributePot(winners, this.playerManager);
         this.gameOver = true;
+
+        // Persist completed game record to MongoDB via GameDao asynchronously
+        GameDao.create({
+            tableId: this.tableId,
+            initialPlayers: this.initialPlayersSnapshot,
+            shuffleSeed: this.currentShuffleSeed,
+            actions: this.actionHistory,
+            potFinal: resultPot,
+            winners: winners
+        }).catch(err => {
+            console.error("Failed to persist game history record:", err);
+        });
+
         this.playerManager.processPendingRemovals(this.gameInProgress);
         return { winners, maxScore, pot: resultPot };
     }

@@ -1,23 +1,46 @@
 /**
- * Represents a standard 52-card deck with built-in poker dealing 
- * and hand evaluation capabilities.
+ * ============================================================================
+ * File Name: pokerLogic.js
+ * Purpose: Represents a standard 52-card deck with support for deterministic 
+ *          seeded pseudo-random number generation (PRNG) for reconstructibility, 
+ *          alongside complete poker hand evaluation capabilities.
+ * ============================================================================
  */
 class Deck {
   /**
-   * Initializes a new Deck with cards 1 through 52 and automatically shuffles them.
+   * Initializes a new Deck with cards 1 through 52 and shuffles them deterministically.
+   * @param {string|number} [seed] Optional seed for reproducible shuffling.
    */
-  constructor() {
+  constructor(seed = null) {
+    this.seed = seed ? String(seed) : Math.random().toString(36).substring(2, 15);
     this.deck = Array.from({ length: 52 }, (_, i) => i + 1);
     this.shuffleCards();
   }
 
   /**
-   * Sorts the deck and performs a randomized Fisher-Yates shuffle.
+   * Simple deterministic pseudo-random number generator (Mulberry32 based on seed string).
+   */
+  #getSeededRandom() {
+    let hash = 1779033703 ^ this.seed.length;
+    for (let i = 0; i < this.seed.length; i++) {
+        hash = Math.imul(hash ^ this.seed.charCodeAt(i), 3432918353);
+        hash = (hash << 13) | (hash >>> 19);
+    }
+    return function() {
+        hash = Math.imul(hash ^ (hash >>> 16), 2246822507);
+        hash = Math.imul(hash ^ (hash >>> 13), 3266489909);
+        return ((hash ^= hash >>> 16) >>> 0) / 4294967296;
+    };
+  }
+
+  /**
+   * Performs a randomized Fisher-Yates shuffle using the deterministic PRNG.
    */
   shuffleCards() {
+    const rng = this.#getSeededRandom();
     this.deck.sort((a, b) => a - b);
     for (let i = this.deck.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
+      const j = Math.floor(rng() * (i + 1));
       [this.deck[i], this.deck[j]] = [this.deck[j], this.deck[i]];
     }
   }

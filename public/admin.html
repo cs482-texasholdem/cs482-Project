@@ -4,8 +4,8 @@
   Author: Bonita Rodrigues
   Purpose: Admin Dashboard interface for the Texas Hold'em web application.
            Provides administrative views for user record management, role 
-           assignments, chip balance adjustments, account deactivation, and 
-           access-controlled navigation.
+           assignments, chip balance adjustments, account deactivation, access-controlled 
+           navigation, and a read-only game history auditing log.
   ============================================================================
 -->
 
@@ -62,7 +62,7 @@
             </div>
 
             <!-- Users Table Card -->
-            <div class="card shadow-sm border-0">
+            <div class="card shadow-sm border-0 mb-5">
                 <div class="card-body p-0">
                     <div class="table-responsive">
                         <table class="table table-hover align-middle mb-0">
@@ -77,6 +77,37 @@
                                 </tr>
                             </thead>
                             <tbody id="userTableBody">
+                                <!-- Dynamic rows will load here -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Game History Section Header -->
+            <div class="row mb-4">
+                <div class="col">
+                    <h2>Game Session History</h2>
+                    <p class="text-muted">Auditing log tracking completed poker hands, table IDs, final pots, and winners.</p>
+                </div>
+            </div>
+
+            <!-- Game History Table Card (Read-Only) -->
+            <div class="card shadow-sm border-0">
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle mb-0">
+                            <thead class="table-dark">
+                                <tr>
+                                    <th class="ps-4">Game ID</th>
+                                    <th>Timestamp</th>
+                                    <th>Table ID</th>
+                                    <th>Players</th>
+                                    <th>Winner(s) & Pot</th>
+                                    <th class="text-end pe-4">Action Count</th>
+                                </tr>
+                            </thead>
+                            <tbody id="gameTableBody">
                                 <!-- Dynamic rows will load here -->
                             </tbody>
                         </table>

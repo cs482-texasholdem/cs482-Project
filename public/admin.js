@@ -4,8 +4,8 @@
  * Author: Bonita Rodrigues
  * Purpose: Frontend controller script for the Admin Dashboard. Manages secure 
  *          user record fetching, role-based access control validation, 
- *          dynamic table rendering, and user modification interactions via 
- *          Bootstrap modals.
+ *          dynamic table rendering, user modification interactions via 
+ *          Bootstrap modals, and game history loading.
  * ============================================================================
  */
 let editModal;
@@ -14,8 +14,9 @@ let editModal;
 document.addEventListener("DOMContentLoaded", async function() {
     // Instantiate the Bootstrap modal used for editing user accounts
     editModal = new bootstrap.Modal(document.getElementById('editUserModal'));
-    // Fetch and render the initial list of users
+    // Fetch and render the initial list of users and game history
     await loadUsers();
+    await loadGameHistory();
 });
 
 
@@ -30,7 +31,6 @@ async function loadUsers() {
         
         // Validate response status and handle administrative security constraints
         if (!response.ok) {
-            // Handle non-OK responses from the server
             if (response.status === 403) {
                 alert("Access Denied: You must be an administrator to view this page.");
                 window.location.href = 'index.html';
@@ -43,20 +43,16 @@ async function loadUsers() {
         const tableBody = document.getElementById("userTableBody");
         tableBody.innerHTML = "";
 
-        // Handle scenario where no user records are returned (spanning 6 columns now)
         if (users.length === 0) {
             tableBody.innerHTML = `<tr><td colspan="6" class="text-center py-4 text-muted">No users found.</td></tr>`;
             return;
         }
 
-        // Iterate through user records and build dynamic HTML table rows
         users.forEach(user => {
-            // Assign a permission badge (Admin = Red, Player = Secondary/Gray)
             let roleBadge = user.permission === 1 
                 ? '<span class="badge bg-danger">ADMIN</span>' 
                 : '<span class="badge bg-secondary">PLAYER</span>';
 
-            // Determine explicit display fields for username and email
             let usernameDisplay = user.username || (user.login && !user.login.includes('@') ? user.login : 'N/A');
             let emailDisplay = user.email || (user.login && user.login.includes('@') ? user.login : 'N/A');
 
@@ -77,7 +73,56 @@ async function loadUsers() {
         });
 
     } catch (error) {
-        console.error("Error loading admin dashboard data:", error);
+        console.error("Error loading admin dashboard user data:", error);
+    }
+}
+
+
+/**
+ * Asynchronously fetches completed game session records and populates 
+ * the read-only game history table.
+ */
+async function loadGameHistory() {
+    try {
+        const response = await fetch('/api/games');
+        if (!response.ok) {
+            throw new Error("Failed to fetch game history records.");
+        }
+
+        const games = await response.json();
+        const tableBody = document.getElementById("gameTableBody");
+        tableBody.innerHTML = "";
+
+        if (!games || games.length === 0) {
+            tableBody.innerHTML = `<tr><td colspan="6" class="text-center py-4 text-muted">No recorded game history found.</td></tr>`;
+            return;
+        }
+
+        games.forEach(game => {
+            const dateStr = game.timestamp ? new Date(game.timestamp).toLocaleString() : 'N/A';
+            const playerCount = game.initialPlayers ? game.initialPlayers.length : 0;
+            const winnersList = game.winners && game.winners.length > 0 ? game.winners.join(', ') : 'None / Folded';
+            const actionCount = game.actions ? game.actions.length : 0;
+
+            let row = `
+                <tr>
+                    <td class="ps-4 text-muted small">${game._id}</td>
+                    <td>${dateStr}</td>
+                    <td><span class="badge bg-info text-dark">${game.tableId || 'main'}</span></td>
+                    <td>${playerCount} Players</td>
+                    <td><strong>${winnersList}</strong> (${game.potFinal || 0} Chips)</td>
+                    <td class="text-end pe-4 text-muted small">${actionCount} Actions Recorded</td>
+                </tr>
+            `;
+            tableBody.innerHTML += row;
+        });
+
+    } catch (error) {
+        console.error("Error loading admin dashboard game history:", error);
+        const tableBody = document.getElementById("gameTableBody");
+        if (tableBody) {
+            tableBody.innerHTML = `<tr><td colspan="6" class="text-center py-4 text-danger">Failed to load game history.</td></tr>`;
+        }
     }
 }
 
@@ -86,7 +131,7 @@ async function loadUsers() {
  * Populates the edit modal form fields with the selected user's account data 
  * and displays the modal dialog to the administrator.
  * 
- * @param {Object} user - The target user object containing metadata
+ * @param {Object} user The target user object containing metadata
  */
 function openEditModal(user) {
     document.getElementById('txt_id').value = user._id;
