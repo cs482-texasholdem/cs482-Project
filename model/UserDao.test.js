@@ -27,7 +27,7 @@ test('readAll should return an empty array when database is empty', async functi
 // ==========================================
 test('create should successfully insert a new user and return the record with an ID', async function(){
     let newUserData = {
-        login: 'testplayer@poker.com',
+        email: 'testplayer@poker.com',
         username: 'testplayer',
         password: 'hashedPassword123',
         permission: 2,
@@ -39,7 +39,7 @@ test('create should successfully insert a new user and return the record with an
 
     expect(users.length).toBe(1);
     expect(createdUser._id).toBeDefined();
-    expect(createdUser.login).toBe('testplayer@poker.com');
+    expect(createdUser.email).toBe('testplayer@poker.com');
     expect(createdUser.username).toBe('testplayer');
     expect(createdUser.points).toBe(1000);
 });
@@ -49,7 +49,8 @@ test('create should successfully insert a new user and return the record with an
 // ==========================================
 test('read should find and return a specific user by their ID', async function(){
     let newUserData = {
-        login: 'readuser@poker.com',
+        email: 'readuser@poker.com',
+        username: 'readuser',
         password: 'password123',
         permission: 2
     };
@@ -58,16 +59,17 @@ test('read should find and return a specific user by their ID', async function()
     let foundUser = await dao.read(created._id);
 
     expect(foundUser).not.toBeNull();
-    expect(foundUser.login).toBe('readuser@poker.com');
+    expect(foundUser.email).toBe('readuser@poker.com');
     expect(foundUser._id.toString()).toBe(created._id.toString());
 });
 
 // ==========================================
 // 4. findLogin Tests
 // ==========================================
-test('findLogin should locate a user document by login/email string', async function(){
+test('findLogin should locate a user document by email string', async function(){
     let newUserData = {
-        login: 'admin@poker.com',
+        email: 'admin@poker.com',
+        username: 'admin',
         password: 'adminPassword',
         permission: 1
     };
@@ -77,7 +79,7 @@ test('findLogin should locate a user document by login/email string', async func
 
     expect(foundUser).not.toBeNull();
     expect(foundUser.permission).toBe(1);
-    expect(foundUser.login).toBe('admin@poker.com');
+    expect(foundUser.email).toBe('admin@poker.com');
 });
 
 // ==========================================
@@ -85,7 +87,8 @@ test('findLogin should locate a user document by login/email string', async func
 // ==========================================
 test('update should modify user fields like points and permission correctly', async function(){
     let newUserData = {
-        login: 'updateuser@poker.com',
+        email: 'updateuser@poker.com',
+        username: 'updateuser',
         password: 'password123',
         points: 500
     };
@@ -96,7 +99,7 @@ test('update should modify user fields like points and permission correctly', as
 
     expect(updatedUser.points).toBe(5000);
     expect(updatedUser.permission).toBe(1);
-    expect(updatedUser.login).toBe('updateuser@poker.com');
+    expect(updatedUser.email).toBe('updateuser@poker.com');
 });
 
 // ==========================================
@@ -104,7 +107,8 @@ test('update should modify user fields like points and permission correctly', as
 // ==========================================
 test('del should remove a user record from the database by ID', async function(){
     let newUserData = {
-        login: 'deleteuser@poker.com',
+        email: 'deleteuser@poker.com',
+        username: 'deleteuser',
         password: 'password123'
     };
 
@@ -121,8 +125,8 @@ test('del should remove a user record from the database by ID', async function()
 // 7. find and findOne Query Tests
 // ==========================================
 test('find should query and return matching user records', async function(){
-    await dao.create({ login: 'alice@mail.com', username: 'alice', permission: 2 });
-    await dao.create({ login: 'bob@mail.com', username: 'bob', permission: 2 });
+    await dao.create({ email: 'alice@mail.com', username: 'alice', password: 'password123', permission: 2 });
+    await dao.create({ email: 'bob@mail.com', username: 'bob', password: 'password123', permission: 2 });
 
     let results = await dao.find({ username: 'alice' });
 
@@ -131,10 +135,10 @@ test('find should query and return matching user records', async function(){
 });
 
 test('findOne should query and return a single matching user document', async function(){
-    await dao.create({ login: 'target@mail.com', username: 'targetuser', permission: 2 });
+    await dao.create({ email: 'target@mail.com', username: 'targetuser', password: 'password123', permission: 2 });
 
     let found = await dao.findOne({ username: 'targetuser' });
 
     expect(found).not.toBeNull();
-    expect(found.login).toBe('target@mail.com');
+    expect(found.email).toBe('target@mail.com');
 });

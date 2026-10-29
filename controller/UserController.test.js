@@ -32,13 +32,13 @@ test('getAll should call dao.readAll and send the result when user is admin', as
         send: jest.fn(),
         end: jest.fn()
     };
-    dao.readAll.mockResolvedValue([{ login: 'adminUser' }]);
+    dao.readAll.mockResolvedValue([{ username: 'adminUser', email: 'admin@mail.com' }]);
 
     await controller.getAll(req, res);
 
     expect(dao.readAll).toHaveBeenCalled();
     expect(res.status).toHaveBeenCalledWith(200);
-    expect(res.send).toHaveBeenCalledWith([{ login: 'adminUser' }]);
+    expect(res.send).toHaveBeenCalledWith([{ username: 'adminUser', email: 'admin@mail.com' }]);
     expect(res.end).toHaveBeenCalled();
 });
 
@@ -101,7 +101,7 @@ test('deleteOne should forbid access when non-admin tries to delete', async func
 // ==========================================
 test('register should create user, set session object, and redirect to index.html on success', async function(){
     let req = {
-        body: { txt_login: 'newplayer', txt_email: 'newplayer@mail.com', txt_pass: 'secure123' },
+        body: { txt_username: 'newplayer', txt_email: 'newplayer@mail.com', txt_pass: 'secure123' },
         session: {}
     };
     let res = { redirect: jest.fn() };
@@ -113,8 +113,8 @@ test('register should create user, set session object, and redirect to index.htm
     expect(passUtil.hashPassword).toHaveBeenCalledWith('secure123');
     expect(dao.create).toHaveBeenCalled();
     expect(req.session.user).toEqual({
-        login: 'newplayer',
         email: 'newplayer@mail.com',
+        username: 'newplayer',
         permission: 2,
         points: 1000
     });
@@ -123,7 +123,7 @@ test('register should create user, set session object, and redirect to index.htm
 
 test('register should catch database errors and redirect to signup.html', async function(){
     let req = {
-        body: { txt_login: 'erroruser' },
+        body: { txt_username: 'erroruser', txt_email: 'error@mail.com' },
         session: {}
     };
     let res = { redirect: jest.fn() };
@@ -138,7 +138,7 @@ test('register should catch database errors and redirect to signup.html', async 
 // 5. login Tests
 // ==========================================
 test('login should redirect with error=1 when user does not exist', async function(){
-    let req = { body: { txt_login: 'nonexistent' } };
+    let req = { body: { txt_email: 'nonexistent@mail.com' } };
     let res = { redirect: jest.fn() };
     dao.findLogin.mockResolvedValue(null);
 
@@ -148,9 +148,9 @@ test('login should redirect with error=1 when user does not exist', async functi
 });
 
 test('login should succeed and redirect admin to admin.html', async function(){
-    let req = { body: { txt_login: 'admin', txt_pass: 'correct' }, session: {} };
+    let req = { body: { txt_email: 'admin@mail.com', txt_pass: 'correct' }, session: {} };
     let res = { redirect: jest.fn() };
-    let adminUser = { login: 'admin', password: 'hashed', permission: 1 };
+    let adminUser = { email: 'admin@mail.com', username: 'admin', password: 'hashed', permission: 1 };
     
     dao.findLogin.mockResolvedValue(adminUser);
     passUtil.comparePassword.mockReturnValue(true);
@@ -162,9 +162,9 @@ test('login should succeed and redirect admin to admin.html', async function(){
 });
 
 test('login should succeed and redirect standard player to index.html', async function(){
-    let req = { body: { txt_login: 'player', txt_pass: 'correct' }, session: {} };
+    let req = { body: { txt_email: 'player@mail.com', txt_pass: 'correct' }, session: {} };
     let res = { redirect: jest.fn() };
-    let playerUser = { login: 'player', password: 'hashed', permission: 2 };
+    let playerUser = { email: 'player@mail.com', username: 'player', password: 'hashed', permission: 2 };
     
     dao.findLogin.mockResolvedValue(playerUser);
     passUtil.comparePassword.mockReturnValue(true);
@@ -176,9 +176,9 @@ test('login should succeed and redirect standard player to index.html', async fu
 });
 
 test('login should fail and redirect with error=1 when password check fails', async function(){
-    let req = { body: { txt_login: 'admin', txt_pass: 'wrong' } };
+    let req = { body: { txt_email: 'admin@mail.com', txt_pass: 'wrong' } };
     let res = { redirect: jest.fn() };
-    dao.findLogin.mockResolvedValue({ password: 'hashed' });
+    dao.findLogin.mockResolvedValue({ email: 'admin@mail.com', password: 'hashed' });
     passUtil.comparePassword.mockReturnValue(false);
 
     await controller.login(req, res);
@@ -190,7 +190,7 @@ test('login should fail and redirect with error=1 when password check fails', as
 // 6. loggedUser & logout Tests
 // ==========================================
 test('loggedUser should send active session user with status 200', function(){
-    let req = { session: { user: { login: 'activeUser' } } };
+    let req = { session: { user: { username: 'activeUser', email: 'active@mail.com' } } };
     let res = {
         status: jest.fn(),
         send: jest.fn(),
@@ -220,7 +220,7 @@ test('loggedUser should send null JSON when no user session is active', function
 });
 
 test('logout should clear session user and redirect to index.html', function(){
-    let req = { session: { user: { login: 'activeUser' } } };
+    let req = { session: { user: { username: 'activeUser', email: 'active@mail.com' } } };
     let res = { redirect: jest.fn() };
 
     controller.logout(req, res);
@@ -235,12 +235,12 @@ test('logout should clear session user and redirect to index.html', function(){
 test('searchUsers should query DAO and return matching usernames as JSON', async function(){
     let req = {
         query: { q: 'bub' },
-        session: { user: { login: 'alice@mail.com', username: 'alice' } }
+        session: { user: { email: 'alice@mail.com', username: 'alice' } }
     };
     let res = {
         json: jest.fn()
     };
-    dao.find.mockResolvedValue([{ username: 'bubbles', login: 'bubbles@mail.com' }]);
+    dao.find.mockResolvedValue([{ username: 'bubbles', email: 'bubbles@mail.com' }]);
 
     await controller.searchUsers(req, res);
 
@@ -251,7 +251,7 @@ test('searchUsers should query DAO and return matching usernames as JSON', async
 test('sendFriendRequest should push sender username into recipient friendRequests and redirect', async function(){
     let req = {
         body: { targetUser: 'bubbles' },
-        session: { user: { login: 'alice@mail.com', username: 'alice' } }
+        session: { user: { email: 'alice@mail.com', username: 'alice' } }
     };
     let res = {
         redirect: jest.fn(),
@@ -259,10 +259,7 @@ test('sendFriendRequest should push sender username into recipient friendRequest
         send: jest.fn()
     };
     
-    // 1st findOne: lookup sender, 2nd findOne: lookup recipient
-    dao.findOne
-        .mockResolvedValueOnce({ username: 'alice', login: 'alice@mail.com' })
-        .mockResolvedValueOnce({ username: 'bubbles', login: 'bubbles@mail.com' });
+    dao.findOne.mockResolvedValue({ username: 'bubbles', email: 'bubbles@mail.com' });
     dao.update.mockResolvedValue(true);
 
     await controller.sendFriendRequest(req, res);
@@ -273,13 +270,12 @@ test('sendFriendRequest should push sender username into recipient friendRequest
 
 test('getFriendsData should return resolved friends and requests JSON', async function(){
     let req = {
-        session: { user: { login: 'alice@mail.com', username: 'alice' } }
+        session: { user: { email: 'alice@mail.com', username: 'alice' } }
     };
     let res = {
         json: jest.fn()
     };
 
-    // 1st findOne: get logged-in user, 2nd findOne: resolve 'bob', 3rd findOne: resolve 'charlie'
     dao.findOne
         .mockResolvedValueOnce({
             username: 'alice',
@@ -300,7 +296,7 @@ test('getFriendsData should return resolved friends and requests JSON', async fu
 test('acceptFriendRequest should move requester from requests to friends and update both users', async function(){
     let req = {
         body: { requester: 'charlie' },
-        session: { user: { login: 'alice@mail.com', username: 'alice' } }
+        session: { user: { email: 'alice@mail.com', username: 'alice' } }
     };
     let res = {
         redirect: jest.fn()
@@ -316,7 +312,7 @@ test('acceptFriendRequest should move requester from requests to friends and upd
 test('declineFriendRequest should remove requester from friendRequests array and redirect', async function(){
     let req = {
         body: { requester: 'charlie' },
-        session: { user: { login: 'alice@mail.com', username: 'alice' } }
+        session: { user: { email: 'alice@mail.com', username: 'alice' } }
     };
     let res = {
         redirect: jest.fn()
@@ -335,7 +331,7 @@ test('declineFriendRequest should remove requester from friendRequests array and
 test('searchUsers should handle database errors and return 500 status', async function(){
     let req = {
         query: { q: 'bub' },
-        session: { user: { login: 'alice@mail.com', username: 'alice' } }
+        session: { user: { email: 'alice@mail.com', username: 'alice' } }
     };
     let res = {
         status: jest.fn().mockReturnThis(),
@@ -362,7 +358,7 @@ test('sendFriendRequest should return 401 Unauthorized if user is not sessioned'
 test('sendFriendRequest should catch errors and redirect to index.html', async function(){
     let req = {
         body: { targetUser: 'bubbles' },
-        session: { user: { login: 'alice@mail.com', username: 'alice' } }
+        session: { user: { email: 'alice@mail.com', username: 'alice' } }
     };
     let res = { redirect: jest.fn() };
     dao.findOne.mockRejectedValue(new Error('DB error'));
@@ -383,8 +379,9 @@ test('getFriendsData should return 401 Unauthorized if not logged in', async fun
 });
 
 test('getFriendsData should return 404 if user document is not found', async function(){
-    let req = { session: { user: { login: 'alice@mail.com', username: 'alice' } } };
+    let req = { session: { user: { email: 'alice@mail.com', username: 'alice' } } };
     let res = { status: jest.fn().mockReturnThis(), json: jest.fn() };
+    res.status.mockReturnValue(res);
     dao.findOne.mockResolvedValue(null);
 
     await controller.getFriendsData(req, res);
@@ -394,8 +391,9 @@ test('getFriendsData should return 404 if user document is not found', async fun
 });
 
 test('getFriendsData should catch errors and return 500 status', async function(){
-    let req = { session: { user: { login: 'alice@mail.com', username: 'alice' } } };
+    let req = { session: { user: { email: 'alice@mail.com', username: 'alice' } } };
     let res = { status: jest.fn().mockReturnThis(), json: jest.fn() };
+    res.status.mockReturnValue(res);
     dao.findOne.mockRejectedValue(new Error('DB failure'));
 
     await controller.getFriendsData(req, res);
@@ -417,7 +415,7 @@ test('acceptFriendRequest should return 401 if unauthenticated', async function(
 test('acceptFriendRequest should catch errors and redirect to index.html', async function(){
     let req = {
         body: { requester: 'charlie' },
-        session: { user: { login: 'alice@mail.com', username: 'alice' } }
+        session: { user: { email: 'alice@mail.com', username: 'alice' } }
     };
     let res = { redirect: jest.fn() };
     dao.update.mockRejectedValue(new Error('DB error'));
@@ -440,7 +438,7 @@ test('declineFriendRequest should return 401 if unauthenticated', async function
 test('declineFriendRequest should catch errors and redirect to index.html', async function(){
     let req = {
         body: { requester: 'charlie' },
-        session: { user: { login: 'alice@mail.com', username: 'alice' } }
+        session: { user: { email: 'alice@mail.com', username: 'alice' } }
     };
     let res = { redirect: jest.fn() };
     dao.update.mockRejectedValue(new Error('DB error'));
