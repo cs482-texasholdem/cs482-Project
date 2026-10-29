@@ -54,4 +54,16 @@ app.post("/api/table/action", playerAction);
 app.post("/api/table/start", startGame);
 app.get("/api/table/next-round", nextRound);
 
+// Game History Route for Admin Dashboard
+const GameDao = require("./model/GameDao");
+app.get('/api/games', async (req, res) => {
+    try {
+        const games = await GameDao.readAll();
+        res.status(200).json(games);
+    } catch (error) {
+        console.error("Error fetching games:", error);
+        res.status(500).json({ error: "Failed to fetch game history" });
+    }
+});
+
 exports.app = app;

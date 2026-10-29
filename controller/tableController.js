@@ -1,10 +1,18 @@
+/**
+ * ============================================================================
+ * File Name: tableController.js
+ * Purpose: Express controller endpoints for table actions using safe 
+ *          player lookups (`mainTable.playerManager.getPlayer`).
+ * ============================================================================
+ */
+
 const ActiveTable = require("../model/activeTable");
 const Deck = require("../util/pokerLogic");
 
 const mainTable = new ActiveTable("main", "general");
 
 function getTableStatus(req, res) {
-    mainTable.checkTimeout(); // Check if current player's turn has timed out
+    mainTable.checkTimeout();
 
     const playerId = req.query.playerId;
     const inTable = playerId ? mainTable.hasPlayer(playerId) : false;
@@ -16,11 +24,13 @@ function getTableStatus(req, res) {
     let playerHand = [];
     let playerHasActed = false;
 
-    if (playerId && mainTable.playerObjects.has(playerId)) {
-        const p = mainTable.playerObjects.get(playerId);
-        playerChips = p.chips;
-        playerBet = p.currentBet;
-        playerHasActed = p.hasActed;
+    if (playerId) {
+        const p = mainTable.playerManager.getPlayer(playerId);
+        if (p) {
+            playerChips = p.chips;
+            playerBet = p.currentBet;
+            playerHasActed = p.hasActed;
+        }
     }
 
     if (playerId && isPlayer && mainTable.gameInProgress) {
@@ -39,7 +49,7 @@ function getTableStatus(req, res) {
     const turnTimeRemaining = Math.max(0, 30 - elapsed);
 
     const allPlayersData = mainTable.players.map(id => {
-        const p = mainTable.playerObjects.get(id);
+        const p = mainTable.playerManager.getPlayer(id);
         const isDealer = id === dealerPlayerId;
         return {
             id,
@@ -157,7 +167,7 @@ function playerAction(req, res) {
         return res.status(400).json({ error: result.error });
     }
 
-    const p = mainTable.playerObjects.get(playerId);
+    const p = mainTable.playerManager.getPlayer(playerId);
     const winnerData = result.winnerData;
     if (winnerData && winnerData.winners) {
         mainTable.resetToLobby();
@@ -165,8 +175,8 @@ function playerAction(req, res) {
 
     return res.status(200).json({
         message: `Action ${action} recorded successfully.`,
-        chips: p.chips,
-        currentBet: p.currentBet,
+        chips: p ? p.chips : 0,
+        currentBet: p ? p.currentBet : 0,
         pot: mainTable.pot,
         winnerData,
         communityCards: mainTable.displayCards()
