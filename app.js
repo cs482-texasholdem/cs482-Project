@@ -65,5 +65,17 @@ app.get('/api/games', async (req, res) => {
         res.status(500).json({ error: "Failed to fetch game history" });
     }
 });
+app.get('/api/games/:id', async (req, res) => {
+    try {
+        const game = await GameDao.read(req.params.id);
+        if (!game) {
+            return res.status(404).json({ error: "Game record not found" });
+        }
+        res.status(200).json(game);
+    } catch (error) {
+        console.error("Error fetching game by ID:", error);
+        res.status(500).json({ error: "Server error fetching game details" });
+    }
+});
 
 exports.app = app;

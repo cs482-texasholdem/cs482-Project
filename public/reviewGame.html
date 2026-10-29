@@ -1,0 +1,94 @@
+<!--
+  ============================================================================
+  File Name: reviewGame.html
+  Purpose: Game Review & Reconstruction Dashboard. Retrieves and visually 
+           replays a saved poker game session from the database using its game ID.
+  ============================================================================
+-->
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Texas Hold'em - Game Review</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css" rel="stylesheet" />
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.13.1/font/bootstrap-icons.min.css">        
+    <link rel="stylesheet" href="style.css">
+    <style>
+        .review-container {
+            max-width: 900px;
+            margin: 30px auto;
+        }
+        .action-log-box {
+            max-height: 350px;
+            overflow-y: auto;
+            background: #131b2e;
+            border: 1px solid var(--border-blue);
+            border-radius: 8px;
+            padding: 15px;
+            font-family: monospace;
+            font-size: 13px;
+        }
+        .action-item {
+            padding: 6px 10px;
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+        }
+        .action-item:last-child {
+            border-bottom: none;
+        }
+    </style>
+</head>
+<body class="table-page">
+
+    <header class="top-bar">
+        <h1>♠ Texas Hold'em (Game Review)</h1>
+        <nav class="navigation" aria-label="Main navigation">
+            <a href="admin.html">Back to Admin Console</a>
+            <a href="index.html">Home / Lobby</a>
+        </nav>
+        <div class="account">
+            Mode: <strong class="text-warning">Game Reconstruction</strong>
+        </div>
+    </header>
+
+    <main class="review-container">
+        <div class="panel mb-4">
+            <h2>Session Summary</h2>
+            <hr style="border-color: var(--border-blue);">
+            <div class="row g-3">
+                <div class="col-md-6">
+                    <p class="mb-1 text-secondary">Game ID:</p>
+                    <strong id="review-game-id" class="text-white font-monospace">Loading...</strong>
+                </div>
+                <div class="col-md-6">
+                    <p class="mb-1 text-secondary">Timestamp:</p>
+                    <strong id="review-timestamp" class="text-white">Loading...</strong>
+                </div>
+                <div class="col-md-6">
+                    <p class="mb-1 text-secondary">Table ID / Shuffle Seed:</p>
+                    <strong id="review-seed" class="text-white font-monospace">Loading...</strong>
+                </div>
+                <div class="col-md-6">
+                    <p class="mb-1 text-secondary">Final Pot & Winner(s):</p>
+                    <strong id="review-outcome" class="text-success">Loading...</strong>
+                </div>
+            </div>
+        </div>
+
+        <div class="panel">
+            <h2>Chronological Action Log</h2>
+            <p class="text-secondary small mb-3">Replaying recorded player actions and betting rounds for this session.</p>
+            <div class="action-log-box" id="action-log-container">
+                <div class="text-muted text-center py-3">Loading action history...</div>
+            </div>
+        </div>
+    </main>
+
+    <div class="mt-5 p-4 custom-footer text-white text-center">
+        <p>Powerpuff Girls Inc. -- CS Department</p>
+    </div>
+
+    <script src="reviewGame.js"></script>
+</body>
+</html>

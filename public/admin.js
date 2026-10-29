@@ -111,7 +111,12 @@ async function loadGameHistory() {
                     <td><span class="badge bg-info text-dark">${game.tableId || 'main'}</span></td>
                     <td>${playerCount} Players</td>
                     <td><strong>${winnersList}</strong> (${game.potFinal || 0} Chips)</td>
-                    <td class="text-end pe-4 text-muted small">${actionCount} Actions Recorded</td>
+                    <td class="text-end pe-4">
+                        <span class="text-muted small me-2">${actionCount} Actions</span>
+                        <a href="reviewGame.html?id=${game._id}" class="btn btn-sm btn-outline-warning" title="Review Game Reconstruction">
+                            <i class="bi bi-eye"></i> Review
+                        </a>
+                    </td>
                 </tr>
             `;
             tableBody.innerHTML += row;
