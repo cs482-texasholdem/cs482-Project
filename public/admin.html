@@ -1,11 +1,11 @@
 <!--
   ============================================================================
   File Name: admin.html
-  Author: Bonita Rodrigues
+  Author: Bonita Rodrigues, Alejandro Escorcia
   Purpose: Admin Dashboard interface for the Texas Hold'em web application.
-           Provides administrative views for user record management, role 
-           assignments, chip balance adjustments, account deactivation, access-controlled 
-           navigation, and a read-only game history auditing log.
+             Provides administrative views for user record management, role 
+             assignments, chip balance adjustments, account deactivation, access-controlled 
+             navigation, player report moderation, and a read-only game history auditing log.
   ============================================================================
 -->
 
@@ -23,28 +23,31 @@
         <link rel="stylesheet" href="style.css">
     </head>
 
-    <body>
+    <body style="background-color: #060919; color: #ffffff;">
 
          <!-- Header / Jumbotron -->
         <div class="p-5 custom-jumbotron text-white text-center">
             <h1 class="display-5 fw-bold">Texas Hold'em Poker <span class="bi bi-suit-spade-fill"></span></h1>
-            <p class="lead text-light opacity-75 mb-0">High Stakes & Strategic Play</p>
+            <p class="lead text-white opacity-90 mb-0">High Stakes & Strategic Play</p>
         </div>
 
         <!-- Navbar -->
-        <nav class="navbar navbar-expand-sm custom-navbar" data-bs-theme="dark"> 
+        <nav class="navbar navbar-expand-sm custom-navbar px-3" data-bs-theme="dark"> 
             <div class="container-fluid">
-                <ul class="navbar-nav">
-                    <li class="nav-item">
-                        <a class="nav-link" href="landing.html"><span class="bi-house-fill"></span> Home</a>
+                <ul class="navbar-nav me-auto">
+                    <li class="nav-item me-3">
+                        <a class="nav-link fw-semibold text-white" href="index.html"><span class="bi-house-fill me-1"></span> Dashboard</a>
+                    </li>
+                    <li class="nav-item me-3">
+                        <a class="nav-link fw-semibold text-white" href="lobby.html"><span class="bi-dice-5-fill me-1"></span> Poker Lobby</a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link active" href="admin.html"><span class="bi-shield-lock-fill"></span> Admin Console</a>
+                        <a class="nav-link active fw-semibold text-warning" href="admin.html"><span class="bi bi-shield-lock-fill me-1"></span> Admin Console</a>
                     </li>
                 </ul>
-                <ul class="navbar-nav ms-auto">
+                <ul class="navbar-nav">
                     <li class="nav-item">
-                        <a class="nav-link" href="login.html"><span class="bi-box-arrow-right"></span> Logout</a>
+                        <a class="nav-link fw-semibold text-white" href="login.html"><span class="bi bi-box-arrow-left me-1"></span> Logout</a>
                     </li>
                 </ul>
             </div>
@@ -53,25 +56,24 @@
         <br/>
 
         <!-- Main Admin Container -->
-        <div class="container mt-4 mb-5">
-            <div class="row mb-4">
-                <div class="col">
-                    <h2>Player Account Management</h2>
-                    <p class="text-muted">Edit user details, update points, or disable accounts as needed.</p>
+        <div class="container my-5">
+            
+            <!-- CONTAINER 1: Player Account Management -->
+            <div class="card border-secondary shadow-lg mb-5" style="background-color: #0b132b; color: #ffffff;">
+                <div class="card-header border-secondary py-3 px-4 bg-transparent">
+                    <h4 class="fw-bold text-white mb-1"><i class="bi bi-people-fill text-info me-2"></i> Player Account Management</h4>
+                    <p class="text-white opacity-75 small mb-0">Edit user details, update points, or disable accounts as needed.</p>
                 </div>
-            </div>
-
-            <!-- Users Table Card -->
-            <div class="card shadow-sm border-0 mb-5">
                 <div class="card-body p-0">
                     <div class="table-responsive">
-                        <table class="table table-hover align-middle mb-0">
-                            <thead class="table-dark">
-                                <tr>
+                        <table class="table table-dark table-hover align-middle mb-0" style="background-color: transparent;">
+                            <thead>
+                                <tr class="text-white opacity-75 small border-secondary">
                                     <th class="ps-4">Username</th>
                                     <th>Email</th>
                                     <th>Role</th>
-                                    <th>Points / Chips</th>
+                                    <th>Points</th>
+                                    <th>Warnings</th>
                                     <th>Status</th>
                                     <th class="text-end pe-4">Actions</th>
                                 </tr>
@@ -84,21 +86,47 @@
                 </div>
             </div>
 
-            <!-- Game History Section Header -->
-            <div class="row mb-4">
-                <div class="col">
-                    <h2>Game Session History</h2>
-                    <p class="text-muted">Auditing log tracking completed poker hands, table IDs, final pots, and winners.</p>
+            <!-- CONTAINER 2: Player Infraction Reports -->
+            <div class="card border-secondary shadow-lg mb-5" style="background-color: #0b132b; color: #ffffff;">
+                <div class="card-header border-secondary py-3 px-4 bg-transparent">
+                    <h4 class="fw-bold text-white mb-1"><i class="bi bi-shield-exclamation text-warning me-2"></i> Player Infraction Reports</h4>
+                    <p class="text-white opacity-75 small mb-0">Review submitted reports regarding cheating, collusion, or toxicity.</p>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-dark table-hover align-middle mb-0" style="background-color: transparent;">
+                            <thead>
+                                <tr class="text-white opacity-75 small border-secondary">
+                                    <th class="ps-4">Reporter</th>
+                                    <th>Offending User</th>
+                                    <th>Reason</th>
+                                    <th>Details</th>
+                                    <th>Date</th>
+                                    <th class="text-end pe-4">Action</th>
+                                </tr>
+                            </thead>
+                            <tbody id="reportTableBody">
+                                <!-- Dynamic reports rows will load here -->
+                                <tr>
+                                    <td colspan="6" class="text-center text-white opacity-75 py-3 fst-italic">No player reports recorded yet.</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
             </div>
 
-            <!-- Game History Table Card (Read-Only) -->
-            <div class="card shadow-sm border-0">
+            <!-- CONTAINER 3: Game Session History -->
+            <div class="card border-secondary shadow-lg mb-4" style="background-color: #0b132b; color: #ffffff;">
+                <div class="card-header border-secondary py-3 px-4 bg-transparent">
+                    <h4 class="fw-bold text-white mb-1"><i class="bi bi-clock-history text-success me-2"></i> Game Session History</h4>
+                    <p class="text-white opacity-75 small mb-0">Auditing log tracking completed poker hands, table IDs, final pots, and winners.</p>
+                </div>
                 <div class="card-body p-0">
                     <div class="table-responsive">
-                        <table class="table table-hover align-middle mb-0">
-                            <thead class="table-dark">
-                                <tr>
+                        <table class="table table-dark table-hover align-middle mb-0" style="background-color: transparent;">
+                            <thead>
+                                <tr class="text-white opacity-75 small border-secondary">
                                     <th class="ps-4">Game ID</th>
                                     <th>Timestamp</th>
                                     <th>Table ID</th>
@@ -114,59 +142,62 @@
                     </div>
                 </div>
             </div>
+
         </div>
 
         <!-- Edit User Modal -->
         <div class="modal fade" id="editUserModal" tabindex="-1" aria-labelledby="editUserModalLabel" aria-hidden="true">
-            <div class="modal-dialog">
-                <div class="modal-content">
+            <div class="modal-dialog modal-dialog-centered">
+                <div class="modal-content border-secondary text-white shadow-lg" style="background-color: #0b132b;">
 
                     <form id="editUserForm" action="/user" method="POST">
 
                         <!-- Modal Header -->
-                        <div class="modal-header bg-primary text-white">
-                            <h5 class="modal-title" id="editUserModalLabel">Edit User Account</h5>
-                            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                        <div class="modal-header border-secondary">
+                            <h5 class="modal-title fw-bold text-white" id="editUserModalLabel">
+                                <i class="bi bi-person-gear text-primary me-2"></i> Edit User Account
+                            </h5>
+                            <button type="button" class="btn-close btn-close-white shadow-none" data-bs-dismiss="modal" aria-label="Close"></button>
                         </div>
 
-                        <div class="modal-body">
+                        <div class="modal-body p-4">
                             <!-- Hidden ID field for backend update mapping -->
                             <input type="hidden" id="txt_id" name="txt_id">
 
                             <!-- Username field -->
                             <div class="mb-3">
-                                <label for="txt_login" class="form-label">Username</label>
-                                <input type="text" class="form-control" id="txt_login" name="txt_login" required>
+                                <label for="txt_login" class="form-label small fw-semibold text-info">Username</label>
+                                <input type="text" class="form-control text-white border-secondary shadow-none" id="txt_login" name="txt_login" style="background-color: #131b2e;" required>
                             </div>
 
                             <!-- Email field -->
                             <div class="mb-3">
-                                <label for="txt_email" class="form-label">Email Address</label>
-                                <input type="email" class="form-control" id="txt_email" name="txt_email" required>
+                                <label for="txt_email" class="form-label small fw-semibold text-info">Email Address</label>
+                                <input type="email" class="form-control text-white border-secondary shadow-none" id="txt_email" name="txt_email" style="background-color: #131b2e;" required>
                             </div>
 
                             <!-- Permission roles from database -->
                             <div class="mb-3">
-                                <label for="txt_perm" class="form-label">Permission Role (1 = Admin, 2 = Player)</label>
-                                <input type="number" class="form-control" id="txt_perm" name="txt_perm" min="1" max="2" required>
+                                <label for="txt_perm" class="form-label small fw-semibold text-info">Permission Role (1 = Admin, 2 = Player)</label>
+                                <input type="number" class="form-control text-white border-secondary shadow-none" id="txt_perm" name="txt_perm" min="1" max="2" style="background-color: #131b2e;" required>
                             </div>
 
                             <!-- Points field for the user -->
                             <div class="mb-3">
-                                <label for="txt_points" class="form-label">Points</label>
-                                <input type="number" class="form-control" id="txt_points" name="txt_points">
+                                <label for="txt_points" class="form-label small fw-semibold text-info">Points</label>
+                                <input type="number" class="form-control text-white border-secondary shadow-none" id="txt_points" name="txt_points" style="background-color: #131b2e;">
                             </div>
 
                             <!-- New password field for the user -->
                             <div class="mb-3">
-                                <label for="txt_pass" class="form-label">New Password (leave blank to keep current)</label>
-                                <input type="password" class="form-control" id="txt_pass" name="txt_pass" placeholder="Enter new password if changing">
+                                <label for="txt_pass" class="form-label small fw-semibold text-info">New Password (leave blank to keep current)</label>
+                                <input type="password" class="form-control text-white border-secondary shadow-none" id="txt_pass" name="txt_pass" placeholder="Enter new password if changing" style="background-color: #131b2e; color-scheme: dark;">
                             </div>
 
                         </div>
-                        <div class="modal-footer">
-                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                            <button type="submit" class="btn btn-primary">Save Changes</button>
+                        <div class="modal-footer border-secondary">
+                            <button type="button" class="btn btn-outline-light btn-sm shadow-none px-4" data-bs-dismiss="modal">Cancel</button>
+                            <button type="submit" class="btn btn-primary btn-sm fw-bold shadow-none px-4">Save Changes</button>
                         </div>
                     </form>
                     
@@ -174,9 +205,58 @@
             </div>
         </div>
 
+        <!-- VIEW REPORT MODAL -->
+        <div class="modal fade" id="viewReportModal" tabindex="-1" aria-labelledby="viewReportModalLabel" aria-hidden="true">
+            <div class="modal-dialog modal-dialog-centered">
+                <div class="modal-content border-secondary text-white shadow-lg" style="background-color: #0b132b;">
+                    <div class="modal-header border-secondary">
+                        <h5 class="modal-title fw-bold text-white" id="viewReportModalLabel">
+                            <i class="bi bi-shield-exclamation text-warning me-2"></i> Player Infraction Report
+                        </h5>
+                        <button type="button" class="btn-close btn-close-white shadow-none" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body p-4">
+                        <input type="hidden" id="modalReportId">
+                        
+                        <div class="mb-3">
+                            <label class="form-label small fw-semibold text-info">Reporter</label>
+                            <input type="text" id="modalReporter" class="form-control text-white border-secondary shadow-none bg-dark" readonly>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label small fw-semibold text-info">Offending Player</label>
+                            <input type="text" id="modalOffendingUser" class="form-control text-warning fw-bold border-secondary shadow-none bg-dark" readonly>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label small fw-semibold text-info">Reason for Infraction</label>
+                            <input type="text" id="modalReason" class="form-control text-white border-secondary shadow-none bg-dark" readonly>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label small fw-semibold text-info">Additional Details</label>
+                            <textarea id="modalDetails" class="form-control text-white border-secondary shadow-none bg-dark" rows="3" readonly></textarea>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="adminWarningMsg" class="form-label small fw-semibold text-warning">Send Warning Message to Player</label>
+                            <textarea id="adminWarningMsg" class="form-control text-white border-secondary shadow-none" rows="2" placeholder="Type a warning message (optional)..." style="background-color: #131b2e;"></textarea>
+                        </div>
+                    </div>
+                    <div class="modal-footer border-secondary justify-content-between">
+                        <button type="button" class="btn btn-outline-light btn-sm shadow-none px-3" data-bs-dismiss="modal">Close</button>
+                        <div>
+                            <button type="button" class="btn btn-outline-secondary btn-sm shadow-none me-2" onclick="markReportResolvedFromModal()">Mark Resolved</button>
+                            <button type="button" class="btn btn-warning btn-sm text-dark fw-bold shadow-none" onclick="sendWarningFromModal()"><i class="bi bi-exclamation-triangle-fill me-1"></i> Send Warning</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <!-- Footer -->
         <div class="mt-5 p-4 custom-footer text-white text-center">
-            <p>Powerpuff Girls Inc. -- CS Department</p>
+            <p class="mb-0">Powerpuff Girls Inc. -- CS Department</p>
         </div>
 
         <!-- Dynamic Data Fetching and Management Script -->

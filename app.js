@@ -45,6 +45,15 @@ app.post('/friends/accept', UserCont.acceptFriendRequest);
 app.post('/friends/decline', UserCont.declineFriendRequest);
 app.get('/api/friends/data', UserCont.getFriendsData);
 
+// Report Player Routes
+const reportCont = require('./controller/ReportController');
+app.post('/api/reports', reportCont.submitReport);
+app.get('/api/reports', reportCont.getAllReports); // Optional: for admin review later
+app.patch('/api/reports/:id/resolve', reportCont.resolveReport);
+app.post('/api/reports/warn', reportCont.warnUser);
+app.get('/api/user/messages', UserCont.getUserMessages);
+app.delete('/api/user/messages/:msgId', UserCont.deleteUserMessage);
+
 // Table Actions (Single Table Architecture)
 const {joinTable, leaveTable, playerAction, startGame, nextRound, getTableStatus} = require("./controller/tableController");
 app.get("/api/table/status", getTableStatus);

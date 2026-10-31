@@ -368,6 +368,60 @@ exports.declineFriendRequest = async function(req, res) {
 
 
 // ============================================================================
+// Messages Controller
+// ============================================================================
+
+/**
+ * Fetches messages for the currently logged-in user.
+ */
+exports.getUserMessages = async function(req, res) {
+    try {
+        const currentHandle = getCurrentUserHandle(req);
+        if (!currentHandle) {
+            return res.status(401).json({ error: "Unauthorized" });
+        }
+
+        const user = await dao.findOne({ 
+            $or: [{ email: currentHandle }, { username: currentHandle }] 
+        });
+
+        if (!user) return res.status(404).json({ error: "User not found" });
+
+        res.status(200).json(user.messages || []);
+    } catch (error) {
+        console.error("Error fetching user messages:", error);
+        res.status(500).json({ error: "Server error" });
+    }
+};
+
+const mongoose = require('mongoose'); // Ensure mongoose is required at the top of your controller
+
+/**
+ * Deletes a specific message from the logged-in user's messages array.
+ */
+exports.deleteUserMessage = async function(req, res) {
+    try {
+        const currentHandle = getCurrentUserHandle(req);
+        const messageId = req.params.msgId;
+
+        if (!currentHandle) {
+            return res.status(401).json({ error: "Unauthorized" });
+        }
+
+        await dao.update(
+            { $or: [{ email: currentHandle }, { username: currentHandle }] },
+            { $pull: { messages: { _id: new mongoose.Types.ObjectId(messageId) } } }
+        );
+
+        res.status(200).json({ success: true, message: "Message deleted successfully." });
+    } catch (error) {
+        console.error("Error deleting user message:", error);
+        res.status(500).json({ error: "Server error while deleting message." });
+    }
+};
+
+
+// ============================================================================
 // Session & Utility Controllers
 // ============================================================================
 
@@ -408,3 +462,5 @@ exports.logout = function(req, res){
 exports.adminCheck = function(req){ 
     return (req.session.user && req.session.user.permission == 1);
 };
+
+

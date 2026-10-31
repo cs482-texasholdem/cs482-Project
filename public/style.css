@@ -598,3 +598,13 @@ body.table-page {
 .midnight-offcanvas .midnight-divider {
     border-color: #1c2541 !important;
 }
+
+#reportedUsername::placeholder {
+    color: #adb5bd !important;
+    opacity: 1;
+}
+
+#reportDetails::placeholder {
+    color: #adb5bd !important;
+    opacity: 1;
+}

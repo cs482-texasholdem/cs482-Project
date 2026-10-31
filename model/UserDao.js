@@ -25,6 +25,16 @@ const userSchema = new mongoose.Schema({
     points: { type: Number, default: 1000 },
     isActive: { type: Boolean, default: true },
 
+    // warnings
+    warnings: { type: Number, default: 0 },
+
+    // Store admin warnings/messages
+    messages: [{
+        sender: { type: String, default: 'Administrator' },
+        text: { type: String, required: true },
+        date: { type: Date, default: Date.now }
+    }],
+
     // Social Feature Fields
     friends: [{ type: String }],          // List of friend usernames
     friendRequests: [{ type: String }]    // List of incoming request usernames
