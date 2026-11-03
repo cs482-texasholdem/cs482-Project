@@ -126,11 +126,28 @@ function renderActivePlayers(status) {
 
     players.forEach((p, index) => {
         const seat = document.createElement("div");
-        seat.className = `player-seat active ${p.isCurrent ? "current-player" : ""}`;
+
+        let playerStatusClass = "";
+        if (p.isFolded || p.status === "Folded") {
+            playerStatusClass = "folded";
+        } else if (p.isActive || p.isCurrent || p.status === "Active" || p.status === "Betting" || p.status === "Acted") {
+            playerStatusClass = "active";
+        } else if (p.isDisconnected || p.status === "Disconnected") {
+            playerStatusClass = "disconnected";
+        }
+
+        seat.className = `player-seat ${playerStatusClass} ${p.isCurrent ? "current-player" : ""}`;
 
         const nameSpan = document.createElement("span");
         nameSpan.className = "player-name";
-        nameSpan.textContent = p.id + (p.isDealer ? " (D)" : "") + (p.isCurrent ? " (You)" : "");
+        nameSpan.textContent = p.id + (p.isCurrent ? " (You)" : "");
+
+        if (p.isDealer) {
+            const dealerBadge = document.createElement("span");
+            dealerBadge.className = "dealer-badge";
+            dealerBadge.textContent = "D";
+            nameSpan.appendChild(dealerBadge);
+        }
 
         const statusSpan = document.createElement("span");
         statusSpan.className = "player-status";
