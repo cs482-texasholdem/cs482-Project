@@ -95,12 +95,13 @@ describe('ActiveTable Class (Delegated PlayerManager & Game Engine)', () => {
     test('checkTimeout handles timeouts and consecutive timeout removals', () => {
         table.addPlayer('P1');
         table.addPlayer('P2');
+        table.addPlayer('P3'); // Add a third player to avoid immediate game end on timeout
         table.startGame();
 
         // No timeout yet
         expect(table.checkTimeout()).toBe(false);
 
-        // Force timeout
+        // Force timeout for P1
         table.turnStartTime = Date.now() - 35000;
         expect(table.checkTimeout()).toBe(true);
 
