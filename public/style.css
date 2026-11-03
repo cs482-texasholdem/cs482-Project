@@ -344,7 +344,7 @@ body.table-page {
     color: var(--main-text);
     font-size: 12px;
     overflow-wrap: anywhere;
-    background: var(--disconnected-player);
+    background: var(--panel-background);
     border: 2px solid transparent;
     box-shadow: 0 3px 5px var(--shadow);
 }
@@ -352,6 +352,29 @@ body.table-page {
 .table-page .player-seat.active {
     background: var(--active-player);
     border-color: var(--main-text);
+}
+
+.table-page .player-seat.folded {
+    background: var(--disconnected-player);
+    color: var(--secondary-text);
+    opacity: 0.65;
+    border-color: var(--disconnected-border);
+}
+
+.table-page .dealer-badge {
+    display: inline-block;
+    align-items: center;
+    justify-content: center;
+    width: 20px;
+    height: 20px;
+    margin-left: 6px;
+    background-color: var(--dealer-badge-background);
+    color: var(--dealer-badge-text);
+    font-size: 11px;
+    font-weight: 800;
+    border-radius: 50%;
+    box-shadow: 0 2px 4px var(--shadow);
+    vertical-align: middle;
 }
 
 .table-page .player-name {
