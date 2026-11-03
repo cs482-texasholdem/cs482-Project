@@ -89,6 +89,14 @@ function getTableStatus(req, res) {
     });
 }
 
+//helper function to broadcast table updates to all connected clients
+function broadcastTableUpdate(req) {
+    const io = req.app.get('io');
+    if (io) {
+        io.emit('TABLE_UPDATED');
+    }
+}
+
 function joinTable(req, res) {
     const playerId = req.body.playerId || req.query.playerId;
 
@@ -110,6 +118,8 @@ function joinTable(req, res) {
     }
 
     const isPlayer = mainTable.players.includes(id);
+    
+    broadcastTableUpdate(req); // Notify all clients of the table update
 
     return res.status(200).json({
         message: isPlayer ? "Successfully joined the table as a player." : "Game in progress. Added to spectator queue.",
@@ -129,6 +139,8 @@ function leaveTable(req, res) {
         return res.status(404).json({ error: "Player is not in this table." });
     }
 
+    broadcastTableUpdate(req); // Notify all clients of the table update
+
     return res.status(200).json({
         message: "Successfully left the table.",
         playerCount: mainTable.getPlayerCount()
@@ -140,6 +152,8 @@ function startGame(req, res) {
     if (!result.success) {
         return res.status(400).json({ error: result.error });
     }
+
+    broadcastTableUpdate(req); // Notify all clients of the table update
 
     const playerId = req.body.playerId || req.query.playerId || mainTable.players[0];
     const playerHand = mainTable.dealHandToPlayer(playerId);
@@ -166,6 +180,8 @@ function playerAction(req, res) {
     if (!result.success) {
         return res.status(400).json({ error: result.error });
     }
+
+    broadcastTableUpdate(req); // Notify all clients of the table update
 
     const p = mainTable.playerManager.getPlayer(playerId);
     const winnerData = result.winnerData;
@@ -203,6 +219,8 @@ function nextRound(req, res) {
         mainTable.resetToLobby();
     }
 
+    broadcastTableUpdate(req); // Notify all clients of the table update
+
     return res.status(200).json({
         message: "Advanced to the next round.",
         communityCards: result.communityCards,
@@ -212,4 +230,4 @@ function nextRound(req, res) {
     });
 }
 
-module.exports = { joinTable, leaveTable, startGame, playerAction, nextRound, getTableStatus };
+module.exports = { joinTable, leaveTable, startGame, playerAction, nextRound, getTableStatus, mainTable };

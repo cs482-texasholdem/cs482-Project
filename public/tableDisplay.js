@@ -104,12 +104,6 @@ function updateTimerDisplay(rem) {
     }
 }
 
-setInterval(() => {
-    if (currentTimerRemaining > 0) {
-        currentTimerRemaining--;
-        updateTimerDisplay(currentTimerRemaining);
-    }
-}, 1000);
 
 async function fetchTableStatus() {
     try {
@@ -307,8 +301,22 @@ async function refreshUI() {
     renderStartGameButton(status);
 }
 
-refreshUI();
-setInterval(refreshUI, 2500);
+const socket = io();
+//When client connects, request the current table status to update the UI
+socket.on("connect", () => {
+    console.log("Connected to server via Socket.io");
+    refreshUI();
+});
+//when any player acts, the server emits a TABLE_UPDATED event to all clients, prompting them to refresh their UI
+socket.on("TABLE_UPDATED", () => {
+    refreshUI();
+});
+//listen for turn timer updates from the server and update the UI accordingly
+socket.on("TURN_TIMER", (data) => {
+    if (data && typeof data.turnTimeRemaining === "number") {
+        updateTimerDisplay(data.turnTimeRemaining);
+    }
+});
 
 function renderCards(containerId, cards) {
     const container = document.getElementById(containerId);
