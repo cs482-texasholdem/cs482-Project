@@ -1,7 +1,7 @@
 /**
  * ============================================================================
  * File Name: login.js
- * Author: Bonita Rodrigues
+ * Author: Bonita Rodrigues, Gigi Li
  * Purpose: Frontend controller script for the Login page. Handles URL query 
  *          parameter parsing to detect authentication failures and dynamically 
  *          renders Bootstrap error alert notifications for the user.
@@ -25,3 +25,9 @@ document.addEventListener("DOMContentLoaded", function() {
         document.getElementById("msg-display").innerHTML = msg;
     }
 });
+
+function playAsGuest() {
+    const randomNum = Math.floor(Math.random() * 10000); // Generate a random number between 0 and 9999
+    const guestName = `Guest_${randomNum}`; // Generate a random guest name
+    window.location.href = `lobby.html?playerId=${encodeURIComponent(guestName)}`;
+}
