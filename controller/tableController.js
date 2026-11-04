@@ -45,6 +45,18 @@ function getTableStatus(req, res) {
     const isCurrentTurn = playerId === currentTurnPlayer;
     const buttonsBlocked = !isPlayer || isSpectator || !mainTable.gameInProgress || !isCurrentTurn || playerHasActed;
 
+    // Determine if Check and Call are specifically applicable
+    let canCheck = false;
+    let canCall = false;
+    if (isCurrentTurn && !buttonsBlocked) {
+        const currentPlayer = mainTable.playerManager.getPlayer(playerId);
+        if (currentPlayer) {
+            canCheck = (currentPlayer.currentBet === mainTable.currentHighestBet);
+            const callAmountNeeded = mainTable.currentHighestBet - currentPlayer.currentBet;
+            canCall = (callAmountNeeded > 0 && currentPlayer.chips >= callAmountNeeded);
+        }
+    }
+
     const elapsed = mainTable.turnStartTime ? Math.floor((Date.now() - mainTable.turnStartTime) / 1000) : 0;
     const turnTimeRemaining = Math.max(0, 30 - elapsed);
 
@@ -82,6 +94,8 @@ function getTableStatus(req, res) {
         currentTurnPlayer,
         isCurrentTurn,
         buttonsBlocked,
+        canCheck,
+        canCall,
         turnTimeRemaining,
         currentHighestBet: mainTable.currentHighestBet,
         communityCards: mainTable.displayCards(),

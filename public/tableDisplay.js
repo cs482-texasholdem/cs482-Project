@@ -212,9 +212,25 @@ function renderActivePlayers(status) {
         });
     } else {
         actionButtons.forEach(btn => {
-            btn.disabled = false;
-            btn.style.opacity = "1";
-            btn.style.cursor = "pointer";
+            const action = btn.dataset.action;
+            let isApplicable = true;
+
+            if (action === "Check" && status.canCheck === false) {
+                isApplicable = false;
+            }
+            if (action === "Call" && status.canCall === false) {
+                isApplicable = false;
+            }
+
+            if (!isApplicable) {
+                btn.disabled = true;
+                btn.style.opacity = "0.3";
+                btn.style.cursor = "not-allowed";
+            } else {
+                btn.disabled = false;
+                btn.style.opacity = "1";
+                btn.style.cursor = "pointer";
+            }
         });
     }
 
@@ -391,6 +407,7 @@ raiseAmount.addEventListener("input", () => {
 
 actionButtons.forEach((button) => {
     button.addEventListener("click", async () => {
+        if (button.disabled) return; // Prevent action if button is disabled/unapplicable
         const action = button.dataset.action;
         let amount = 0;
 
