@@ -85,6 +85,35 @@ body {
     color: var(--main-text);
 }
 
+/* Guest Login Button Styling */
+.guest-btn-container {
+    text-align: center;
+    margin-top: 1.5rem;
+    padding-top: 1.25rem;
+    border-top: 1px solid #e2e8f0;
+}
+.btn-guest {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background-color: var(--button-blue);
+    border: 1px solid var(--button-hover-blue);
+    color: var(--main-text);
+    border-radius: 8px; /* Clean, modern rounding */
+    font-weight: 500;
+    font-size: 0.9rem;
+    padding: 0.55rem 1.25rem;
+    transition: all 0.2s ease-in-out;
+    box-shadow: 0 2px 5px rgba(49, 92, 168, 0.25);
+}
+.btn-guest:hover {
+    background-color: var(--button-hover-blue);
+    border-color: #719be6;
+    color: var(--main-text);
+    box-shadow: 0 4px 10px rgba(82, 127, 209, 0.4);
+    transform: translateY(-1px);
+}
+
 .custom-navbar {
     background-color: var(--navbar-background) !important;
 }
