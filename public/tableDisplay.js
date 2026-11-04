@@ -54,35 +54,59 @@ const timerCircle = document.getElementById("turn-timer-circle");
 const actionButtons = document.querySelectorAll("[data-action]");
 
 // Dynamic Leave Button Injection to guarantee it loads without manual page refresh
-let leaveTableBtn = document.getElementById("leave-table-btn");
-if (!leaveTableBtn) {
-    const nav = document.querySelector(".navigation");
-    if (nav) {
-        leaveTableBtn = document.createElement("button");
-        leaveTableBtn.id = "leave-table-btn";
-        leaveTableBtn.textContent = "Leave Table";
-        leaveTableBtn.style.background = "#d42c25";
-        leaveTableBtn.style.borderColor = "#961e19";
-        nav.insertBefore(leaveTableBtn, nav.firstChild);
+
+// Reusable function for leaving the current table
+async function leaveTable(destination) {
+
+    // Ask the player before leaving
+    if (!confirm("Are you sure you want to leave the table?")) {
+        return;
+    }
+
+    try {
+        const response = await fetch("/api/table/leave", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ playerId: currentPlayerId })
+        });
+
+        if (!response.ok) {
+            throw new Error("Failed to leave table.");
+        }
+
+        // Redirect after successfully leaving
+        window.location.href = destination;
+    } 
+    
+    catch (error) {
+        console.error("Failed to leave table:", error);
+        alert("Unable to leave the table. Please try again.");
     }
 }
 
-if (leaveTableBtn) {
-    leaveTableBtn.addEventListener("click", async () => {
-        if (confirm("Are you sure you want to leave the table?")) {
-            try {
-                await fetch("/api/table/leave", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ playerId: currentPlayerId })
-                });
-                window.location.href = "index.html";
-            } catch (error) {
-                console.error("Failed to leave table:", error);
-            }
-        }
+
+// Leave Table button -> Lobby
+document.getElementById("leave-table-btn")
+    .addEventListener("click", () => {
+        leaveTable("lobby.html");
     });
-}
+
+
+// Home link -> Dashboard
+document.getElementById("home-link")
+    .addEventListener("click", (event) => {
+        event.preventDefault();
+        leaveTable("index.html");
+    });
+
+
+// Lobby link -> Poker Lobby
+document.getElementById("lobby-link")
+    .addEventListener("click", (event) => {
+        event.preventDefault();
+        leaveTable("lobby.html");
+    });
+
 
 let modalTimeout = null;
 let currentTimerRemaining = 30;
