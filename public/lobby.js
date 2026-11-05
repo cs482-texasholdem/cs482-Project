@@ -73,6 +73,10 @@ document.addEventListener("DOMContentLoaded", async function() {
                 lobbyContainer.prepend(pokerBanner);
             }
         } else {
+            //logged-in user: clear any guest playerId from storage to avoid confusion
+            localStorage.removeItem("guestPlayerId");
+            sessionStorage.removeItem("guestPlayerId");
+
             // LOGGED-IN USER VIEW: Keep normal Dashboard link and hide guest save elements
             if (dashboardNavItem) {
                 dashboardNavItem.innerHTML = `
@@ -137,7 +141,24 @@ function togglePublicLobbies() {
 // Ensure table seating form appends the correct guest playerId when submitting
 const joinTableForm = document.getElementById("joinTableForm");
 if (joinTableForm) {
-    joinTableForm.addEventListener("submit", function(event) {
+    joinTableForm.addEventListener("submit", async function(event) {
+        // Double check if there is an active user session before appending guest playerId
+        try {
+            const res = await fetch('/loggeduser');
+            const user = await res.json();
+
+            if (user && (user.username || user.email || user.id)) {
+                // Logged-in user: no need to append guest playerId
+                const existingGuestInput = this.querySelector('input[name="playerId"]');
+                if (existingGuestInput) {
+                    existingGuestInput.remove();
+                }
+                return;
+        }
+        } catch (error) {
+            console.error('Session check during table join failed:', error);
+        }
+
         const urlParams = new URLSearchParams(window.location.search);
         let playerId = urlParams.get("playerId") || localStorage.getItem("guestPlayerId");
         

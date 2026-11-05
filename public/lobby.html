@@ -247,32 +247,35 @@
                 <button type="button" class="btn-close btn-close-white shadow-none" data-bs-dismiss="offcanvas" aria-label="Close"></button>
             </div>
             <div class="offcanvas-body d-flex flex-column">
+                <!-- Sidebar: Table Configurations and Buy-In -->
                 <form id="joinTableForm" action="tableDisplay.html" method="GET">
                     <div class="mb-3">
-                        <label class="form-label small fw-semibold text-info">Selected Table</label>
-                        <input type="text" class="form-control midnight-input text-white" id="sidebarTableName" readonly>
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label small fw-semibold text-info">Table Blinds</label>
-                        <input type="text" class="form-control midnight-input text-white" id="sidebarTableBlinds" readonly>
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label small fw-semibold text-info">Minimum Buy-in Required</label>
-                        <input type="text" class="form-control midnight-input text-white" id="sidebarTableMinBuyin" readonly>
+                        <div class="p-3 rounded-3 midnight-input">
+                            <label class="form-label small fw-semibold text-info">
+                                Selected Table
+                            </label>
+                            <h5 class="text-white mb-3" id="sidebarTableName">
+                                Beginner Table 1
+                            </h5>
+
+                            <div class="d-flex justify-content-between">
+                                <div>
+                                    <small class="text-info">Table Blinds</small>
+                                    <p class="text-white fw-semibold mb-0"
+                                    id="sidebarTableBlinds">10 / 20</p>
+                                </div>
+
+                                <div class="text-end">
+                                    <small class="text-info">Minimum Buy-in</small>
+                                    <p class="text-white fw-semibold mb-0"
+                                    id="sidebarTableMinBuyin">$500</p>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                     <div class="mb-3">
                         <label for="buyInAmount" class="form-label small fw-semibold text-info">Your Buy-in Amount ($)</label>
                         <input type="number" class="form-control midnight-input text-white shadow-none" id="buyInAmount" name="buyInAmount" value="1000" required>
-                    </div>
-                    <div class="mb-3">
-                        <label for="seatPreference" class="form-label small fw-semibold text-info">Preferred Seat Position</label>
-                        <select class="form-select midnight-input text-white shadow-none" id="seatPreference" name="seat">
-                            <option value="random" class="midnight-option">Auto-Assign (Random Open Seat)</option>
-                            <option value="1" class="midnight-option">Seat 1 (Dealer)</option>
-                            <option value="2" class="midnight-option">Seat 2</option>
-                            <option value="3" class="midnight-option">Seat 3</option>
-                            <option value="4" class="midnight-option">Seat 4</option>
-                        </select>
                     </div>
                     <div class="mt-auto pt-3">
                         <button type="submit" class="btn btn-primary w-100 py-2 fw-bold shadow">Take Your Seat & Play</button>
