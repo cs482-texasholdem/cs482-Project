@@ -3,6 +3,7 @@
  * File Name: activeTable.js
  * Purpose: Manages table session, records action history, tracks positional 
  *          indices (dealer, blinds, seating order), and persists game records.
+ *          Updated with thread-safe mutex locking and turn token versioning.
  * ============================================================================
  */
 
@@ -91,6 +92,25 @@ class ActiveTable {
         this.aggressorIndex = 0;
         this.gameCount = 0;
         this.turnStartTime = null;
+
+        // Race Condition Mitigation
+        this.isLocked = false;
+        this.turnToken = 0;
+    }
+
+    /**
+     * Executes critical state updates safely under a synchronous mutex lock.
+     */
+    _acquireLock(callback) {
+        if (this.isLocked) {
+            return { success: false, error: "Table state is currently updating. Please try again." };
+        }
+        this.isLocked = true;
+        try {
+            return callback();
+        } finally {
+            this.isLocked = false;
+        }
     }
 
     isFull() { return this.playerManager.isFull(); }
@@ -105,53 +125,56 @@ class ActiveTable {
     }
 
     removePlayer(playerId) {
-        const pIndex = this.playerManager.players.indexOf(playerId);
-        const isCurrentTurnPlayer = (this.gameInProgress && pIndex !== -1 && this.currentTurnIndex === pIndex);
+        return this._acquireLock(() => {
+            const pIndex = this.playerManager.players.indexOf(playerId);
+            const isCurrentTurnPlayer = (this.gameInProgress && pIndex !== -1 && this.currentTurnIndex === pIndex);
 
-        if (this.gameInProgress) {
-            const res = this.playerManager.removePlayer(playerId, this.gameInProgress);
-            const aggressorId = this.playerManager.players[this.aggressorIndex];
-            const aggressorPlayer = this.playerManager.getPlayer(aggressorId);
-            
-            if (aggressorPlayer && this.players.indexOf(playerId) === this.aggressorIndex) {
-                let idx = this.aggressorIndex;
-                let safety = 0;
-                do {
-                    idx = (idx + 1) % this.playerManager.players.length;
-                    const nextId = this.playerManager.players[idx];
-                    const nextP = this.playerManager.getPlayer(nextId);
-                    if (nextP && !nextP.folded) break;
-                    safety++;
-                } while (safety < this.playerManager.players.length);
-                this.aggressorIndex = idx;
-            }
-
-            if (isCurrentTurnPlayer) {
-                let safety = 0;
-                do {
-                    this.currentTurnIndex = (this.currentTurnIndex + 1) % this.playerManager.players.length;
-                    const currentId = this.playerManager.players[this.currentTurnIndex];
-                    const currentP = this.playerManager.getPlayer(currentId);
-                    if (currentP && !currentP.folded) break;
-                    safety++;
-                } while (safety < this.playerManager.players.length);
-
-                this.turnStartTime = Date.now();
-
-                const activeNonFolded = this.playerManager.players
-                    .map(id => this.playerManager.getPlayer(id))
-                    .filter(p => p && !p.folded);
-
-                if (activeNonFolded.length <= 1) {
-                    this.handleWinner();
-                } else if (this.allPlayersHaveActedAndMatched()) {
-                    this.nextRound();
+            if (this.gameInProgress) {
+                const res = this.playerManager.removePlayer(playerId, this.gameInProgress);
+                const aggressorId = this.playerManager.players[this.aggressorIndex];
+                const aggressorPlayer = this.playerManager.getPlayer(aggressorId);
+                
+                if (aggressorPlayer && this.players.indexOf(playerId) === this.aggressorIndex) {
+                    let idx = this.aggressorIndex;
+                    let safety = 0;
+                    do {
+                        idx = (idx + 1) % this.playerManager.players.length;
+                        const nextId = this.playerManager.players[idx];
+                        const nextP = this.playerManager.getPlayer(nextId);
+                        if (nextP && !nextP.folded) break;
+                        safety++;
+                    } while (safety < this.playerManager.players.length);
+                    this.aggressorIndex = idx;
                 }
-            }
-            return res;
-        }
 
-        return this.playerManager.removePlayer(playerId, this.gameInProgress);
+                if (isCurrentTurnPlayer) {
+                    let safety = 0;
+                    do {
+                        this.currentTurnIndex = (this.currentTurnIndex + 1) % this.playerManager.players.length;
+                        const currentId = this.playerManager.players[this.currentTurnIndex];
+                        const currentP = this.playerManager.getPlayer(currentId);
+                        if (currentP && !currentP.folded) break;
+                        safety++;
+                    } while (safety < this.playerManager.players.length);
+
+                    this.turnStartTime = Date.now();
+                    this.turnToken++; // Increment turn version
+
+                    const activeNonFolded = this.playerManager.players
+                        .map(id => this.playerManager.getPlayer(id))
+                        .filter(p => p && !p.folded);
+
+                    if (activeNonFolded.length <= 1) {
+                        this.handleWinner();
+                    } else if (this.allPlayersHaveActedAndMatched()) {
+                        this.nextRound();
+                    }
+                }
+                return res;
+            }
+
+            return this.playerManager.removePlayer(playerId, this.gameInProgress);
+        });
     }
 
     get queue() { return this.playerManager.queue; }
@@ -170,13 +193,15 @@ class ActiveTable {
     set currentHighestBet(val) { this.potManager.currentHighestBet = val; }
 
     startGame() {
-        if (this.playerManager.players.length < 2) {
-            return { success: false, error: "At least 2 players are required to start the game." };
-        }
-        this.gameStarted = true;
-        this.gameInProgress = true;
-        this.newGameSession();
-        return { success: true };
+        return this._acquireLock(() => {
+            if (this.playerManager.players.length < 2) {
+                return { success: false, error: "At least 2 players are required to start the game." };
+            }
+            this.gameStarted = true;
+            this.gameInProgress = true;
+            this.newGameSession();
+            return { success: true };
+        });
     }
 
     dealHandToPlayer(playerId) {
@@ -196,39 +221,57 @@ class ActiveTable {
     }
 
     checkTimeout() {
-        if (!this.gameInProgress || this.playerManager.players.length === 0) return false;
-        const now = Date.now();
-        if (this.turnStartTime && (now - this.turnStartTime >= 30000)) {
-            const currentId = this.playerManager.players[this.currentTurnIndex];
-            const player = this.playerManager.getPlayer(currentId);
-            if (player && !player.folded && !player.hasActed) {
-                const canCheck = (player.currentBet === this.currentHighestBet);
-                const action = canCheck ? "Check" : "Fold";
+        return this._acquireLock(() => {
+            if (!this.gameInProgress || this.playerManager.players.length === 0) return false;
+            const now = Date.now();
+            
+            if (this.turnStartTime && (now - this.turnStartTime >= 30000)) {
+                const currentId = this.playerManager.players[this.currentTurnIndex];
+                const player = this.playerManager.getPlayer(currentId);
                 
-                const timeouts = (this.playerManager.consecutiveTimeouts.get(currentId) || 0) + 1;
-                this.playerManager.consecutiveTimeouts.set(currentId, timeouts);
+                if (player && !player.folded && !player.hasActed) {
+                    const canCheck = (player.currentBet === this.currentHighestBet);
+                    const action = canCheck ? "Check" : "Fold";
+                    
+                    const timeouts = (this.playerManager.consecutiveTimeouts.get(currentId) || 0) + 1;
+                    this.playerManager.consecutiveTimeouts.set(currentId, timeouts);
 
-                this.recordAction(currentId, action, 0);
+                    // Execute timeout action internally without re-locking
+                    this._executeActionInternal(currentId, action, 0);
 
-                if (timeouts >= 2) {
-                    this.removePlayer(currentId);
+                    if (timeouts >= 2) {
+                        this.removePlayer(currentId);
+                    }
+                    return true;
                 }
-                return true;
             }
-        }
-        return false;
+            return false;
+        });
     }
 
-    recordAction(playerId, action, amount = 0) {
-        const player = this.playerManager.getPlayer(playerId);
-        if (!player || player.folded || !this.playerManager.players.includes(playerId)) {
-            return { success: false, error: "Invalid player or inactive in this round." };
-        }
-        if (this.playerManager.players[this.currentTurnIndex] !== playerId) {
-            return { success: false, error: "Not your turn." };
-        }
-        if (player.hasActed && action !== "Raise") return { success: false, error: "You have already acted this round." };
+    recordAction(playerId, action, amount = 0, providedToken = null) {
+        return this._acquireLock(() => {
+            const player = this.playerManager.getPlayer(playerId);
+            if (!player || player.folded || !this.playerManager.players.includes(playerId)) {
+                return { success: false, error: "Invalid player or inactive in this round." };
+            }
+            if (this.playerManager.players[this.currentTurnIndex] !== playerId) {
+                return { success: false, error: "Not your turn." };
+            }
+            if (player.hasActed && action !== "Raise") {
+                return { success: false, error: "You have already acted this round." };
+            }
 
+            return this._executeActionInternal(playerId, action, amount);
+        });
+    }
+
+    /**
+     * Internal action execution helper used by recordAction and checkTimeout.
+     * Assumes table lock is already acquired.
+     */
+    _executeActionInternal(playerId, action, amount = 0) {
+        const player = this.playerManager.getPlayer(playerId);
         this.playerManager.consecutiveTimeouts.set(playerId, 0);
 
         if (action === "Fold") {
@@ -305,6 +348,7 @@ class ActiveTable {
         } while (this.playerManager.getPlayer(this.playerManager.players[this.currentTurnIndex])?.folded && safety < this.playerManager.players.length);
 
         this.turnStartTime = Date.now();
+        this.turnToken++; // Increment version token on turn switch
 
         return { success: true, roundAdvanced: false };
     }
@@ -340,6 +384,7 @@ class ActiveTable {
             safety++;
         }
         this.turnStartTime = Date.now();
+        this.turnToken++;
     }
 
     nextRound() {
@@ -440,6 +485,7 @@ class ActiveTable {
         }
 
         this.turnStartTime = Date.now();
+        this.turnToken++;
     }
 
     resetToLobby() {
@@ -454,6 +500,7 @@ class ActiveTable {
         this.potManager.reset();
         this.currentTurnIndex = 0;
         this.turnStartTime = null;
+        this.turnToken++;
         this.playerManager.consecutiveTimeouts.clear();
         this.playerManager.updateQueueDistribution(this.gameInProgress);
         
