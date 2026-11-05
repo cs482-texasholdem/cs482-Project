@@ -66,11 +66,12 @@ class PotManager {
 }
 
 class ActiveTable {
-    constructor(tableId = "main", skillLevel = "general", timeLimit = 30) {
+    constructor(tableId = "main", skillLevel = "general", timeLimit = 30, gameMode = "custom") {
         this.tableId = tableId;
         this.skillLevel = skillLevel;
         this.timeLimit = timeLimit;
-        this.playerManager = new PlayerManager(10);
+        this.gameMode = gameMode;
+        this.playerManager = new PlayerManager(9);
         this.potManager = new PotManager();
         this.displayedCards = [];
         this.deck = new Deck();

@@ -11,7 +11,7 @@ describe('ActiveTable Class (Delegated PlayerManager & Game Engine)', () => {
         expect(table.tableId).toBe('main-table');
         expect(table.skillLevel).toBe('general');
         expect(table.timeLimit).toBe(30);
-        expect(table.maxPlayers).toBe(10);
+        expect(table.maxPlayers).toBe(9);
         expect(table.gameStarted).toBe(false);
         expect(table.gameInProgress).toBe(false);
         expect(table.pot).toBe(0);
