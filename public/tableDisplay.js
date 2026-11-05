@@ -359,16 +359,17 @@ async function refreshUI() {
 }
 
 const socket = io();
-//When client connects, request the current table status to update the UI
+
 socket.on("connect", () => {
     console.log("Connected to server via Socket.io");
+    socket.emit("join_table", "main");
     refreshUI();
 });
-//when any player acts, the server emits a TABLE_UPDATED event to all clients, prompting them to refresh their UI
+
 socket.on("TABLE_UPDATED", () => {
     refreshUI();
 });
-//listen for turn timer updates from the server and update the UI accordingly
+
 socket.on("TURN_TIMER", (data) => {
     if (data && typeof data.turnTimeRemaining === "number") {
         updateTimerDisplay(data.turnTimeRemaining);

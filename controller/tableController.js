@@ -1,9 +1,9 @@
 /**
- * ============================================================================
- * File Name: tableController.js
- * Purpose: Express controller endpoints for table actions using safe 
- *          player lookups (`mainTable.playerManager.getPlayer`).
- * ============================================================================
+- ============================================================================
+- File Name: tableController.js
+- Purpose: Express controller endpoints for table actions using safe 
+-          player lookups (`mainTable.playerManager.getPlayer`).
+- ============================================================================
  */
 
 const ActiveTable = require("../model/activeTable");
@@ -43,7 +43,7 @@ function getTableStatus(req, res) {
     const currentTurnPlayer = (mainTable.gameInProgress && mainTable.players.length > 0) ? mainTable.players[mainTable.currentTurnIndex] : null;
     const dealerPlayerId = (mainTable.gameInProgress && mainTable.players.length > 0) ? mainTable.players[mainTable.dealerIndex] : null;
     const isCurrentTurn = playerId === currentTurnPlayer;
-    const buttonsBlocked = !isPlayer || isSpectator || !mainTable.gameInProgress || !isCurrentTurn || playerHasActed;
+    const buttonsBlocked = !isPlayer || !mainTable.gameInProgress || !isCurrentTurn || playerHasActed;
 
     let canCheck = false;
     let canCall = false;
@@ -53,7 +53,6 @@ function getTableStatus(req, res) {
             canCheck = (currentPlayer.currentBet === mainTable.currentHighestBet);
             const callAmountNeeded = mainTable.currentHighestBet - currentPlayer.currentBet;
             canCall = (callAmountNeeded > 0 && currentPlayer.chips >= callAmountNeeded);
-            // Allow calling even if chips < callAmountNeeded (as an all-in)
             if (callAmountNeeded > 0 && currentPlayer.chips > 0) {
                 canCall = true;
             }
@@ -109,7 +108,7 @@ function getTableStatus(req, res) {
 function broadcastTableUpdate(req) {
     const io = req.app.get('io');
     if (io) {
-        io.emit('TABLE_UPDATED');
+        io.to(`table_${mainTable.tableId}`).emit('TABLE_UPDATED');
     }
 }
 
