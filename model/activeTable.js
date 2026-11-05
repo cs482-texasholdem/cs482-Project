@@ -1,10 +1,10 @@
 /**
- * ============================================================================
- * File Name: activeTable.js
- * Purpose: Manages table session, records action history, tracks positional 
- *          indices (dealer, blinds, seating order), persists game records,
- *          and manages multi-tier side-pots for all-in scenarios.
- * ============================================================================
+- ============================================================================
+- File Name: activeTable.js
+- Purpose: Manages table session, records action history, tracks positional 
+-          indices (dealer, blinds, seating order), persists game records,
+-          and manages multi-tier side-pots for all-in scenarios.
+- ============================================================================
  */
 
 const Deck = require("../util/pokerLogic");
@@ -13,12 +13,11 @@ const GameDao = require("./GameDao");
 
 class PotManager {
     constructor() {
-        this.pots = [{ amount: 0, eligiblePlayers: [] }]; // Array of pots: [{ amount, eligiblePlayers }]
+        this.pots = [{ amount: 0, eligiblePlayers: [] }];
         this.currentHighestBet = 0;
     }
 
     get pot() {
-        // Backward compatibility for total pot sum
         return this.pots.reduce((sum, p) => sum + p.amount, 0);
     }
 
@@ -64,11 +63,7 @@ class PotManager {
         return { sbIndex, bbIndex };
     }
 
-    /**
-     * Builds Main Pot and Side Pots based on player contributions and all-in states.
-     */
     buildPots(players, playerManager) {
-        // Collect contributions and active states
         const contributions = [];
         for (const pid of players) {
             const p = playerManager.getPlayer(pid);
@@ -81,7 +76,6 @@ class PotManager {
             }
         }
 
-        // Sort unique contribution thresholds ascending
         const thresholds = [...new Set(contributions.map(c => c.contribution))]
             .filter(c => c > 0)
             .sort((a, b) => a - b);
@@ -94,12 +88,10 @@ class PotManager {
             let eligible = [];
 
             for (const c of contributions) {
-                // How much this player contributes to this specific pot tier
                 const contribAtTier = Math.min(c.contribution, threshold) - Math.min(c.contribution, previousThreshold);
                 if (contribAtTier > 0) {
                     potAmount += contribAtTier;
                 }
-                // Eligible if they contributed at least this threshold and haven't folded
                 if (c.contribution >= threshold && !c.folded) {
                     eligible.push(c.playerId);
                 }
@@ -111,7 +103,6 @@ class PotManager {
             previousThreshold = threshold;
         }
 
-        // Handle any uncalled bets or leftover pots
         if (newPots.length === 0) {
             newPots.push({ amount: 0, eligiblePlayers: players.filter(id => !playerManager.getPlayer(id)?.folded) });
         }
@@ -119,20 +110,15 @@ class PotManager {
         this.pots = newPots;
     }
 
-    /**
-     * Distributes Main Pot and Side Pots to eligible winners.
-     */
     distributePot(winners, playerManager, commonCards, playerHands, deckRef, roundPlayerCount) {
         let totalDistributed = 0;
 
         for (const potObj of this.pots) {
             if (potObj.amount <= 0 || potObj.eligiblePlayers.length === 0) continue;
 
-            // Filter global winners to those eligible for *this specific pot tier*
             const eligibleWinners = winners.filter(wId => potObj.eligiblePlayers.includes(wId));
 
             if (eligibleWinners.length === 0) {
-                // If direct winners aren't eligible (e.g. folded/out), re-evaluate best hand among eligiblePlayers for this pot
                 let bestEligibleScore = -1;
                 let potWinners = [];
 
@@ -159,7 +145,6 @@ class PotManager {
                     });
                 }
             } else {
-                // Distribute equally among eligible winners for this pot tier
                 const share = Math.floor(potObj.amount / eligibleWinners.length);
                 const remainder = potObj.amount % eligibleWinners.length;
                 eligibleWinners.forEach((wId, idx) => {
@@ -237,22 +222,6 @@ class ActiveTable {
 
             if (this.gameInProgress) {
                 const res = this.playerManager.removePlayer(playerId, this.gameInProgress);
-                const aggressorId = this.playerManager.players[this.aggressorIndex];
-                const aggressorPlayer = this.playerManager.getPlayer(aggressorId);
-                
-                if (aggressorPlayer && this.players.indexOf(playerId) === this.aggressorIndex) {
-                    let idx = this.aggressorIndex;
-                    let safety = 0;
-                    do {
-                        idx = (idx + 1) % this.playerManager.players.length;
-                        const nextId = this.playerManager.players[idx];
-                        const nextP = this.playerManager.getPlayer(nextId);
-                        if (nextP && !nextP.folded) break;
-                        safety++;
-                    } while (safety < this.playerManager.players.length);
-                    this.aggressorIndex = idx;
-                }
-
                 if (isCurrentTurnPlayer) {
                     let safety = 0;
                     do {
@@ -310,6 +279,17 @@ class ActiveTable {
         });
     }
 
+    finishGame() {
+        return this._acquireLock(() => {
+            if (!this.gameInProgress) {
+                return { success: false, error: "No game in progress to finish." };
+            }
+            const winnerData = this.handleWinner();
+            this.resetToLobby();
+            return { success: true, winnerData };
+        });
+    }
+
     dealHandToPlayer(playerId) {
         if (typeof playerId !== "string" || !this.playerManager.players.includes(playerId)) {
             return false;
@@ -357,13 +337,16 @@ class ActiveTable {
     recordAction(playerId, action, amount = 0) {
         return this._acquireLock(() => {
             const player = this.playerManager.getPlayer(playerId);
-            if (!player || player.folded || !this.playerManager.players.includes(playerId)) {
+            if (!player || !this.playerManager.players.includes(playerId)) {
                 return { success: false, error: "Invalid player or inactive in this round." };
             }
-            if (this.playerManager.players[this.currentTurnIndex] !== playerId) {
+            if (action !== "Fold" && player.folded) {
+                return { success: false, error: "Player has already folded." };
+            }
+            if (action !== "Fold" && this.playerManager.players[this.currentTurnIndex] !== playerId) {
                 return { success: false, error: "Not your turn." };
             }
-            if (player.hasActed && action !== "Raise") {
+            if (action !== "Fold" && player.hasActed && action !== "Raise") {
                 return { success: false, error: "You have already acted this round." };
             }
 
@@ -377,6 +360,7 @@ class ActiveTable {
 
         if (action === "Fold") {
             player.folded = true;
+            player.mucked = true; // Set mucked flag on fold
             if (this.playerManager.players.indexOf(playerId) === this.aggressorIndex) {
                 let idx = this.aggressorIndex;
                 let safety = 0;
@@ -393,7 +377,6 @@ class ActiveTable {
         } else if (action === "Call") {
             const diff = this.currentHighestBet - player.currentBet;
             if (player.chips < diff) {
-                // All-in scenario on Call
                 const allInAmount = player.chips;
                 player.chips = 0;
                 player.currentBet += allInAmount;
@@ -409,7 +392,6 @@ class ActiveTable {
             }
             const diff = amount - player.currentBet;
             if (player.chips < diff) {
-                // All-in scenario on Raise
                 const allInAmount = player.chips;
                 player.chips = 0;
                 player.currentBet += allInAmount;
@@ -430,9 +412,10 @@ class ActiveTable {
             }
         }
 
-        player.hasActed = true;
+        if (action !== "Fold") {
+            player.hasActed = true;
+        }
 
-        // Recompute side pots after every action in case of all-in
         this.potManager.buildPots(this.playerManager.players, this.playerManager);
 
         this.actionHistory.push({
@@ -456,11 +439,13 @@ class ActiveTable {
             return { success: true, roundAdvanced: true, ...roundResult };
         }
 
-        let safety = 0;
-        do {
-            this.currentTurnIndex = (this.currentTurnIndex + 1) % this.playerManager.players.length;
-            safety++;
-        } while (this.playerManager.getPlayer(this.playerManager.players[this.currentTurnIndex])?.folded && safety < this.playerManager.players.length);
+        if (action !== "Fold") {
+            let safety = 0;
+            do {
+                this.currentTurnIndex = (this.currentTurnIndex + 1) % this.playerManager.players.length;
+                safety++;
+            } while (this.playerManager.getPlayer(this.playerManager.players[this.currentTurnIndex])?.folded && safety < this.playerManager.players.length);
+        }
 
         this.turnStartTime = Date.now();
         this.turnToken++;
@@ -579,6 +564,7 @@ class ActiveTable {
             const p = this.playerManager.getPlayer(playerId);
             if (p) {
                 p.folded = false;
+                p.mucked = false; // Reset muck flag
                 p.currentBet = 0; 
                 p.hasActed = false;
                 p.totalHandContribution = 0;
@@ -624,6 +610,7 @@ class ActiveTable {
         
         for (const [_, p] of this.playerManager.playerObjects) {
             p.folded = false;
+            p.mucked = false;
             p.currentBet = 0;
             p.hasActed = false;
             p.totalHandContribution = 0;
@@ -662,7 +649,6 @@ class ActiveTable {
             }
         }
 
-        // Distribute pot across Main and Side pots
         const resultPot = this.potManager.distributePot(
             winners, 
             this.playerManager, 

@@ -18,8 +18,7 @@ function getTableStatus(req, res) {
     const inTable = playerId ? mainTable.hasPlayer(playerId) : false;
     const isPlayer = playerId ? mainTable.players.includes(playerId) : false;
     const isSpectator = playerId ? mainTable.spectators.includes(playerId) : false;
-    const isLoggedIn = !!req.session.user; 
-
+    
     let playerChips = 1000;
     let playerBet = 0;
     let playerHand = [];
@@ -44,7 +43,7 @@ function getTableStatus(req, res) {
     const currentTurnPlayer = (mainTable.gameInProgress && mainTable.players.length > 0) ? mainTable.players[mainTable.currentTurnIndex] : null;
     const dealerPlayerId = (mainTable.gameInProgress && mainTable.players.length > 0) ? mainTable.players[mainTable.dealerIndex] : null;
     const isCurrentTurn = playerId === currentTurnPlayer;
-    const buttonsBlocked = !isPlayer || !mainTable.gameInProgress || !isCurrentTurn || playerHasActed;
+    const buttonsBlocked = !isPlayer || isSpectator || !mainTable.gameInProgress || !isCurrentTurn || playerHasActed;
 
     let canCheck = false;
     let canCall = false;
@@ -80,7 +79,6 @@ function getTableStatus(req, res) {
     return res.status(200).json({
         tableId: mainTable.tableId,
         skillLevel: mainTable.skillLevel,
-        isLoggedIn,
         playerCount: mainTable.getPlayerCount(),
         spectatorCount: mainTable.getSpectatorCount(),
         maxPlayers: mainTable.maxPlayers,
@@ -186,6 +184,20 @@ function startGame(req, res) {
     });
 }
 
+function finishGame(req, res) {
+    const result = mainTable.finishGame();
+    if (!result.success) {
+        return res.status(400).json({ error: result.error });
+    }
+
+    broadcastTableUpdate(req);
+
+    return res.status(200).json({
+        message: "Game finished successfully.",
+        winnerData: result.winnerData
+    });
+}
+
 function playerAction(req, res) {
     const { playerId, action, amount } = req.body;
     if (!playerId || !action) {
@@ -246,4 +258,4 @@ function nextRound(req, res) {
     });
 }
 
-module.exports = { joinTable, leaveTable, startGame, playerAction, nextRound, getTableStatus, mainTable };
+module.exports = { joinTable, leaveTable, startGame, finishGame, playerAction, nextRound, getTableStatus, mainTable };

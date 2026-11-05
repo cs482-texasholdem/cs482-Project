@@ -3,9 +3,12 @@ const { app } = require('./app');
 const db = require('./model/DbConnection');
 const http = require('http');
 const { Server } = require('socket.io');
-const mainTable = require('./controller/tableController').mainTable;
+const { mainTable, finishGame } = require('./controller/tableController');
 
 const PORT = process.env.PORT || 3000;
+
+// Register finish game route
+app.post("/api/table/finish", finishGame);
 
 async function startServer() {
     try {

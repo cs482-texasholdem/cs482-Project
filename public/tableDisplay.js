@@ -53,12 +53,7 @@ const timerText = document.getElementById("turn-timer-text");
 const timerCircle = document.getElementById("turn-timer-circle");
 const actionButtons = document.querySelectorAll("[data-action]");
 
-// Dynamic Leave Button Injection to guarantee it loads without manual page refresh
-
-// Reusable function for leaving the current table
 async function leaveTable(destination) {
-
-    // Ask the player before leaving
     if (!confirm("Are you sure you want to leave the table?")) {
         return;
     }
@@ -74,39 +69,30 @@ async function leaveTable(destination) {
             throw new Error("Failed to leave table.");
         }
 
-        // Redirect after successfully leaving
         window.location.href = destination;
     } 
-    
     catch (error) {
         console.error("Failed to leave table:", error);
         alert("Unable to leave the table. Please try again.");
     }
 }
 
-
-// Leave Table button -> Lobby
 document.getElementById("leave-table-btn")
     .addEventListener("click", () => {
         leaveTable("lobby.html");
     });
 
-
-// Home link -> Dashboard
 document.getElementById("home-link")
     .addEventListener("click", (event) => {
         event.preventDefault();
         leaveTable("index.html");
     });
 
-
-// Lobby link -> Poker Lobby
 document.getElementById("lobby-link")
     .addEventListener("click", (event) => {
         event.preventDefault();
         leaveTable("lobby.html");
     });
-
 
 let modalTimeout = null;
 let currentTimerRemaining = 30;
@@ -116,18 +102,17 @@ function updateTimerDisplay(rem) {
     if (timerText) timerText.textContent = rem + "s";
     if (timerCircle) {
         if (rem > 15) {
-            timerCircle.style.backgroundColor = "#3c8d79"; // green
+            timerCircle.style.backgroundColor = "#3c8d79";
             timerCircle.style.borderColor = "#2e6d5e";
         } else if (rem > 5) {
-            timerCircle.style.backgroundColor = "#f1c40f"; // yellow
+            timerCircle.style.backgroundColor = "#f1c40f";
             timerCircle.style.borderColor = "#d4ac0d";
         } else {
-            timerCircle.style.backgroundColor = "#d42c25"; // red
+            timerCircle.style.backgroundColor = "#d42c25";
             timerCircle.style.borderColor = "#961e19";
         }
     }
 }
-
 
 async function fetchTableStatus() {
     try {
@@ -204,17 +189,22 @@ function renderActivePlayers(status) {
         updateTimerDisplay(status.turnTimeRemaining);
     }
 
-    if (status.buttonsBlocked) {
-        actionButtons.forEach(btn => {
+    // Ensure Fold button is NEVER locked, while other buttons follow status.buttonsBlocked
+    actionButtons.forEach(btn => {
+        const action = btn.dataset.action;
+        if (action === "Fold") {
+            btn.disabled = false;
+            btn.style.opacity = "1";
+            btn.style.cursor = "pointer";
+            return;
+        }
+
+        if (status.buttonsBlocked) {
             btn.disabled = true;
             btn.style.opacity = "0.5";
             btn.style.cursor = "not-allowed";
-        });
-    } else {
-        actionButtons.forEach(btn => {
-            const action = btn.dataset.action;
+        } else {
             let isApplicable = true;
-
             if (action === "Check" && status.canCheck === false) {
                 isApplicable = false;
             }
@@ -231,8 +221,8 @@ function renderActivePlayers(status) {
                 btn.style.opacity = "1";
                 btn.style.cursor = "pointer";
             }
-        });
-    }
+        }
+    });
 
     if (status.communityCards) {
         renderCards("community-cards", status.communityCards);
@@ -312,6 +302,26 @@ function renderStartGameButton(status) {
     }
 }
 
+function renderFinishGameButton(status) {
+    let finishBtnContainer = document.getElementById("finish-game-container");
+    if (status.gameInProgress && status.isPlayer) {
+        if (!finishBtnContainer) {
+            finishBtnContainer = document.createElement("div");
+            finishBtnContainer.id = "finish-game-container";
+            finishBtnContainer.style.textAlign = "center";
+            finishBtnContainer.style.margin = "10px 0";
+            finishBtnContainer.innerHTML = `
+                <button type="button" id="finish-game-btn" class="action-button fold" style="width: auto; height: auto; padding: 10px 20px; border-radius: 8px; background: #d42c25; border-color: #961e19;">Finish Game / Showdown</button>
+            `;
+            const gameHeading = document.querySelector(".game-heading");
+            if (gameHeading) gameHeading.appendChild(finishBtnContainer);
+            document.getElementById("finish-game-btn").addEventListener("click", finishGame);
+        }
+    } else if (finishBtnContainer) {
+        finishBtnContainer.remove();
+    }
+}
+
 async function startGame() {
     try {
         const response = await fetch("/api/table/start", {
@@ -341,37 +351,33 @@ async function startGame() {
     }
 }
 
+async function finishGame() {
+    try {
+        const response = await fetch("/api/table/finish", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ playerId: currentPlayerId })
+        });
+        if (!response.ok) {
+            const err = await response.json();
+            throw new Error(err.error || "Failed to finish game.");
+        }
+        const data = await response.json();
+        if (data.winnerData && data.winnerData.winners) {
+            const winnersText = data.winnerData.winners.join(", ");
+            winnerModalText.innerHTML = `Winner(s):<br><strong>${winnersText}</strong><br>Pot Won: ${data.winnerData.pot}`;
+            winnerModal.style.display = "flex";
+        }
+        tableMessage.textContent = "Game finished successfully.";
+        refreshUI();
+    } catch (error) {
+        alert(error.message);
+    }
+}
+
 async function refreshUI() {
     const status = await fetchTableStatus();
     if (!status) return;
-
-    const navContainer = document.getElementById("table-navigation");
-    if (navContainer) {
-        const homeLink = document.getElementById("home-link");
-        const createAccountLink = document.getElementById("guest-create-account-link");
-
-        if (!status.isLoggedIn) {
-            if (homeLink) homeLink.remove();
-
-            if (!createAccountLink) {
-                const signupLink = document.createElement("a");
-                signupLink.id = "guest-create-account-link";
-                signupLink.href = `signup.html?playerId=${encodeURIComponent(currentPlayerId)}`;
-                signupLink.className = "text-warning fw-semibold";
-                signupLink.innerHTML = `<span class="bi bi-person-plus-fill me-1"></span> Create Account`;
-                navContainer.prepend(signupLink);
-            }
-        }
-    }
-
-    const savePointsContainer = document.getElementById("save-points-container");
-    if (savePointsContainer) {
-        if (status.isLoggedIn) {
-            savePointsContainer.style.display = "inline-block";
-        } else {
-            savePointsContainer.style.display = "none";
-        }
-    }
 
     if (!status.inTable) {
         showJoinPrompt(status.gameInProgress);
@@ -384,17 +390,10 @@ async function refreshUI() {
 
     renderActivePlayers(status);
     renderStartGameButton(status);
+    renderFinishGameButton(status);
 }
 
-document.addEventListener("click", (event) => {
-    if (event.target && event.target.id === "save-points-btn" || event.target.closest("#save-points-btn")) {
-        const currentChips = yourChipsElem ? yourChipsElem.textContent.replace(/,/g, '') : "1000";
-        window.location.href = `signup.html?playerId=${encodeURIComponent(currentPlayerId)}&chips=${encodeURIComponent(currentChips)}`;
-    }
-});
-
 const socket = io();
-
 socket.on("connect", () => {
     console.log("Connected to server via Socket.io");
     socket.emit("join_table", "main");
@@ -443,7 +442,6 @@ raiseAmount.addEventListener("input", () => {
 
 actionButtons.forEach((button) => {
     button.addEventListener("click", async () => {
-        if (button.disabled) return; // Prevent action if button is disabled/unapplicable
         const action = button.dataset.action;
         let amount = 0;
 
