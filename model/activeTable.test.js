@@ -1,6 +1,6 @@
 const ActiveTable = require('./activeTable.js');
 
-describe('ActiveTable Class (Delegated PlayerManager & Game Engine)', () => {
+describe('ActiveTable Class (Delegated PlayerManager & Game Engine with Side-Pots)', () => {
     let table;
 
     beforeEach(() => {
@@ -32,7 +32,6 @@ describe('ActiveTable Class (Delegated PlayerManager & Game Engine)', () => {
         expect(table.hasPlayer('P1')).toBe(true);
         expect(table.getPlayerCount()).toBe(1);
 
-        // Test proxy getters and setters
         expect(table.queue).toContain('P1');
         expect(table.players).toContain('P1');
         table.players = ['P1'];
@@ -51,11 +50,9 @@ describe('ActiveTable Class (Delegated PlayerManager & Game Engine)', () => {
         table.addPlayer('P1');
         table.addPlayer('P2');
 
-        // Not in game
         expect(table.removePlayer('Ghost')).toBe(false);
         expect(table.removePlayer('P1')).toBe(true);
 
-        // In game (deferred removal)
         table.addPlayer('P1');
         table.addPlayer('P2');
         table.startGame();
@@ -87,7 +84,6 @@ describe('ActiveTable Class (Delegated PlayerManager & Game Engine)', () => {
         const hand1 = table.dealHandToPlayer('P1');
         expect(hand1).toHaveLength(2);
 
-        // Retrieve cached hand
         const hand2 = table.dealHandToPlayer('P1');
         expect(hand2).toEqual(hand1);
     });
@@ -95,17 +91,14 @@ describe('ActiveTable Class (Delegated PlayerManager & Game Engine)', () => {
     test('checkTimeout handles timeouts and consecutive timeout removals', () => {
         table.addPlayer('P1');
         table.addPlayer('P2');
-        table.addPlayer('P3'); // Add a third player to avoid immediate game end on timeout
+        table.addPlayer('P3');
         table.startGame();
 
-        // No timeout yet
         expect(table.checkTimeout()).toBe(false);
 
-        // Force timeout for P1
         table.turnStartTime = Date.now() - 35000;
         expect(table.checkTimeout()).toBe(true);
 
-        // Force second consecutive timeout to trigger removal
         table.turnStartTime = Date.now() - 35000;
         table.playerObjects.get(table.players[table.currentTurnIndex]).hasActed = false;
         expect(table.checkTimeout()).toBe(true);
@@ -119,22 +112,16 @@ describe('ActiveTable Class (Delegated PlayerManager & Game Engine)', () => {
 
         const currentId = table.players[table.currentTurnIndex];
 
-        // Invalid player / inactive
         expect(table.recordAction('Ghost', 'Call').success).toBe(false);
 
-        // Wrong turn
         const wrongTurnId = table.players[(table.currentTurnIndex + 1) % table.players.length];
         expect(table.recordAction(wrongTurnId, 'Call').success).toBe(false);
 
-        // Valid Call
         const callRes = table.recordAction(currentId, 'Call');
         expect(callRes.success).toBe(true);
 
-        // Next turn - Raise
         const nextId = table.players[table.currentTurnIndex];
-        // Invalid raise (below current highest bet)
         expect(table.recordAction(nextId, 'Raise', 10).success).toBe(false);
-        // Valid raise
         const raiseRes = table.recordAction(nextId, 'Raise', 50);
         expect(raiseRes.success).toBe(true);
         expect(table.currentHighestBet).toBe(50);
@@ -156,23 +143,18 @@ describe('ActiveTable Class (Delegated PlayerManager & Game Engine)', () => {
         table.addPlayer('P2');
         table.startGame();
 
-        // Force betting round completion
         table.playerObjects.forEach(p => { p.hasActed = true; p.currentBet = table.currentHighestBet; });
 
-        // Flop
         const round1 = table.nextRound();
         expect(round1.communityCards).toHaveLength(5);
         expect(table.displayedCards).toHaveLength(3);
 
-        // Turn
         const round2 = table.nextRound();
         expect(table.displayedCards).toHaveLength(4);
 
-        // River
         const round3 = table.nextRound();
         expect(table.displayedCards).toHaveLength(5);
 
-        // Showdown / Winner
         const round4 = table.nextRound();
         expect(round4.winnerData).toBeDefined();
     });
@@ -183,7 +165,6 @@ describe('ActiveTable Class (Delegated PlayerManager & Game Engine)', () => {
         expect(formatted[0]).toBe('2♥');
         expect(formatted[3]).toBe('🂠');
 
-        // Invalid card number throws error
         table.displayedCards = [999];
         expect(() => table.displayCards()).toThrow('Displayed cards must be valid card numbers.');
     });
@@ -205,9 +186,92 @@ describe('ActiveTable Class (Delegated PlayerManager & Game Engine)', () => {
         table.addPlayer('P2');
         table.startGame();
 
-        // Test single active non-folded winner
         table.playerObjects.get('P2').folded = true;
         const winnerData = table.handleWinner();
         expect(winnerData.winners).toEqual(['P1']);
+    });
+
+    // ==========================================
+    // SIDE-POT ARCHITECTURE UNIT TESTS
+    // ==========================================
+
+    test('PotManager correctly builds single main pot when contributions are equal', () => {
+        table.addPlayer('P1');
+        table.addPlayer('P2');
+        table.startGame();
+
+        table.playerObjects.get('P1').totalHandContribution = 100;
+        table.playerObjects.get('P2').totalHandContribution = 100;
+
+        table.potManager.buildPots(['P1', 'P2'], table.playerManager);
+
+        expect(table.potManager.pots).toHaveLength(1);
+        expect(table.potManager.pots[0].amount).toBe(200);
+        expect(table.potManager.pots[0].eligiblePlayers).toEqual(['P1', 'P2']);
+    });
+
+    test('PotManager correctly builds main pot and side pots for staggered all-in contributions', () => {
+        table.addPlayer('P1');
+        table.addPlayer('P2');
+        table.addPlayer('P3');
+        table.startGame();
+
+        // P1 all-in at 100, P2 all-in at 300, P3 calls 500
+        table.playerObjects.get('P1').totalHandContribution = 100;
+        table.playerObjects.get('P2').totalHandContribution = 300;
+        table.playerObjects.get('P3').totalHandContribution = 500;
+
+        table.potManager.buildPots(['P1', 'P2', 'P3'], table.playerManager);
+
+        // Tier 1 (100 from P1, P2, P3 = 300) -> Eligible: P1, P2, P3
+        // Tier 2 (200 extra from P2, P3 = 400) -> Eligible: P2, P3
+        // Tier 3 (200 extra from P3 = 200) -> Eligible: P3 only
+        expect(table.potManager.pots.length).toBeGreaterThanOrEqual(2);
+        expect(table.potManager.pots[0].amount).toBe(300);
+        expect(table.potManager.pots[0].eligiblePlayers).toEqual(['P1', 'P2', 'P3']);
+        expect(table.potManager.pots[1].eligiblePlayers).toEqual(['P2', 'P3']);
+    });
+
+    test('PotManager excludes folded players from pot eligibility', () => {
+        table.addPlayer('P1');
+        table.addPlayer('P2');
+        table.startGame();
+
+        table.playerObjects.get('P1').totalHandContribution = 200;
+        table.playerObjects.get('P2').totalHandContribution = 200;
+        table.playerObjects.get('P2').folded = true;
+
+        table.potManager.buildPots(['P1', 'P2'], table.playerManager);
+
+        expect(table.potManager.pots[0].eligiblePlayers).toEqual(['P1']);
+    });
+
+    test('PotManager distributes multi-tier side pots correctly among eligible winners', () => {
+        table.addPlayer('P1');
+        table.addPlayer('P2');
+        table.startGame();
+
+        // Set up manual pots for testing distribution
+        table.potManager.pots = [
+            { amount: 200, eligiblePlayers: ['P1', 'P2'] },
+            { amount: 400, eligiblePlayers: ['P2'] }
+        ];
+
+        table.playerObjects.get('P1').chips = 1000;
+        table.playerObjects.get('P2').chips = 1000;
+
+        // P1 wins main pot, P2 wins side pot (or P2 wins both)
+        const distributed = table.potManager.distributePot(
+            ['P2'], 
+            table.playerManager, 
+            [], 
+            table.playerHands, 
+            table.deck, 
+            2
+        );
+
+        expect(distributed).toBe(600);
+        expect(table.playerObjects.get('P2').chips).toBe(1600); // 1000 + 600
+        expect(table.playerObjects.get('P1').chips).toBe(1000); // Unchanged
     });
 });

@@ -45,7 +45,6 @@ function getTableStatus(req, res) {
     const isCurrentTurn = playerId === currentTurnPlayer;
     const buttonsBlocked = !isPlayer || isSpectator || !mainTable.gameInProgress || !isCurrentTurn || playerHasActed;
 
-    // Determine if Check and Call are specifically applicable
     let canCheck = false;
     let canCall = false;
     if (isCurrentTurn && !buttonsBlocked) {
@@ -54,6 +53,10 @@ function getTableStatus(req, res) {
             canCheck = (currentPlayer.currentBet === mainTable.currentHighestBet);
             const callAmountNeeded = mainTable.currentHighestBet - currentPlayer.currentBet;
             canCall = (callAmountNeeded > 0 && currentPlayer.chips >= callAmountNeeded);
+            // Allow calling even if chips < callAmountNeeded (as an all-in)
+            if (callAmountNeeded > 0 && currentPlayer.chips > 0) {
+                canCall = true;
+            }
         }
     }
 
@@ -66,7 +69,7 @@ function getTableStatus(req, res) {
         return {
             id,
             chips: p ? p.chips : 1000,
-            status: p && p.folded ? "Folded" : (p && p.hasActed ? "Acted" : "Active"),
+            status: p && p.folded ? "Folded" : (p && p.chips === 0 ? "All-In" : (p && p.hasActed ? "Acted" : "Active")),
             isCurrent: id === playerId,
             isDealer
         };
@@ -103,7 +106,6 @@ function getTableStatus(req, res) {
     });
 }
 
-//helper function to broadcast table updates to all connected clients
 function broadcastTableUpdate(req) {
     const io = req.app.get('io');
     if (io) {
@@ -132,8 +134,7 @@ function joinTable(req, res) {
     }
 
     const isPlayer = mainTable.players.includes(id);
-    
-    broadcastTableUpdate(req); // Notify all clients of the table update
+    broadcastTableUpdate(req);
 
     return res.status(200).json({
         message: isPlayer ? "Successfully joined the table as a player." : "Game in progress. Added to spectator queue.",
@@ -153,7 +154,7 @@ function leaveTable(req, res) {
         return res.status(404).json({ error: "Player is not in this table." });
     }
 
-    broadcastTableUpdate(req); // Notify all clients of the table update
+    broadcastTableUpdate(req);
 
     return res.status(200).json({
         message: "Successfully left the table.",
@@ -167,7 +168,7 @@ function startGame(req, res) {
         return res.status(400).json({ error: result.error });
     }
 
-    broadcastTableUpdate(req); // Notify all clients of the table update
+    broadcastTableUpdate(req);
 
     const playerId = req.body.playerId || req.query.playerId || mainTable.players[0];
     const playerHand = mainTable.dealHandToPlayer(playerId);
@@ -195,7 +196,7 @@ function playerAction(req, res) {
         return res.status(400).json({ error: result.error });
     }
 
-    broadcastTableUpdate(req); // Notify all clients of the table update
+    broadcastTableUpdate(req);
 
     const p = mainTable.playerManager.getPlayer(playerId);
     const winnerData = result.winnerData;
@@ -233,7 +234,7 @@ function nextRound(req, res) {
         mainTable.resetToLobby();
     }
 
-    broadcastTableUpdate(req); // Notify all clients of the table update
+    broadcastTableUpdate(req);
 
     return res.status(200).json({
         message: "Advanced to the next round.",

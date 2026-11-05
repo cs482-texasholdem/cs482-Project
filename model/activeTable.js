@@ -2,8 +2,8 @@
  * ============================================================================
  * File Name: activeTable.js
  * Purpose: Manages table session, records action history, tracks positional 
- *          indices (dealer, blinds, seating order), and persists game records.
- *          Updated with thread-safe mutex locking and turn token versioning.
+ *          indices (dealer, blinds, seating order), persists game records,
+ *          and manages multi-tier side-pots for all-in scenarios.
  * ============================================================================
  */
 
@@ -13,18 +13,30 @@ const GameDao = require("./GameDao");
 
 class PotManager {
     constructor() {
-        this.pot = 0;
+        this.pots = [{ amount: 0, eligiblePlayers: [] }]; // Array of pots: [{ amount, eligiblePlayers }]
         this.currentHighestBet = 0;
     }
 
+    get pot() {
+        // Backward compatibility for total pot sum
+        return this.pots.reduce((sum, p) => sum + p.amount, 0);
+    }
+
+    set pot(val) {
+        if (this.pots.length > 0) {
+            this.pots[0].amount = val;
+        } else {
+            this.pots = [{ amount: val, eligiblePlayers: [] }];
+        }
+    }
+
     reset() {
-        this.pot = 0;
+        this.pots = [{ amount: 0, eligiblePlayers: [] }];
         this.currentHighestBet = 0;
     }
 
     postBlinds(players, playerManager, dealerIndex) {
-        this.pot = 0;
-        this.currentHighestBet = 0;
+        this.reset();
         const n = players.length;
         if (n < 2) return { sbIndex: 0, bbIndex: 0 };
 
@@ -38,7 +50,7 @@ class PotManager {
             const sbAmount = Math.min(10, sbPlayer.chips);
             sbPlayer.chips -= sbAmount;
             sbPlayer.currentBet = sbAmount;
-            this.pot += sbAmount;
+            sbPlayer.totalHandContribution = (sbPlayer.totalHandContribution || 0) + sbAmount;
         }
 
         if (bbPlayer) {
@@ -46,23 +58,121 @@ class PotManager {
             bbPlayer.chips -= bbAmount;
             bbPlayer.currentBet = bbAmount;
             this.currentHighestBet = bbAmount;
-            this.pot += bbAmount;
+            bbPlayer.totalHandContribution = (bbPlayer.totalHandContribution || 0) + bbAmount;
         }
 
         return { sbIndex, bbIndex };
     }
 
-    distributePot(winners, playerManager) {
-        if (winners.length > 0 && this.pot > 0) {
-            const share = Math.floor(this.pot / winners.length);
-            for (const winId of winners) {
-                const winnerPlayer = playerManager.getPlayer(winId);
-                if (winnerPlayer) {
-                    winnerPlayer.chips += share;
-                }
+    /**
+     * Builds Main Pot and Side Pots based on player contributions and all-in states.
+     */
+    buildPots(players, playerManager) {
+        // Collect contributions and active states
+        const contributions = [];
+        for (const pid of players) {
+            const p = playerManager.getPlayer(pid);
+            if (p) {
+                contributions.push({
+                    playerId: pid,
+                    contribution: p.totalHandContribution || 0,
+                    folded: p.folded
+                });
             }
         }
-        return this.pot;
+
+        // Sort unique contribution thresholds ascending
+        const thresholds = [...new Set(contributions.map(c => c.contribution))]
+            .filter(c => c > 0)
+            .sort((a, b) => a - b);
+
+        let newPots = [];
+        let previousThreshold = 0;
+
+        for (const threshold of thresholds) {
+            let potAmount = 0;
+            let eligible = [];
+
+            for (const c of contributions) {
+                // How much this player contributes to this specific pot tier
+                const contribAtTier = Math.min(c.contribution, threshold) - Math.min(c.contribution, previousThreshold);
+                if (contribAtTier > 0) {
+                    potAmount += contribAtTier;
+                }
+                // Eligible if they contributed at least this threshold and haven't folded
+                if (c.contribution >= threshold && !c.folded) {
+                    eligible.push(c.playerId);
+                }
+            }
+
+            if (potAmount > 0) {
+                newPots.push({ amount: potAmount, eligiblePlayers: eligible });
+            }
+            previousThreshold = threshold;
+        }
+
+        // Handle any uncalled bets or leftover pots
+        if (newPots.length === 0) {
+            newPots.push({ amount: 0, eligiblePlayers: players.filter(id => !playerManager.getPlayer(id)?.folded) });
+        }
+
+        this.pots = newPots;
+    }
+
+    /**
+     * Distributes Main Pot and Side Pots to eligible winners.
+     */
+    distributePot(winners, playerManager, commonCards, playerHands, deckRef, roundPlayerCount) {
+        let totalDistributed = 0;
+
+        for (const potObj of this.pots) {
+            if (potObj.amount <= 0 || potObj.eligiblePlayers.length === 0) continue;
+
+            // Filter global winners to those eligible for *this specific pot tier*
+            const eligibleWinners = winners.filter(wId => potObj.eligiblePlayers.includes(wId));
+
+            if (eligibleWinners.length === 0) {
+                // If direct winners aren't eligible (e.g. folded/out), re-evaluate best hand among eligiblePlayers for this pot
+                let bestEligibleScore = -1;
+                let potWinners = [];
+
+                for (const eId of potObj.eligiblePlayers) {
+                    const hand = playerHands.get(eId);
+                    if (!hand) continue;
+                    const score = Deck.bestHand(hand, commonCards);
+                    if (score > bestEligibleScore) {
+                        bestEligibleScore = score;
+                        potWinners = [eId];
+                    } else if (score === bestEligibleScore) {
+                        potWinners.push(eId);
+                    }
+                }
+
+                if (potWinners.length > 0) {
+                    const share = Math.floor(potObj.amount / potWinners.length);
+                    const remainder = potObj.amount % potWinners.length;
+                    potWinners.forEach((wId, idx) => {
+                        const wp = playerManager.getPlayer(wId);
+                        if (wp) {
+                            wp.chips += share + (idx === 0 ? remainder : 0);
+                        }
+                    });
+                }
+            } else {
+                // Distribute equally among eligible winners for this pot tier
+                const share = Math.floor(potObj.amount / eligibleWinners.length);
+                const remainder = potObj.amount % eligibleWinners.length;
+                eligibleWinners.forEach((wId, idx) => {
+                    const wp = playerManager.getPlayer(wId);
+                    if (wp) {
+                        wp.chips += share + (idx === 0 ? remainder : 0);
+                    }
+                });
+            }
+            totalDistributed += potObj.amount;
+        }
+
+        return totalDistributed;
     }
 }
 
@@ -93,14 +203,10 @@ class ActiveTable {
         this.gameCount = 0;
         this.turnStartTime = null;
 
-        // Race Condition Mitigation
         this.isLocked = false;
         this.turnToken = 0;
     }
 
-    /**
-     * Executes critical state updates safely under a synchronous mutex lock.
-     */
     _acquireLock(callback) {
         if (this.isLocked) {
             return { success: false, error: "Table state is currently updating. Please try again." };
@@ -158,7 +264,7 @@ class ActiveTable {
                     } while (safety < this.playerManager.players.length);
 
                     this.turnStartTime = Date.now();
-                    this.turnToken++; // Increment turn version
+                    this.turnToken++;
 
                     const activeNonFolded = this.playerManager.players
                         .map(id => this.playerManager.getPlayer(id))
@@ -236,7 +342,6 @@ class ActiveTable {
                     const timeouts = (this.playerManager.consecutiveTimeouts.get(currentId) || 0) + 1;
                     this.playerManager.consecutiveTimeouts.set(currentId, timeouts);
 
-                    // Execute timeout action internally without re-locking
                     this._executeActionInternal(currentId, action, 0);
 
                     if (timeouts >= 2) {
@@ -249,7 +354,7 @@ class ActiveTable {
         });
     }
 
-    recordAction(playerId, action, amount = 0, providedToken = null) {
+    recordAction(playerId, action, amount = 0) {
         return this._acquireLock(() => {
             const player = this.playerManager.getPlayer(playerId);
             if (!player || player.folded || !this.playerManager.players.includes(playerId)) {
@@ -266,10 +371,6 @@ class ActiveTable {
         });
     }
 
-    /**
-     * Internal action execution helper used by recordAction and checkTimeout.
-     * Assumes table lock is already acquired.
-     */
     _executeActionInternal(playerId, action, amount = 0) {
         const player = this.playerManager.getPlayer(playerId);
         this.playerManager.consecutiveTimeouts.set(playerId, 0);
@@ -292,23 +393,34 @@ class ActiveTable {
         } else if (action === "Call") {
             const diff = this.currentHighestBet - player.currentBet;
             if (player.chips < diff) {
-                return { success: false, error: "Not enough chips to call." };
+                // All-in scenario on Call
+                const allInAmount = player.chips;
+                player.chips = 0;
+                player.currentBet += allInAmount;
+                player.totalHandContribution = (player.totalHandContribution || 0) + allInAmount;
+            } else {
+                player.chips -= diff;
+                player.currentBet += diff;
+                player.totalHandContribution = (player.totalHandContribution || 0) + diff;
             }
-            player.chips -= diff;
-            player.currentBet += diff;
-            this.potManager.pot += diff;
         } else if (action === "Raise") {
             if (amount <= this.currentHighestBet) {
                 return { success: false, error: "Raise amount must exceed current highest bet." };
             }
             const diff = amount - player.currentBet;
             if (player.chips < diff) {
-                return { success: false, error: "Not enough chips to raise." };
+                // All-in scenario on Raise
+                const allInAmount = player.chips;
+                player.chips = 0;
+                player.currentBet += allInAmount;
+                player.totalHandContribution = (player.totalHandContribution || 0) + allInAmount;
+                this.potManager.currentHighestBet = player.currentBet;
+            } else {
+                player.chips -= diff;
+                player.currentBet = amount;
+                this.potManager.currentHighestBet = amount;
+                player.totalHandContribution = (player.totalHandContribution || 0) + diff;
             }
-            player.chips -= diff;
-            player.currentBet = amount;
-            this.potManager.currentHighestBet = amount;
-            this.potManager.pot += diff;
             this.aggressorIndex = this.playerManager.players.indexOf(playerId);
             for (const id of this.playerManager.players) {
                 if (id !== playerId) {
@@ -319,6 +431,9 @@ class ActiveTable {
         }
 
         player.hasActed = true;
+
+        // Recompute side pots after every action in case of all-in
+        this.potManager.buildPots(this.playerManager.players, this.playerManager);
 
         this.actionHistory.push({
             playerId,
@@ -348,7 +463,7 @@ class ActiveTable {
         } while (this.playerManager.getPlayer(this.playerManager.players[this.currentTurnIndex])?.folded && safety < this.playerManager.players.length);
 
         this.turnStartTime = Date.now();
-        this.turnToken++; // Increment version token on turn switch
+        this.turnToken++;
 
         return { success: true, roundAdvanced: false };
     }
@@ -361,7 +476,7 @@ class ActiveTable {
         if (activeNonFolded.length <= 1) return true;
 
         for (const p of activeNonFolded) {
-            if (!p.hasActed || p.currentBet !== this.currentHighestBet) {
+            if (!p.folded && p.chips > 0 && (!p.hasActed || p.currentBet !== this.currentHighestBet)) {
                 return false;
             }
         }
@@ -466,6 +581,7 @@ class ActiveTable {
                 p.folded = false;
                 p.currentBet = 0; 
                 p.hasActed = false;
+                p.totalHandContribution = 0;
             }
         }
 
@@ -474,6 +590,8 @@ class ActiveTable {
             const blindIndices = this.potManager.postBlinds(this.playerManager.players, this.playerManager, this.dealerIndex);
             this.recordedSbIndex = blindIndices.sbIndex;
             this.recordedBbIndex = blindIndices.bbIndex;
+
+            this.potManager.buildPots(this.playerManager.players, this.playerManager);
 
             let sbIndex = (n === 2) ? this.dealerIndex : (this.dealerIndex + 1) % n;
             if (n > 2) {
@@ -508,6 +626,7 @@ class ActiveTable {
             p.folded = false;
             p.currentBet = 0;
             p.hasActed = false;
+            p.totalHandContribution = 0;
         }
     }
 
@@ -519,12 +638,12 @@ class ActiveTable {
         let winners = [];
         let maxScore = 0;
 
+        const commonCards = this.deck.commonCards(this.roundPlayerCount);
+
         if (activeNonFolded.length === 1) {
             winners = [activeNonFolded[0].id];
         } else {
-            const commonCards = this.deck.commonCards(this.roundPlayerCount);
             let highest = -1;
-
             for (const playerId of this.playerManager.players) {
                 const p = this.playerManager.getPlayer(playerId);
                 if (!p || p.folded) continue;
@@ -543,7 +662,15 @@ class ActiveTable {
             }
         }
 
-        const resultPot = this.potManager.distributePot(winners, this.playerManager);
+        // Distribute pot across Main and Side pots
+        const resultPot = this.potManager.distributePot(
+            winners, 
+            this.playerManager, 
+            commonCards, 
+            this.playerHands, 
+            this.deck, 
+            this.roundPlayerCount
+        );
         this.gameOver = true;
 
         GameDao.create({
