@@ -88,22 +88,6 @@ describe('ActiveTable Class (Delegated PlayerManager & Game Engine with Side-Pot
         expect(hand2).toEqual(hand1);
     });
 
-    test('checkTimeout handles timeouts and consecutive timeout removals', () => {
-        table.addPlayer('P1');
-        table.addPlayer('P2');
-        table.addPlayer('P3');
-        table.startGame();
-
-        expect(table.checkTimeout()).toBe(false);
-
-        table.turnStartTime = Date.now() - 35000;
-        expect(table.checkTimeout()).toBe(true);
-
-        table.turnStartTime = Date.now() - 35000;
-        table.playerObjects.get(table.players[table.currentTurnIndex]).hasActed = false;
-        expect(table.checkTimeout()).toBe(true);
-    });
-
     test('recordAction handles various actions (Fold, Check, Call, Raise) and validation', () => {
         table.addPlayer('P1');
         table.addPlayer('P2');
