@@ -146,6 +146,7 @@ function renderActivePlayers(status) {
         }
 
         seat.className = `player-seat ${playerStatusClass} ${p.isCurrent ? "current-player" : ""}`;
+        seat.id = `seat-${p.id}`;
 
         const nameSpan = document.createElement("span");
         nameSpan.className = "player-name";
@@ -189,7 +190,6 @@ function renderActivePlayers(status) {
         updateTimerDisplay(status.turnTimeRemaining);
     }
 
-    // Ensure Fold button is NEVER locked, while other buttons follow status.buttonsBlocked
     actionButtons.forEach(btn => {
         const action = btn.dataset.action;
         if (action === "Fold") {
@@ -351,6 +351,66 @@ async function startGame() {
     }
 }
 
+// Stage 2: Sequenced Card Reveal Pipeline Handler
+async function handleSequencedShowdown(winnerData) {
+    if (!winnerData || !winnerData.winners) return;
+
+    const showdownHands = winnerData.showdownHands || {};
+    const playerIds = Object.keys(showdownHands);
+
+    winnerModalText.innerHTML = `Showdown in progress...<br>Revealing hands.`;
+    winnerModal.style.display = "flex";
+    tableMessage.textContent = "Showdown: Revealing active hands...";
+
+    // Sequenced reveal per player
+    for (let i = 0; i < playerIds.length; i++) {
+        const pid = playerIds[i];
+        const cards = showdownHands[pid];
+        
+        tableMessage.textContent = `Revealing cards for ${pid}...`;
+        
+        // Find seat element and append revealed mini-cards if desired
+        const seatElem = document.getElementById(`seat-${pid}`);
+        if (seatElem && cards) {
+            let revealBox = seatElem.querySelector(".revealed-cards");
+            if (!revealBox) {
+                revealBox = document.createElement("div");
+                revealBox.className = "revealed-cards";
+                revealBox.style.display = "flex";
+                revealBox.style.gap = "3px";
+                revealBox.style.justifyContent = "center";
+                revealBox.style.marginTop = "4px";
+                seatElem.appendChild(revealBox);
+            }
+            revealBox.innerHTML = "";
+            cards.forEach(c => {
+                const cDiv = document.createElement("span");
+                cDiv.style.fontSize = "10px";
+                cDiv.style.background = "#fff";
+                cDiv.style.color = c.includes("♥") || c.includes("♦") ? "#D42C25" : "#202B40";
+                cDiv.style.padding = "2px 4px";
+                cDiv.style.borderRadius = "3px";
+                cDiv.style.fontWeight = "bold";
+                cDiv.textContent = c;
+                revealBox.appendChild(cDiv);
+            });
+        }
+
+        // Wait 600ms between each player reveal for suspense
+        await new Promise(resolve => setTimeout(resolve, 600));
+    }
+
+    const winnersText = winnerData.winners.join(", ");
+    winnerModalText.innerHTML = `Winner(s):<br><strong>${winnersText}</strong><br>Pot Won: ${winnerData.pot}`;
+    tableMessage.textContent = `Round complete. Winner: ${winnersText}`;
+
+    if (modalTimeout) clearTimeout(modalTimeout);
+    modalTimeout = setTimeout(() => {
+        winnerModal.style.display = "none";
+        refreshUI();
+    }, 4000);
+}
+
 async function finishGame() {
     try {
         const response = await fetch("/api/table/finish", {
@@ -364,12 +424,8 @@ async function finishGame() {
         }
         const data = await response.json();
         if (data.winnerData && data.winnerData.winners) {
-            const winnersText = data.winnerData.winners.join(", ");
-            winnerModalText.innerHTML = `Winner(s):<br><strong>${winnersText}</strong><br>Pot Won: ${data.winnerData.pot}`;
-            winnerModal.style.display = "flex";
+            await handleSequencedShowdown(data.winnerData);
         }
-        tableMessage.textContent = "Game finished successfully.";
-        refreshUI();
     } catch (error) {
         alert(error.message);
     }
@@ -469,16 +525,7 @@ actionButtons.forEach((button) => {
             const data = await res.json();
 
             if (data.winnerData && data.winnerData.winners) {
-                const winnersText = data.winnerData.winners.join(", ");
-                winnerModalText.innerHTML = `Winner(s):<br><strong>${winnersText}</strong><br>Pot Won: ${data.winnerData.pot}`;
-                winnerModal.style.display = "flex";
-                tableMessage.textContent = "Round complete. Showing winner...";
-
-                if (modalTimeout) clearTimeout(modalTimeout);
-                modalTimeout = setTimeout(() => {
-                    winnerModal.style.display = "none";
-                    refreshUI();
-                }, 3500);
+                await handleSequencedShowdown(data.winnerData);
                 return;
             }
 

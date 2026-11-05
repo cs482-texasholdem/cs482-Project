@@ -1,9 +1,9 @@
 /**
-- ============================================================================
-- File Name: tableController.js
-- Purpose: Express controller endpoints for table actions using safe 
--          player lookups (`mainTable.playerManager.getPlayer`).
-- ============================================================================
+ * ============================================================================
+ * File Name: tableController.js
+ * Purpose: Express controller endpoints for table actions using safe 
+ *          player lookups and returning showdown hand data for sequenced reveals.
+ * ============================================================================
  */
 
 const ActiveTable = require("../model/activeTable");

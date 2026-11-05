@@ -1,10 +1,10 @@
 /**
-- ============================================================================
-- File Name: activeTable.js
-- Purpose: Manages table session, records action history, tracks positional 
--          indices (dealer, blinds, seating order), persists game records,
--          and manages multi-tier side-pots for all-in scenarios.
-- ============================================================================
+ * ============================================================================
+ * File Name: activeTable.js
+ * Purpose: Manages table session, records action history, tracks positional 
+ *          indices (dealer, blinds, seating order), persists game records,
+ *          manages multi-tier side-pots, and packages showdown hands for Stage 2.
+ * ============================================================================
  */
 
 const Deck = require("../util/pokerLogic");
@@ -110,7 +110,7 @@ class PotManager {
         this.pots = newPots;
     }
 
-    distributePot(winners, playerManager, commonCards, playerHands, deckRef, roundPlayerCount) {
+    distributePot(winners, playerManager, commonCards, playerHands) {
         let totalDistributed = 0;
 
         for (const potObj of this.pots) {
@@ -360,7 +360,7 @@ class ActiveTable {
 
         if (action === "Fold") {
             player.folded = true;
-            player.mucked = true; // Set mucked flag on fold
+            player.mucked = true;
             if (this.playerManager.players.indexOf(playerId) === this.aggressorIndex) {
                 let idx = this.aggressorIndex;
                 let safety = 0;
@@ -564,7 +564,7 @@ class ActiveTable {
             const p = this.playerManager.getPlayer(playerId);
             if (p) {
                 p.folded = false;
-                p.mucked = false; // Reset muck flag
+                p.mucked = false;
                 p.currentBet = 0; 
                 p.hasActed = false;
                 p.totalHandContribution = 0;
@@ -653,11 +653,21 @@ class ActiveTable {
             winners, 
             this.playerManager, 
             commonCards, 
-            this.playerHands, 
-            this.deck, 
-            this.roundPlayerCount
+            this.playerHands
         );
         this.gameOver = true;
+
+        // Stage 2: Gather showdown hands only for active players who did not muck
+        const showdownHands = {};
+        for (const playerId of this.playerManager.players) {
+            const p = this.playerManager.getPlayer(playerId);
+            if (p && !p.folded && !p.mucked) {
+                const hand = this.playerHands.get(playerId);
+                if (hand) {
+                    showdownHands[playerId] = hand.map(c => Deck.cardToText(c));
+                }
+            }
+        }
 
         GameDao.create({
             tableId: this.tableId,
@@ -674,7 +684,7 @@ class ActiveTable {
         });
 
         this.playerManager.processPendingRemovals(this.gameInProgress);
-        return { winners, maxScore, pot: resultPot };
+        return { winners, maxScore, pot: resultPot, showdownHands };
     }
 }
 
