@@ -18,7 +18,8 @@ function getTableStatus(req, res) {
     const inTable = playerId ? mainTable.hasPlayer(playerId) : false;
     const isPlayer = playerId ? mainTable.players.includes(playerId) : false;
     const isSpectator = playerId ? mainTable.spectators.includes(playerId) : false;
-    
+    const isLoggedIn = !!req.session.user; 
+
     let playerChips = 1000;
     let playerBet = 0;
     let playerHand = [];
@@ -80,6 +81,7 @@ function getTableStatus(req, res) {
     return res.status(200).json({
         tableId: mainTable.tableId,
         skillLevel: mainTable.skillLevel,
+        isLoggedIn,
         playerCount: mainTable.getPlayerCount(),
         spectatorCount: mainTable.getSpectatorCount(),
         maxPlayers: mainTable.maxPlayers,
