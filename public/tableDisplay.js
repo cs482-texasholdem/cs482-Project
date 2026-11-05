@@ -38,9 +38,6 @@ document.getElementById("display-player-id").textContent = currentPlayerId;
 const betScale = document.getElementById("bet-scale");
 const raiseAmount = document.getElementById("raise-amount");
 const tableMessage = document.getElementById("table-message");
-const winnerModal = document.getElementById("winner-modal");
-const winnerModalText = document.getElementById("winner-modal-text");
-const modalCloseBtn = document.getElementById("modal-close-btn");
 const leftSideContainer = document.getElementById("left-player-side");
 const rightSideContainer = document.getElementById("right-player-side");
 const totalPotElem = document.getElementById("total-pot");
@@ -94,7 +91,7 @@ document.getElementById("lobby-link")
         leaveTable("lobby.html");
     });
 
-let modalTimeout = null;
+let resetTimeout = null;
 let currentTimerRemaining = 30;
 
 function updateTimerDisplay(rem) {
@@ -190,15 +187,9 @@ function renderActivePlayers(status) {
         updateTimerDisplay(status.turnTimeRemaining);
     }
 
+    // Gate all action buttons (including Fold) when game is not in progress or not player's turn
     actionButtons.forEach(btn => {
         const action = btn.dataset.action;
-        if (action === "Fold") {
-            btn.disabled = false;
-            btn.style.opacity = "1";
-            btn.style.cursor = "pointer";
-            return;
-        }
-
         if (status.buttonsBlocked) {
             btn.disabled = true;
             btn.style.opacity = "0.5";
@@ -304,17 +295,25 @@ function renderStartGameButton(status) {
 
 function renderFinishGameButton(status) {
     let finishBtnContainer = document.getElementById("finish-game-container");
+    const communityCards = status.communityCards || [];
+    // Block Finish Game / Showdown button until the last round is reached (5 community cards present and valid)
+    const reachedLastRound = communityCards.length === 5 && !communityCards.includes("🂠");
+
     if (status.gameInProgress && status.isPlayer) {
         if (!finishBtnContainer) {
             finishBtnContainer = document.createElement("div");
             finishBtnContainer.id = "finish-game-container";
             finishBtnContainer.style.textAlign = "center";
             finishBtnContainer.style.margin = "10px 0";
-            finishBtnContainer.innerHTML = `
-                <button type="button" id="finish-game-btn" class="action-button fold" style="width: auto; height: auto; padding: 10px 20px; border-radius: 8px; background: #d42c25; border-color: #961e19;">Finish Game / Showdown</button>
-            `;
-            const gameHeading = document.querySelector(".game-heading");
-            if (gameHeading) gameHeading.appendChild(finishBtnContainer);
+            const heading = document.querySelector(".game-heading");
+            if (heading) heading.appendChild(finishBtnContainer);
+        }
+
+        finishBtnContainer.innerHTML = `
+            <button type="button" id="finish-game-btn" class="action-button fold" style="width: auto; height: auto; padding: 10px 20px; border-radius: 8px; background: ${reachedLastRound ? '#d42c25' : '#555'}; border-color: ${reachedLastRound ? '#961e19' : '#333'}; cursor: ${reachedLastRound ? 'pointer' : 'not-allowed'}; opacity: ${reachedLastRound ? '1' : '0.5'};" ${reachedLastRound ? '' : 'disabled'}>Finish Game / Showdown</button>
+        `;
+
+        if (reachedLastRound) {
             document.getElementById("finish-game-btn").addEventListener("click", finishGame);
         }
     } else if (finishBtnContainer) {
@@ -351,25 +350,22 @@ async function startGame() {
     }
 }
 
-// Stage 2: Sequenced Card Reveal Pipeline Handler
+// Sequenced Reveal & Winner Highlighting without Popup Modal
 async function handleSequencedShowdown(winnerData) {
     if (!winnerData || !winnerData.winners) return;
 
     const showdownHands = winnerData.showdownHands || {};
     const playerIds = Object.keys(showdownHands);
+    const winnersList = winnerData.winners || [];
 
-    winnerModalText.innerHTML = `Showdown in progress...<br>Revealing hands.`;
-    winnerModal.style.display = "flex";
     tableMessage.textContent = "Showdown: Revealing active hands...";
 
-    // Sequenced reveal per player
     for (let i = 0; i < playerIds.length; i++) {
         const pid = playerIds[i];
         const cards = showdownHands[pid];
         
         tableMessage.textContent = `Revealing cards for ${pid}...`;
         
-        // Find seat element and append revealed mini-cards if desired
         const seatElem = document.getElementById(`seat-${pid}`);
         if (seatElem && cards) {
             let revealBox = seatElem.querySelector(".revealed-cards");
@@ -396,19 +392,26 @@ async function handleSequencedShowdown(winnerData) {
             });
         }
 
-        // Wait 600ms between each player reveal for suspense
         await new Promise(resolve => setTimeout(resolve, 600));
     }
 
-    const winnersText = winnerData.winners.join(", ");
-    winnerModalText.innerHTML = `Winner(s):<br><strong>${winnersText}</strong><br>Pot Won: ${winnerData.pot}`;
-    tableMessage.textContent = `Round complete. Winner: ${winnersText}`;
+    winnersList.forEach(wId => {
+        const winningSeat = document.getElementById(`seat-${wId}`);
+        if (winningSeat) {
+            winningSeat.classList.add("winner-seat");
+        }
+    });
 
-    if (modalTimeout) clearTimeout(modalTimeout);
-    modalTimeout = setTimeout(() => {
-        winnerModal.style.display = "none";
+    const winnersText = winnersList.join(", ");
+    tableMessage.textContent = `Winner(s): ${winnersText} | Pot Won: ${winnerData.pot}`;
+
+    if (resetTimeout) clearTimeout(resetTimeout);
+    resetTimeout = setTimeout(() => {
+        document.querySelectorAll(".winner-seat").forEach(el => {
+            el.classList.remove("winner-seat");
+        });
         refreshUI();
-    }, 4000);
+    }, 4500);
 }
 
 async function finishGame() {
@@ -535,12 +538,6 @@ actionButtons.forEach((button) => {
             console.error("Error executing action:", error);
         }
     });
-});
-
-modalCloseBtn.addEventListener("click", () => {
-    if (modalTimeout) clearTimeout(modalTimeout);
-    winnerModal.style.display = "none";
-    refreshUI();
 });
 
 document.getElementById("chat-form").addEventListener("submit", (event) => {

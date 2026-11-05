@@ -85,7 +85,7 @@ body {
     color: var(--main-text);
 }
 
-/* Guest Login Button */
+/* Guest Login Button Styling */
 .guest-btn-container {
     text-align: center;
     margin-top: 1.5rem;
@@ -99,7 +99,7 @@ body {
     background-color: var(--button-blue);
     border: 1px solid var(--button-hover-blue);
     color: var(--main-text);
-    border-radius: 8px; /* Clean, modern rounding */
+    border-radius: 8px;
     font-weight: 500;
     font-size: 0.9rem;
     padding: 0.55rem 1.25rem;
@@ -112,26 +112,6 @@ body {
     color: var(--main-text);
     box-shadow: 0 4px 10px rgba(82, 127, 209, 0.4);
     transform: translateY(-1px);
-}
-
-/* Save Points Button */
-.btn-save-points {
-    background: linear-gradient(135deg, #f39c12 0%, #f1c40f 100%);
-    border: 1.5px solid #d4ac0d;
-    color: #1a1a1a;
-    font-size: 14px; 
-    font-weight: 700;
-    padding: 10px 20px; 
-    border-radius: 24px;
-    box-shadow: 0 4px 12px rgba(241, 196, 15, 0.35);
-    transition: all 0.2s ease-in-out;
-}
-.btn-save-points:hover {
-    background: linear-gradient(135deg, #f1c40f 0%, #f39c12 100%);
-    color: #0b132b;
-    border-color: #f1c40f;
-    box-shadow: 0 6px 16px rgba(241, 196, 15, 0.55);
-    transform: translateY(-2px);
 }
 
 .custom-navbar {
@@ -153,72 +133,6 @@ footer {
 .auth-container {
     position: relative;
     z-index: 1;
-}
-
-.falling-card {
-    position: absolute;
-    width: 170px;
-    height: 250px;
-    border: 2px solid var(--button-hover-blue);
-    border-radius: 14px;
-    background: rgba(15, 23, 42, 0.85);
-    box-shadow: 0 0 25px rgba(82, 127, 209, 0.35), 
-                0 0 50px rgba(49, 92, 168, 0.25),
-                inset 0 0 15px rgba(82, 127, 209, 0.15);
-    pointer-events: none;
-    z-index: 0;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    color: #38bdf8;
-    text-shadow: 0 0 12px rgba(82, 127, 209, 0.7);
-    transition: transform 0.3s ease-in-out;
-}
-
-.falling-card .card-rank {
-    position: absolute;
-    top: 10px;
-    left: 14px;
-    font-size: 1.8rem;
-    font-weight: 800;
-    line-height: 1;
-    text-align: center;
-}
-
-.falling-card .card-rank i {
-    display: block;
-    font-size: 1.2rem;
-}
-
-.falling-card .center-suit {
-    font-size: 5.5rem;
-    color: var(--main-text);
-    text-shadow: 0 0 15px rgba(82, 127, 209, 0.8);
-}
-
-.card-left-ace {
-    top: 10%;
-    left: -110px;
-    transform: rotate(-18deg) scale(1.05);
-}
-
-.card-right-king {
-    top: 15%;
-    right: -100px;
-    transform: rotate(22deg) scale(1.1);
-}
-
-.card-left-jack {
-    bottom: -30px;
-    left: -70px;
-    transform: rotate(-35deg) scale(0.85);
-    opacity: 0.8;
-}
-
-.login-card-wrapper {
-    position: relative;
-    z-index: 2;
 }
 
 body.table-page {
@@ -396,6 +310,7 @@ body.table-page {
     background: var(--panel-background);
     border: 2px solid transparent;
     box-shadow: 0 3px 5px var(--shadow);
+    transition: all 0.3s ease;
 }
 
 .table-page .player-seat.active {
@@ -407,11 +322,18 @@ body.table-page {
     background: var(--disconnected-player);
     color: var(--secondary-text);
     opacity: 0.65;
-    border-color: var(--disconnected-border);
+}
+
+/* Stage 3: Winner Box Highlighting */
+.table-page .player-seat.winner-seat {
+    background: linear-gradient(135deg, #2c3e50 0%, #f1c40f 100%) !important;
+    border: 3px solid #f1c40f !important;
+    box-shadow: 0 0 20px rgba(241, 196, 15, 0.7), 0 5px 15px var(--strong-shadow) !important;
+    transform: scale(1.03);
 }
 
 .table-page .dealer-badge {
-    display: inline-block;
+    display: inline-flex;
     align-items: center;
     justify-content: center;
     width: 20px;
@@ -627,56 +549,4 @@ body.table-page {
 
 .table-page .action-button.raise {
     background: var(--button-hover-blue);
-}
-
-/* ============================================================================
-   Midnight Theme Styling for Offcanvas Sidebars (Blueberry Milk Accents)
-   ============================================================================ */
-
-.midnight-offcanvas {
-    background-color: #0b132b !important;
-    color: #e0e6ed !important;
-}
-
-.midnight-offcanvas .offcanvas-header {
-    border-color: #1c2541 !important;
-}
-
-/* Soft blueberry milk color for labels and subheadings */
-.midnight-offcanvas .form-label,
-.midnight-offcanvas h6 {
-    color: #e2eafc !important; /* Soft blueberry milk pale blue */
-    opacity: 0.85;
-}
-
-.midnight-offcanvas .midnight-input {
-    background-color: #131b2e !important;
-    border-color: #3a506b !important;
-    color: #ffffff !important;
-}
-
-.midnight-offcanvas .midnight-input:focus {
-    background-color: #131b2e !important;
-    border-color: #6c757d !important;
-    color: #ffffff !important;
-    box-shadow: 0 0 0 0.25rem rgba(226, 234, 252, 0.15) !important;
-}
-
-.midnight-offcanvas .midnight-option {
-    background-color: #0b132b !important;
-    color: #ffffff !important;
-}
-
-.midnight-offcanvas .midnight-divider {
-    border-color: #1c2541 !important;
-}
-
-#reportedUsername::placeholder {
-    color: #adb5bd !important;
-    opacity: 1;
-}
-
-#reportDetails::placeholder {
-    color: #adb5bd !important;
-    opacity: 1;
 }
