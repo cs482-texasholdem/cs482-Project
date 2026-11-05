@@ -345,6 +345,34 @@ async function refreshUI() {
     const status = await fetchTableStatus();
     if (!status) return;
 
+    const navContainer = document.getElementById("table-navigation");
+    if (navContainer) {
+        const homeLink = document.getElementById("home-link");
+        const createAccountLink = document.getElementById("guest-create-account-link");
+
+        if (!status.isLoggedIn) {
+            if (homeLink) homeLink.remove();
+
+            if (!createAccountLink) {
+                const signupLink = document.createElement("a");
+                signupLink.id = "guest-create-account-link";
+                signupLink.href = `signup.html?playerId=${encodeURIComponent(currentPlayerId)}`;
+                signupLink.className = "text-warning fw-semibold";
+                signupLink.innerHTML = `<span class="bi bi-person-plus-fill me-1"></span> Create Account`;
+                navContainer.prepend(signupLink);
+            }
+        }
+    }
+
+    const savePointsContainer = document.getElementById("save-points-container");
+    if (savePointsContainer) {
+        if (status.isLoggedIn) {
+            savePointsContainer.style.display = "inline-block";
+        } else {
+            savePointsContainer.style.display = "none";
+        }
+    }
+
     if (!status.inTable) {
         showJoinPrompt(status.gameInProgress);
         return;
@@ -357,6 +385,13 @@ async function refreshUI() {
     renderActivePlayers(status);
     renderStartGameButton(status);
 }
+
+document.addEventListener("click", (event) => {
+    if (event.target && event.target.id === "save-points-btn" || event.target.closest("#save-points-btn")) {
+        const currentChips = yourChipsElem ? yourChipsElem.textContent.replace(/,/g, '') : "1000";
+        window.location.href = `signup.html?playerId=${encodeURIComponent(currentPlayerId)}&chips=${encodeURIComponent(currentChips)}`;
+    }
+});
 
 const socket = io();
 

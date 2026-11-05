@@ -448,8 +448,17 @@ exports.loggedUser = function(req, res){
  * @param {Object} res response object
  */
 exports.logout = function(req, res){
-    req.session.user = null; 
-    res.redirect('index.html');
+    req.session.user = null; // Clear user data from session
+    req.session.destroy((err) => {
+        if (err) {
+            console.error("Error destroying session during logout:", err);
+        }
+        res.clearCookie('connect.sid', { path: '/' }); // Clear session cookie
+        res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate'); // Prevent caching of sensitive data
+        res.setHeader('Pragma', 'no-cache');
+        res.setHeader('Expires', '0');
+        res.redirect('/login.html'); // Redirect to sign in page after logout
+    });
 };
 
 

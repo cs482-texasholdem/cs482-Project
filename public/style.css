@@ -85,7 +85,7 @@ body {
     color: var(--main-text);
 }
 
-/* Guest Login Button Styling */
+/* Guest Login Button */
 .guest-btn-container {
     text-align: center;
     margin-top: 1.5rem;
@@ -112,6 +112,26 @@ body {
     color: var(--main-text);
     box-shadow: 0 4px 10px rgba(82, 127, 209, 0.4);
     transform: translateY(-1px);
+}
+
+/* Save Points Button */
+.btn-save-points {
+    background: linear-gradient(135deg, #f39c12 0%, #f1c40f 100%);
+    border: 1.5px solid #d4ac0d;
+    color: #1a1a1a;
+    font-size: 14px; 
+    font-weight: 700;
+    padding: 10px 20px; 
+    border-radius: 24px;
+    box-shadow: 0 4px 12px rgba(241, 196, 15, 0.35);
+    transition: all 0.2s ease-in-out;
+}
+.btn-save-points:hover {
+    background: linear-gradient(135deg, #f1c40f 0%, #f39c12 100%);
+    color: #0b132b;
+    border-color: #f1c40f;
+    box-shadow: 0 6px 16px rgba(241, 196, 15, 0.55);
+    transform: translateY(-2px);
 }
 
 .custom-navbar {
