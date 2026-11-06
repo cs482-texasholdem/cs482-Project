@@ -285,4 +285,4 @@ function nextRound(req, res) {
     });
 }
 
-module.exports = { joinTable, leaveTable, startGame, playerAction, nextRound, getTableStatus, mainTable };
+module.exports = { joinTable, leaveTable, startGame, playerAction, nextRound, getTableStatus, tableManager, mainTable };
