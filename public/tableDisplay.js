@@ -5,7 +5,7 @@ function getPlayerIdFromUrl() {
 }
 
 // Robust initialization: URL > Logged-In User Session > Guest Storage > Fallback Guest
-async function initializePlayerIdesntity() {
+async function initializePlayerIdentity() {
     currentPlayerId = getPlayerIdFromUrl();
 
     if (!currentPlayerId) {
