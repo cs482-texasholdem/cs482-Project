@@ -190,6 +190,11 @@ function finishGame(req, res) {
         return res.status(400).json({ error: result.error });
     }
 
+    const io = req.app.get('io');
+    if (io) {
+        io.to(`table_${mainTable.tableId}`).emit('SHOWDOWN_REVEAL', result.winnerData);
+    }
+
     broadcastTableUpdate(req);
 
     return res.status(200).json({
