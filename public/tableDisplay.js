@@ -1,16 +1,70 @@
 function getPlayerIdFromUrl() {
     const urlParams = new URLSearchParams(window.location.search);
     let id = urlParams.get("playerId");
-    
-    if (!id) {
-        const keys = Array.from(urlParams.keys());
-        if (keys.length > 0) {
-            id = keys[0];
+    return id && id !== "buyInAmount" && id !== "tableName" ? decodeURIComponent(id.trim()) : "";
+}
+
+// Robust initialization: URL > Logged-In User Session > Guest Storage > Fallback Guest
+async function initializePlayerIdesntity() {
+    currentPlayerId = getPlayerIdFromUrl();
+
+    if (!currentPlayerId) {
+        try {
+            const res = await fetch('/loggeduser');
+            if (res.ok) {
+                const user = await res.json();
+                if (user && (user.username || user.email || user.id)) {
+                    currentPlayerId = user.username || user.email.split('@')[0];
+                }
+            }
+        } catch (e) {
+            console.error("Failed to fetch user session:", e);
         }
     }
-    
-    return id ? decodeURIComponent(id.trim()) : "";
+
+    if (!currentPlayerId) {
+        currentPlayerId = localStorage.getItem("guestPlayerId") || sessionStorage.getItem("guestPlayerId");
+    }
+
+    if (!currentPlayerId) {
+        currentPlayerId = `Guest_${Math.floor(1000 + Math.random() * 9000)}`;
+        localStorage.setItem("guestPlayerId", currentPlayerId);
+    }
+
+    // Update UI headers immediately
+    const headerName = document.getElementById("header-player-name");
+    const displayName = document.getElementById("display-player-id");
+    if (headerName) headerName.textContent = currentPlayerId;
+    if (displayName) displayName.textContent = currentPlayerId;
+
+    // Connect socket and refresh UI once identity is confirmed
+    initializeSocketAndUI();
 }
+
+
+function initializeSocketAndUI() {
+    const socket = io();
+    socket.on("connect", () => {
+        console.log("Connected to server via Socket.io");
+        socket.emit("join_table", "main");
+        refreshUI();
+    });
+
+    socket.on("TABLE_UPDATED", () => {
+        refreshUI();
+    });
+
+    socket.on("TURN_TIMER", (data) => {
+        if (data && typeof data.turnTimeRemaining === "number") {
+            updateTimerDisplay(data.turnTimeRemaining);
+        }
+    });
+
+    refreshUI();
+}
+
+// Run initialization on load
+initializePlayerIdentity();
 
 let currentPlayerId = getPlayerIdFromUrl();
 
