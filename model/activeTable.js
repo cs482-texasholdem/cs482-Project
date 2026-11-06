@@ -657,11 +657,10 @@ class ActiveTable {
         );
         this.gameOver = true;
 
-        // Stage 2: Gather showdown hands only for active players who did not muck
         const showdownHands = {};
         for (const playerId of this.playerManager.players) {
             const p = this.playerManager.getPlayer(playerId);
-            if (p && !p.folded && !p.mucked) {
+            if (p && !p.folded) {
                 const hand = this.playerHands.get(playerId);
                 if (hand) {
                     showdownHands[playerId] = hand.map(c => Deck.cardToText(c));
