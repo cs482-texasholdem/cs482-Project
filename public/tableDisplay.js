@@ -404,14 +404,6 @@ async function handleSequencedShowdown(winnerData) {
 
     const winnersText = winnersList.join(", ");
     tableMessage.textContent = `Winner(s): ${winnersText} | Pot Won: ${winnerData.pot}`;
-
-    if (resetTimeout) clearTimeout(resetTimeout);
-    resetTimeout = setTimeout(() => {
-        document.querySelectorAll(".winner-seat").forEach(el => {
-            el.classList.remove("winner-seat");
-        });
-        refreshUI();
-    }, 4500);
 }
 
 async function finishGame() {
