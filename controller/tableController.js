@@ -8,16 +8,37 @@
 
 const ActiveTable = require("../model/activeTable");
 const Deck = require("../util/pokerLogic");
+const TableManager = require("../model/tableManager");
+const tableManager = new TableManager();
 
 const mainTable = new ActiveTable("main", "general");
+tableManager.addTable(mainTable.tableId, mainTable);
+
+// Retrieve table based on ID
+function getRequestedTable(req) {
+    const tableId = req.params?.tableId ||
+                    req.body?.tableId ||
+                    req.query?.tableId ||
+                    "main";
+
+    return tableManager.getTable(tableId);
+}
 
 function getTableStatus(req, res) {
-    mainTable.checkTimeout();
+    //call helper function to retrieved table ID
+    const table = getRequestedTable(req); 
 
+    //no table
+    if (!table) {
+        return res.status(404).json({ error: "Table not found." });
+    }
+
+    table.checkTimeout();
+    
     const playerId = req.query.playerId;
-    const inTable = playerId ? mainTable.hasPlayer(playerId) : false;
-    const isPlayer = playerId ? mainTable.players.includes(playerId) : false;
-    const isSpectator = playerId ? mainTable.spectators.includes(playerId) : false;
+    const inTable = playerId ? table.hasPlayer(playerId) : false;
+    const isPlayer = playerId ? table.players.includes(playerId) : false;
+    const isSpectator = playerId ? table.spectators.includes(playerId) : false;
     
     let playerChips = 1000;
     let playerBet = 0;
@@ -25,7 +46,7 @@ function getTableStatus(req, res) {
     let playerHasActed = false;
 
     if (playerId) {
-        const p = mainTable.playerManager.getPlayer(playerId);
+        const p = table.playerManager.getPlayer(playerId);
         if (p) {
             playerChips = p.chips;
             playerBet = p.currentBet;
@@ -33,23 +54,23 @@ function getTableStatus(req, res) {
         }
     }
 
-    if (playerId && isPlayer && mainTable.gameInProgress) {
-        let hand = mainTable.dealHandToPlayer(playerId);
+    if (playerId && isPlayer && table.gameInProgress) {
+        let hand = table.dealHandToPlayer(playerId);
         if (hand) {
             playerHand = hand.map(card => Deck.cardToText(card));
         }
     }
 
-    const currentTurnPlayer = (mainTable.gameInProgress && mainTable.players.length > 0) ? mainTable.players[mainTable.currentTurnIndex] : null;
-    const dealerPlayerId = (mainTable.gameInProgress && mainTable.players.length > 0) ? mainTable.players[mainTable.dealerIndex] : null;
+    const currentTurnPlayer = (table.gameInProgress && table.players.length > 0) ? table.players[table.currentTurnIndex] : null;
+    const dealerPlayerId = (table.gameInProgress && table.players.length > 0) ? table.players[table.dealerIndex] : null;
     const isCurrentTurn = playerId === currentTurnPlayer;
-    const buttonsBlocked = !isPlayer || isSpectator || !mainTable.gameInProgress || !isCurrentTurn || playerHasActed;
+    const buttonsBlocked = !isPlayer || isSpectator || !table.gameInProgress || !isCurrentTurn || playerHasActed;
 
-    const elapsed = mainTable.turnStartTime ? Math.floor((Date.now() - mainTable.turnStartTime) / 1000) : 0;
+    const elapsed = table.turnStartTime ? Math.floor((Date.now() - table.turnStartTime) / 1000) : 0;
     const turnTimeRemaining = Math.max(0, 30 - elapsed);
 
-    const allPlayersData = mainTable.players.map(id => {
-        const p = mainTable.playerManager.getPlayer(id);
+    const allPlayersData = table.players.map(id => {
+        const p = table.playerManager.getPlayer(id);
         const isDealer = id === dealerPlayerId;
         return {
             id,
@@ -60,22 +81,22 @@ function getTableStatus(req, res) {
         };
     });
 
-    const spectatorsData = mainTable.spectators;
+    const spectatorsData = table.spectators;
 
     return res.status(200).json({
-        tableId: mainTable.tableId,
-        skillLevel: mainTable.skillLevel,
-        playerCount: mainTable.getPlayerCount(),
-        spectatorCount: mainTable.getSpectatorCount(),
-        maxPlayers: mainTable.maxPlayers,
+        tableId: table.tableId,
+        skillLevel: table.skillLevel,
+        playerCount: table.getPlayerCount(),
+        spectatorCount: table.getSpectatorCount(),
+        maxPlayers: table.maxPlayers,
         players: allPlayersData,
         spectators: spectatorsData,
         inTable,
         isPlayer,
         isSpectator,
-        gameStarted: mainTable.gameStarted,
-        gameInProgress: mainTable.gameInProgress,
-        pot: mainTable.pot,
+        gameStarted: table.gameStarted,
+        gameInProgress: table.gameInProgress,
+        pot: table.pot,
         playerChips,
         playerBet,
         playerHasActed,
@@ -83,8 +104,8 @@ function getTableStatus(req, res) {
         isCurrentTurn,
         buttonsBlocked,
         turnTimeRemaining,
-        currentHighestBet: mainTable.currentHighestBet,
-        communityCards: mainTable.displayCards(),
+        currentHighestBet: table.currentHighestBet,
+        communityCards: table.displayCards(),
         playerHand
     });
 }
@@ -98,6 +119,12 @@ function broadcastTableUpdate(req) {
 }
 
 function joinTable(req, res) {
+    const table = getRequestedTable(req);
+
+    if (!table) {
+        return res.status(404).json({ error: "Table not found." });
+    }
+
     const playerId = req.body.playerId || req.query.playerId;
 
     if (typeof playerId !== "string" || !playerId.trim()) {
@@ -106,36 +133,44 @@ function joinTable(req, res) {
 
     const id = playerId.trim();
 
-    if (mainTable.hasPlayer(id)) {
+    if (table.hasPlayer(id)) {
         return res.status(200).json({
             message: "Player is already at the table.",
-            isPlayer: mainTable.players.includes(id)
+            isPlayer: table.players.includes(id)
         });
     }
 
-    if (!mainTable.addPlayer(id)) {
+    if (!table.addPlayer(id)) {
         return res.status(409).json({ error: "Could not add player to table." });
     }
 
-    const isPlayer = mainTable.players.includes(id);
+    const isPlayer = table.players.includes(id);
     
     broadcastTableUpdate(req); // Notify all clients of the table update
 
     return res.status(200).json({
         message: isPlayer ? "Successfully joined the table as a player." : "Game in progress. Added to spectator queue.",
+        tableId: table.tableId,
         isPlayer,
-        playerCount: mainTable.getPlayerCount()
+        playerCount: table.getPlayerCount()
     });
 }
 
 function leaveTable(req, res) {
+    // Retrieve requested table
+    const table = getRequestedTable(req);
+
+    if (!table) {
+        return res.status(404).json({ error: "Table not found." });
+    }
+
     const playerId = req.body.playerId || req.query.playerId;
 
     if (typeof playerId !== "string" || !playerId.trim()) {
         return res.status(400).json({ error: "Player ID is required." });
     }
 
-    if (!mainTable.removePlayer(playerId.trim())) {
+    if (!table.removePlayer(playerId.trim())) {
         return res.status(404).json({ error: "Player is not in this table." });
     }
 
@@ -143,27 +178,34 @@ function leaveTable(req, res) {
 
     return res.status(200).json({
         message: "Successfully left the table.",
-        playerCount: mainTable.getPlayerCount()
+        playerCount: table.getPlayerCount()
     });
 }
 
 function startGame(req, res) {
-    const result = mainTable.startGame();
+    const table = getRequestedTable(req);
+
+    if (!table) {
+        return res.status(404).json({ error: "Table not found." });
+    }
+
+    const result = table.startGame();
+
     if (!result.success) {
         return res.status(400).json({ error: result.error });
     }
-
+    
     broadcastTableUpdate(req); // Notify all clients of the table update
 
-    const playerId = req.body.playerId || req.query.playerId || mainTable.players[0];
-    const playerHand = mainTable.dealHandToPlayer(playerId);
-    const currentTurnPlayer = mainTable.players[mainTable.currentTurnIndex];
-    const elapsed = mainTable.turnStartTime ? Math.floor((Date.now() - mainTable.turnStartTime) / 1000) : 0;
+    const playerId = req.body.playerId || req.query.playerId || table.players[0];
+    const playerHand = table.dealHandToPlayer(playerId);
+    const currentTurnPlayer = table.players[table.currentTurnIndex];
+    const elapsed = table.turnStartTime ? Math.floor((Date.now() - table.turnStartTime) / 1000) : 0;
     const turnTimeRemaining = Math.max(0, 30 - elapsed);
 
     return res.status(200).json({
         message: "Game started successfully.",
-        communityCards: mainTable.displayCards(),
+        communityCards: table.displayCards(),
         playerHand: playerHand ? playerHand.map(card => Deck.cardToText(card)) : [],
         currentTurnPlayer,
         turnTimeRemaining
@@ -171,44 +213,57 @@ function startGame(req, res) {
 }
 
 function playerAction(req, res) {
+    const table = getRequestedTable(req);
+
+    if (!table) {
+        return res.status(404).json({ error: "Table not found." });
+    }
+
+    
     const { playerId, action, amount } = req.body;
     if (!playerId || !action) {
         return res.status(400).json({ error: "Player ID and action are required." });
     }
 
-    const result = mainTable.recordAction(playerId, action, Number(amount) || 0);
+    const result = table.recordAction(playerId, action, Number(amount) || 0);
     if (!result.success) {
         return res.status(400).json({ error: result.error });
     }
 
     broadcastTableUpdate(req); // Notify all clients of the table update
 
-    const p = mainTable.playerManager.getPlayer(playerId);
+    const p = table.playerManager.getPlayer(playerId);
     const winnerData = result.winnerData;
     if (winnerData && winnerData.winners) {
-        mainTable.resetToLobby();
+        table.resetToLobby();
     }
 
     return res.status(200).json({
         message: `Action ${action} recorded successfully.`,
         chips: p ? p.chips : 0,
         currentBet: p ? p.currentBet : 0,
-        pot: mainTable.pot,
+        pot: table.pot,
         winnerData,
-        communityCards: mainTable.displayCards()
+        communityCards: table.displayCards()
     });
 }
 
 function nextRound(req, res) {
-    const result = mainTable.nextRound();
+    const table = getRequestedTable(req);
+
+    if (!table) {
+        return res.status(404).json({ error: "Table not found." });
+    }
+
+    const result = table.nextRound();
     if (result.error) {
         return res.status(400).json({ error: result.error });
     }
 
     const playerId = req.query.playerId;
     let playerHand = [];
-    if (playerId && mainTable.players.includes(playerId)) {
-        let hand = mainTable.dealHandToPlayer(playerId);
+    if (playerId && table.players.includes(playerId)) {
+        let hand = table.dealHandToPlayer(playerId);
         if (hand) {
             playerHand = hand.map(card => Deck.cardToText(card));
         }
@@ -216,7 +271,7 @@ function nextRound(req, res) {
 
     const winnerData = result.winnerData;
     if (winnerData && winnerData.winners) {
-        mainTable.resetToLobby();
+        table.resetToLobby();
     }
 
     broadcastTableUpdate(req); // Notify all clients of the table update

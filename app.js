@@ -63,6 +63,14 @@ app.post("/api/table/action", playerAction);
 app.post("/api/table/start", startGame);
 app.get("/api/table/next-round", nextRound);
 
+// Table Actions (Multiple Tables)
+app.get("/api/tables/:tableId/status", getTableStatus);
+app.post("/api/tables/:tableId/join", joinTable);
+app.post("/api/tables/:tableId/leave", leaveTable);
+app.post("/api/tables/:tableId/action", playerAction);
+app.post("/api/tables/:tableId/start", startGame);
+app.get("/api/tables/:tableId/next-round", nextRound);
+
 // Game History Route for Admin Dashboard
 const GameDao = require("./model/GameDao");
 app.get('/api/games', async (req, res) => {
