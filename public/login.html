@@ -1,7 +1,7 @@
 <!--
   ============================================================================
   File Name: login.html
-  Author: Bonita Rodrigues
+  Author: Bonita Rodrigues, Gigi Li
   Purpose: User authentication and login interface for the Texas Hold'em web 
              application. Collects credentials, submits them securely to the 
              backend login controller, and displays error messaging upon failure.
@@ -129,6 +129,14 @@
                                         <button type="submit" class="btn btn-login-gradient">Login</button>
                                     </div>
                                 </form>
+
+                                <!-- Play as Guest Option -->
+                                <div class="guest-btn-container">
+                                    <p class="text-muted small mb-2">Want to jump right in without an account?</p>
+                                    <button type="button" class="btn btn-guest shadow-none" onclick="playAsGuest()">
+                                        <i class="bi bi-person-badge me-2"></i> Play as Guest
+                                    </button>
+                                </div>
 
                                 <!-- Error Display Area -->
                                 <div class="mt-3" id="msg-display"></div>

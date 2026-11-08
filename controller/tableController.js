@@ -1,10 +1,8 @@
-/**
- * ============================================================================
- * File Name: tableController.js
- * Purpose: Express controller endpoints for table actions using safe 
- *          player lookups (`mainTable.playerManager.getPlayer`).
- * ============================================================================
- */
+// ============================================================================
+// File Name: tableController.js
+// Purpose: Express controller endpoints for table actions using safe 
+//          player lookups, muck preferences, and returning showdown data.
+// ============================================================================
 
 const ActiveTable = require("../model/activeTable");
 const Deck = require("../util/pokerLogic");
@@ -64,7 +62,21 @@ function getTableStatus(req, res) {
     const currentTurnPlayer = (table.gameInProgress && table.players.length > 0) ? table.players[table.currentTurnIndex] : null;
     const dealerPlayerId = (table.gameInProgress && table.players.length > 0) ? table.players[table.dealerIndex] : null;
     const isCurrentTurn = playerId === currentTurnPlayer;
-    const buttonsBlocked = !isPlayer || isSpectator || !table.gameInProgress || !isCurrentTurn || playerHasActed;
+    const buttonsBlocked = !isPlayer || isSpectator || !mainTable.gameInProgress || !isCurrentTurn || playerHasActed;
+
+    let canCheck = false;
+    let canCall = false;
+    if (isCurrentTurn && !buttonsBlocked) {
+        const currentPlayer = mainTable.playerManager.getPlayer(playerId);
+        if (currentPlayer) {
+            canCheck = (currentPlayer.currentBet === mainTable.currentHighestBet);
+            const callAmountNeeded = mainTable.currentHighestBet - currentPlayer.currentBet;
+            canCall = (callAmountNeeded > 0 && currentPlayer.chips >= callAmountNeeded);
+            if (callAmountNeeded > 0 && currentPlayer.chips > 0) {
+                canCall = true;
+            }
+        }
+    }
 
     const elapsed = table.turnStartTime ? Math.floor((Date.now() - table.turnStartTime) / 1000) : 0;
     const turnTimeRemaining = Math.max(0, 30 - elapsed);
@@ -75,7 +87,7 @@ function getTableStatus(req, res) {
         return {
             id,
             chips: p ? p.chips : 1000,
-            status: p && p.folded ? "Folded" : (p && p.hasActed ? "Acted" : "Active"),
+            status: p && p.folded ? "Folded" : (p && p.chips === 0 ? "All-In" : (p && p.hasActed ? "Acted" : "Active")),
             isCurrent: id === playerId,
             isDealer
         };
@@ -112,6 +124,8 @@ function getTableStatus(req, res) {
         currentTurnPlayer,
         isCurrentTurn,
         buttonsBlocked,
+        canCheck,
+        canCall,
         turnTimeRemaining,
         currentHighestBet: table.currentHighestBet,
         communityCards: table.displayCards(),
@@ -120,7 +134,7 @@ function getTableStatus(req, res) {
 }
 
 //helper function to broadcast table updates to all connected clients
-function broadcastTableUpdate(req, tableId=null) {
+function broadcastTableUpdate(req) {
     const io = req.app.get('io');
     if (io) {
         io.emit('TABLE_UPDATED', { tableId });
@@ -295,6 +309,7 @@ function startGame(req, res) {
 }
 
 function playerAction(req, res) {
+    const { playerId, action, amount, muckPreference } = req.body;
     const table = getRequestedTable(req);
 
     if (!table) {
@@ -307,6 +322,16 @@ function playerAction(req, res) {
         return res.status(400).json({ error: "Player ID and action are required." });
     }
 
+    const p = mainTable.playerManager.getPlayer(playerId);
+    if (p && typeof muckPreference === 'boolean') {
+        p.muckPreference = muckPreference;
+    }
+
+    const p = mainTable.playerManager.getPlayer(playerId);
+    if (p && typeof muckPreference === 'boolean') {
+        p.muckPreference = muckPreference;
+    }
+
     const result = table.recordAction(playerId, action, Number(amount) || 0);
     if (!result.success) {
         return res.status(400).json({ error: result.error });
@@ -317,8 +342,14 @@ function playerAction(req, res) {
     const p = table.playerManager.getPlayer(playerId);
     const winnerData = result.winnerData;
     if (winnerData && winnerData.winners) {
-        table.resetToLobby();
+        const io = req.app.get('io');
+        if (io) {
+            io.to(`table_${mainTable.tableId}`).emit('SHOWDOWN_REVEAL', winnerData);
+        }
+        mainTable.resetToLobby();
     }
+
+    broadcastTableUpdate(req);
 
     return res.status(200).json({
         message: `Action ${action} recorded successfully.`,
@@ -353,6 +384,11 @@ function nextRound(req, res) {
 
     const winnerData = result.winnerData;
     if (winnerData && winnerData.winners) {
+        const io = req.app.get('io');
+        if (io) {
+            io.to(`table_${mainTable.tableId}`).emit('SHOWDOWN_REVEAL', winnerData);
+        }
+        mainTable.resetToLobby();
         table.resetToLobby();
     }
 
@@ -367,4 +403,23 @@ function nextRound(req, res) {
     });
 }
 
-module.exports = { createTable, joinTable, leaveTable, startGame, playerAction, nextRound, getTableStatus, tableManager, mainTable };
+function finishGame(req, res) {
+    const result = mainTable.finishGame();
+    if (!result.success) {
+        return res.status(400).json({ error: result.error });
+    }
+
+    const io = req.app.get('io');
+    if (io) {
+        io.to(`table_${mainTable.tableId}`).emit('SHOWDOWN_REVEAL', result.winnerData);
+    }
+
+    broadcastTableUpdate(req);
+
+    return res.status(200).json({
+        message: "Game finished successfully.",
+        winnerData: result.winnerData
+    });
+}
+
+module.exports = { createTable, joinTable, leaveTable, startGame, finishGame, playerAction, nextRound, getTableStatus, tableManager, mainTable };

@@ -1,7 +1,7 @@
 <!--
   ============================================================================
   File Name: lobby.html
-  Author: Camila Cosme
+  Author: Camila Cosme, Gigi Li
   Purpose: Standalone poker lobby page displaying active tables and stakes, 
              with integrated offcanvas seating buy-in controls.
   ============================================================================
@@ -35,16 +35,24 @@
         <nav class="navbar navbar-expand-sm custom-navbar px-3" data-bs-theme="dark"> 
             <div class="container-fluid">
                 <ul class="navbar-nav me-auto">
-                    <li class="nav-item me-3">
+                    <li class="nav-item me-3" id="dashboard-nav-item">
                         <a class="nav-link fw-semibold text-white" href="index.html"><span class="bi-house-fill me-1"></span> Dashboard</a>
                     </li>
                     <li class="nav-item">
                         <a class="nav-link active fw-semibold text-white" href="lobby.html"><span class="bi-dice-5-fill me-1"></span> Poker Lobby</a>
                     </li>
                 </ul>
-                <ul class="navbar-nav">
+                <ul class="navbar-nav align-items-center">
+                    <!-- Guest Save Points Option (Hidden by default, shown for guests) -->
+                    <li class="nav-item me-3" id="lobby-save-container" style="display: none;">
+                        <button type="button" id="lobby-save-btn" class="btn btn-save-points shadow-none">
+                            <i class="bi bi-person-plus-fill me-1"></i> Save Points (Sign Up)
+                        </button>
+                    </li>
                     <li class="nav-item">
-                        <a class="nav-link text-white" href="login.html"><span class="bi-box-arrow-right me-1"></span> Logout</a>
+                        <a class="nav-link text-white" href="/logout" id="logout-link">
+                            <span class="bi bi-box-arrow-right me-1"></span> Logout
+                        </a>
                     </li>
                 </ul>
             </div>
@@ -239,32 +247,35 @@
                 <button type="button" class="btn-close btn-close-white shadow-none" data-bs-dismiss="offcanvas" aria-label="Close"></button>
             </div>
             <div class="offcanvas-body d-flex flex-column">
+                <!-- Sidebar: Table Configurations and Buy-In -->
                 <form id="joinTableForm" action="tableDisplay.html" method="GET">
                     <div class="mb-3">
-                        <label class="form-label small fw-semibold text-info">Selected Table</label>
-                        <input type="text" class="form-control midnight-input text-white" id="sidebarTableName" readonly>
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label small fw-semibold text-info">Table Blinds</label>
-                        <input type="text" class="form-control midnight-input text-white" id="sidebarTableBlinds" readonly>
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label small fw-semibold text-info">Minimum Buy-in Required</label>
-                        <input type="text" class="form-control midnight-input text-white" id="sidebarTableMinBuyin" readonly>
+                        <div class="p-3 rounded-3 midnight-input">
+                            <label class="form-label small fw-semibold text-info">
+                                Selected Table
+                            </label>
+                            <h5 class="text-white mb-3" id="sidebarTableName">
+                                Beginner Table 1
+                            </h5>
+
+                            <div class="d-flex justify-content-between">
+                                <div>
+                                    <small class="text-info">Table Blinds</small>
+                                    <p class="text-white fw-semibold mb-0"
+                                    id="sidebarTableBlinds">10 / 20</p>
+                                </div>
+
+                                <div class="text-end">
+                                    <small class="text-info">Minimum Buy-in</small>
+                                    <p class="text-white fw-semibold mb-0"
+                                    id="sidebarTableMinBuyin">$500</p>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                     <div class="mb-3">
                         <label for="buyInAmount" class="form-label small fw-semibold text-info">Your Buy-in Amount ($)</label>
                         <input type="number" class="form-control midnight-input text-white shadow-none" id="buyInAmount" name="buyInAmount" value="1000" required>
-                    </div>
-                    <div class="mb-3">
-                        <label for="seatPreference" class="form-label small fw-semibold text-info">Preferred Seat Position</label>
-                        <select class="form-select midnight-input text-white shadow-none" id="seatPreference" name="seat">
-                            <option value="random" class="midnight-option">Auto-Assign (Random Open Seat)</option>
-                            <option value="1" class="midnight-option">Seat 1 (Dealer)</option>
-                            <option value="2" class="midnight-option">Seat 2</option>
-                            <option value="3" class="midnight-option">Seat 3</option>
-                            <option value="4" class="midnight-option">Seat 4</option>
-                        </select>
                     </div>
                     <div class="mt-auto pt-3">
                         <button type="submit" class="btn btn-primary w-100 py-2 fw-bold shadow">Take Your Seat & Play</button>
@@ -278,36 +289,6 @@
             <p class="mb-0">Powerpuff Girls Inc. -- CS Department</p>
         </div>
 
-        <script>
-            let joinSidebar;
-            document.addEventListener("DOMContentLoaded", function() {
-                const sidebarElement = document.getElementById('joinGameSidebar');
-                if (sidebarElement) {
-                    joinSidebar = new bootstrap.Offcanvas(sidebarElement);
-                }
-            });
-
-            function openJoinSidebar(tableName, blinds, minBuyin) {
-                document.getElementById('sidebarTableName').value = tableName;
-                document.getElementById('sidebarTableBlinds').value = blinds;
-                document.getElementById('sidebarTableMinBuyin').value = minBuyin;
-                let numericBuyin = parseInt(minBuyin.replace(/[^0-9]/g, '')) || 1000;
-                document.getElementById('buyInAmount').value = numericBuyin;
-                document.getElementById('buyInAmount').min = numericBuyin;
-                if (joinSidebar) joinSidebar.show();
-            }
-
-            function togglePublicLobbies() {
-                const section = document.getElementById('publicLobbiesSection');
-                section.classList.toggle('d-none');
-                if (!section.classList.contains('d-none')) {
-                    section.scrollIntoView({
-                        behavior: 'smooth',
-                        block: 'start'
-                    });
-                }
-            }
-            
-        </script>
+        <script src="lobby.js"></script>
     </body>
 </html>

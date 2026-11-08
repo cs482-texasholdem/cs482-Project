@@ -1,7 +1,7 @@
 /**
  * ============================================================================
  * File Name: index.js
- * Author: Bonita Rodrigues
+ * Author: Bonita Rodrigues, Gigi Li
  * Purpose: Frontend controller script for the User Dashboard homepage. Manages 
  *          dynamic user profile/points loading, user search capabilities, and 
  *          asynchronous friend list/request rendering directly on the dashboard.
@@ -12,6 +12,18 @@
 // DOM Content Loaded Initialization
 // ============================================================================
 document.addEventListener("DOMContentLoaded", async function() {
+
+    //Clear local storage and disconnect socket on logout to prevent session persistence
+    const logoutLink = document.getElementById("logout-link");
+    if (logoutLink) {
+        logoutLink.addEventListener("click", () => {
+            localStorage.clear();
+            sessionStorage.clear();
+            if (typeof socket !== 'undefined' && socket) {
+                socket.disconnect();
+            }
+        });
+    }
     
     // ------------------------------------------------------------------------
     // 1. Fetch & Populate Logged-In User Profile & Points

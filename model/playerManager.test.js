@@ -1,4 +1,5 @@
 const PlayerManager = require('./playerManager.js');
+Player = PlayerManager.Player
 
 describe('Player & PlayerManager Classes', () => {
   let manager;

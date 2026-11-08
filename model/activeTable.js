@@ -2,7 +2,8 @@
  * ============================================================================
  * File Name: activeTable.js
  * Purpose: Manages table session, records action history, tracks positional 
- *          indices (dealer, blinds, seating order), and persists game records.
+ *          indices, persists game records, manages multi-tier side-pots, and 
+ *          respects player muck preferences during showdown reveals.
  * ============================================================================
  */
 
@@ -12,18 +13,29 @@ const GameDao = require("./GameDao");
 
 class PotManager {
     constructor() {
-        this.pot = 0;
+        this.pots = [{ amount: 0, eligiblePlayers: [] }];
         this.currentHighestBet = 0;
     }
 
+    get pot() {
+        return this.pots.reduce((sum, p) => sum + p.amount, 0);
+    }
+
+    set pot(val) {
+        if (this.pots.length > 0) {
+            this.pots[0].amount = val;
+        } else {
+            this.pots = [{ amount: val, eligiblePlayers: [] }];
+        }
+    }
+
     reset() {
-        this.pot = 0;
+        this.pots = [{ amount: 0, eligiblePlayers: [] }];
         this.currentHighestBet = 0;
     }
 
     postBlinds(players, playerManager, dealerIndex) {
-        this.pot = 0;
-        this.currentHighestBet = 0;
+        this.reset();
         const n = players.length;
         if (n < 2) return { sbIndex: 0, bbIndex: 0 };
 
@@ -37,7 +49,7 @@ class PotManager {
             const sbAmount = Math.min(10, sbPlayer.chips);
             sbPlayer.chips -= sbAmount;
             sbPlayer.currentBet = sbAmount;
-            this.pot += sbAmount;
+            sbPlayer.totalHandContribution = (sbPlayer.totalHandContribution || 0) + sbAmount;
         }
 
         if (bbPlayer) {
@@ -45,23 +57,107 @@ class PotManager {
             bbPlayer.chips -= bbAmount;
             bbPlayer.currentBet = bbAmount;
             this.currentHighestBet = bbAmount;
-            this.pot += bbAmount;
+            bbPlayer.totalHandContribution = (bbPlayer.totalHandContribution || 0) + bbAmount;
         }
 
         return { sbIndex, bbIndex };
     }
 
-    distributePot(winners, playerManager) {
-        if (winners.length > 0 && this.pot > 0) {
-            const share = Math.floor(this.pot / winners.length);
-            for (const winId of winners) {
-                const winnerPlayer = playerManager.getPlayer(winId);
-                if (winnerPlayer) {
-                    winnerPlayer.chips += share;
-                }
+    buildPots(players, playerManager) {
+        const contributions = [];
+        for (const pid of players) {
+            const p = playerManager.getPlayer(pid);
+            if (p) {
+                contributions.push({
+                    playerId: pid,
+                    contribution: p.totalHandContribution || 0,
+                    folded: p.folded
+                });
             }
         }
-        return this.pot;
+
+        const thresholds = [...new Set(contributions.map(c => c.contribution))]
+            .filter(c => c > 0)
+            .sort((a, b) => a - b);
+
+        let newPots = [];
+        let previousThreshold = 0;
+
+        for (const threshold of thresholds) {
+            let potAmount = 0;
+            let eligible = [];
+
+            for (const c of contributions) {
+                const contribAtTier = Math.min(c.contribution, threshold) - Math.min(c.contribution, previousThreshold);
+                if (contribAtTier > 0) {
+                    potAmount += contribAtTier;
+                }
+                if (c.contribution >= threshold && !c.folded) {
+                    eligible.push(c.playerId);
+                }
+            }
+
+            if (potAmount > 0) {
+                newPots.push({ amount: potAmount, eligiblePlayers: eligible });
+            }
+            previousThreshold = threshold;
+        }
+
+        if (newPots.length === 0) {
+            newPots.push({ amount: 0, eligiblePlayers: players.filter(id => !playerManager.getPlayer(id)?.folded) });
+        }
+
+        this.pots = newPots;
+    }
+
+    distributePot(winners, playerManager, commonCards, playerHands) {
+        let totalDistributed = 0;
+
+        for (const potObj of this.pots) {
+            if (potObj.amount <= 0 || potObj.eligiblePlayers.length === 0) continue;
+
+            const eligibleWinners = winners.filter(wId => potObj.eligiblePlayers.includes(wId));
+
+            if (eligibleWinners.length === 0) {
+                let bestEligibleScore = -1;
+                let potWinners = [];
+
+                for (const eId of potObj.eligiblePlayers) {
+                    const hand = playerHands.get(eId);
+                    if (!hand) continue;
+                    const score = Deck.bestHand(hand, commonCards);
+                    if (score > bestEligibleScore) {
+                        bestEligibleScore = score;
+                        potWinners = [eId];
+                    } else if (score === bestEligibleScore) {
+                        potWinners.push(eId);
+                    }
+                }
+
+                if (potWinners.length > 0) {
+                    const share = Math.floor(potObj.amount / potWinners.length);
+                    const remainder = potObj.amount % potWinners.length;
+                    potWinners.forEach((wId, idx) => {
+                        const wp = playerManager.getPlayer(wId);
+                        if (wp) {
+                            wp.chips += share + (idx === 0 ? remainder : 0);
+                        }
+                    });
+                }
+            } else {
+                const share = Math.floor(potObj.amount / eligibleWinners.length);
+                const remainder = potObj.amount % eligibleWinners.length;
+                eligibleWinners.forEach((wId, idx) => {
+                    const wp = playerManager.getPlayer(wId);
+                    if (wp) {
+                        wp.chips += share + (idx === 0 ? remainder : 0);
+                    }
+                });
+            }
+            totalDistributed += potObj.amount;
+        }
+
+        return totalDistributed;
     }
 }
 
@@ -92,6 +188,21 @@ class ActiveTable {
         this.aggressorIndex = 0;
         this.gameCount = 0;
         this.turnStartTime = null;
+
+        this.isLocked = false;
+        this.turnToken = 0;
+    }
+
+    _acquireLock(callback) {
+        if (this.isLocked) {
+            return { success: false, error: "Table state is currently updating. Please try again." };
+        }
+        this.isLocked = true;
+        try {
+            return callback();
+        } finally {
+            this.isLocked = false;
+        }
     }
 
     isFull() { return this.playerManager.isFull(); }
@@ -106,53 +217,40 @@ class ActiveTable {
     }
 
     removePlayer(playerId) {
-        const pIndex = this.playerManager.players.indexOf(playerId);
-        const isCurrentTurnPlayer = (this.gameInProgress && pIndex !== -1 && this.currentTurnIndex === pIndex);
+        return this._acquireLock(() => {
+            const pIndex = this.playerManager.players.indexOf(playerId);
+            const isCurrentTurnPlayer = (this.gameInProgress && pIndex !== -1 && this.currentTurnIndex === pIndex);
 
-        if (this.gameInProgress) {
-            const res = this.playerManager.removePlayer(playerId, this.gameInProgress);
-            const aggressorId = this.playerManager.players[this.aggressorIndex];
-            const aggressorPlayer = this.playerManager.getPlayer(aggressorId);
-            
-            if (aggressorPlayer && this.players.indexOf(playerId) === this.aggressorIndex) {
-                let idx = this.aggressorIndex;
-                let safety = 0;
-                do {
-                    idx = (idx + 1) % this.playerManager.players.length;
-                    const nextId = this.playerManager.players[idx];
-                    const nextP = this.playerManager.getPlayer(nextId);
-                    if (nextP && !nextP.folded) break;
-                    safety++;
-                } while (safety < this.playerManager.players.length);
-                this.aggressorIndex = idx;
-            }
+            if (this.gameInProgress) {
+                const res = this.playerManager.removePlayer(playerId, this.gameInProgress);
+                if (isCurrentTurnPlayer) {
+                    let safety = 0;
+                    do {
+                        this.currentTurnIndex = (this.currentTurnIndex + 1) % this.playerManager.players.length;
+                        const currentId = this.playerManager.players[this.currentTurnIndex];
+                        const currentP = this.playerManager.getPlayer(currentId);
+                        if (currentP && !currentP.folded) break;
+                        safety++;
+                    } while (safety < this.playerManager.players.length);
 
-            if (isCurrentTurnPlayer) {
-                let safety = 0;
-                do {
-                    this.currentTurnIndex = (this.currentTurnIndex + 1) % this.playerManager.players.length;
-                    const currentId = this.playerManager.players[this.currentTurnIndex];
-                    const currentP = this.playerManager.getPlayer(currentId);
-                    if (currentP && !currentP.folded) break;
-                    safety++;
-                } while (safety < this.playerManager.players.length);
+                    this.turnStartTime = Date.now();
+                    this.turnToken++;
 
-                this.turnStartTime = Date.now();
+                    const activeNonFolded = this.playerManager.players
+                        .map(id => this.playerManager.getPlayer(id))
+                        .filter(p => p && !p.folded);
 
-                const activeNonFolded = this.playerManager.players
-                    .map(id => this.playerManager.getPlayer(id))
-                    .filter(p => p && !p.folded);
-
-                if (activeNonFolded.length <= 1) {
-                    this.handleWinner();
-                } else if (this.allPlayersHaveActedAndMatched()) {
-                    this.nextRound();
+                    if (activeNonFolded.length <= 1) {
+                        this.handleWinner();
+                    } else if (this.allPlayersHaveActedAndMatched()) {
+                        this.nextRound();
+                    }
                 }
+                return res;
             }
-            return res;
-        }
 
-        return this.playerManager.removePlayer(playerId, this.gameInProgress);
+            return this.playerManager.removePlayer(playerId, this.gameInProgress);
+        });
     }
 
     get queue() { return this.playerManager.queue; }
@@ -171,13 +269,25 @@ class ActiveTable {
     set currentHighestBet(val) { this.potManager.currentHighestBet = val; }
 
     startGame() {
-        if (this.playerManager.players.length < 2) {
-            return { success: false, error: "At least 2 players are required to start the game." };
-        }
-        this.gameStarted = true;
-        this.gameInProgress = true;
-        this.newGameSession();
-        return { success: true };
+        return this._acquireLock(() => {
+            if (this.playerManager.players.length < 2) {
+                return { success: false, error: "At least 2 players are required to start the game." };
+            }
+            this.gameStarted = true;
+            this.gameInProgress = true;
+            this.newGameSession();
+            return { success: true };
+        });
+    }
+
+    finishGame() {
+        return this._acquireLock(() => {
+            if (!this.gameInProgress) {
+                return { success: false, error: "No game in progress to finish." };
+            }
+            const winnerData = this.handleWinner();
+            return { success: true, winnerData };
+        });
     }
 
     dealHandToPlayer(playerId) {
@@ -197,43 +307,60 @@ class ActiveTable {
     }
 
     checkTimeout() {
-        if (!this.gameInProgress || this.playerManager.players.length === 0) return false;
-        const now = Date.now();
-        if (this.turnStartTime && (now - this.turnStartTime >= 30000)) {
-            const currentId = this.playerManager.players[this.currentTurnIndex];
-            const player = this.playerManager.getPlayer(currentId);
-            if (player && !player.folded && !player.hasActed) {
-                const canCheck = (player.currentBet === this.currentHighestBet);
-                const action = canCheck ? "Check" : "Fold";
+        return this._acquireLock(() => {
+            if (!this.gameInProgress || this.playerManager.players.length === 0) return false;
+            const now = Date.now();
+            
+            if (this.turnStartTime && (now - this.turnStartTime >= 30000)) {
+                const currentId = this.playerManager.players[this.currentTurnIndex];
+                const player = this.playerManager.getPlayer(currentId);
                 
-                const timeouts = (this.playerManager.consecutiveTimeouts.get(currentId) || 0) + 1;
-                this.playerManager.consecutiveTimeouts.set(currentId, timeouts);
+                if (player && !player.folded && !player.hasActed) {
+                    const canCheck = (player.currentBet === this.currentHighestBet);
+                    const action = canCheck ? "Check" : "Fold";
+                    
+                    const timeouts = (this.playerManager.consecutiveTimeouts.get(currentId) || 0) + 1;
+                    this.playerManager.consecutiveTimeouts.set(currentId, timeouts);
 
-                this.recordAction(currentId, action, 0);
+                    this._executeActionInternal(currentId, action, 0);
 
-                if (timeouts >= 2) {
-                    this.removePlayer(currentId);
+                    if (timeouts >= 2) {
+                        this.removePlayer(currentId);
+                    }
+                    return true;
                 }
-                return true;
             }
-        }
-        return false;
+            return false;
+        });
     }
 
     recordAction(playerId, action, amount = 0) {
-        const player = this.playerManager.getPlayer(playerId);
-        if (!player || player.folded || !this.playerManager.players.includes(playerId)) {
-            return { success: false, error: "Invalid player or inactive in this round." };
-        }
-        if (this.playerManager.players[this.currentTurnIndex] !== playerId) {
-            return { success: false, error: "Not your turn." };
-        }
-        if (player.hasActed && action !== "Raise") return { success: false, error: "You have already acted this round." };
+        return this._acquireLock(() => {
+            const player = this.playerManager.getPlayer(playerId);
+            if (!player || !this.playerManager.players.includes(playerId)) {
+                return { success: false, error: "Invalid player or inactive in this round." };
+            }
+            if (action !== "Fold" && player.folded) {
+                return { success: false, error: "Player has already folded." };
+            }
+            if (action !== "Fold" && this.playerManager.players[this.currentTurnIndex] !== playerId) {
+                return { success: false, error: "Not your turn." };
+            }
+            if (action !== "Fold" && player.hasActed && action !== "Raise") {
+                return { success: false, error: "You have already acted this round." };
+            }
 
+            return this._executeActionInternal(playerId, action, amount);
+        });
+    }
+
+    _executeActionInternal(playerId, action, amount = 0) {
+        const player = this.playerManager.getPlayer(playerId);
         this.playerManager.consecutiveTimeouts.set(playerId, 0);
 
         if (action === "Fold") {
             player.folded = true;
+            player.mucked = true;
             if (this.playerManager.players.indexOf(playerId) === this.aggressorIndex) {
                 let idx = this.aggressorIndex;
                 let safety = 0;
@@ -250,23 +377,32 @@ class ActiveTable {
         } else if (action === "Call") {
             const diff = this.currentHighestBet - player.currentBet;
             if (player.chips < diff) {
-                return { success: false, error: "Not enough chips to call." };
+                const allInAmount = player.chips;
+                player.chips = 0;
+                player.currentBet += allInAmount;
+                player.totalHandContribution = (player.totalHandContribution || 0) + allInAmount;
+            } else {
+                player.chips -= diff;
+                player.currentBet += diff;
+                player.totalHandContribution = (player.totalHandContribution || 0) + diff;
             }
-            player.chips -= diff;
-            player.currentBet += diff;
-            this.potManager.pot += diff;
         } else if (action === "Raise") {
             if (amount <= this.currentHighestBet) {
                 return { success: false, error: "Raise amount must exceed current highest bet." };
             }
             const diff = amount - player.currentBet;
             if (player.chips < diff) {
-                return { success: false, error: "Not enough chips to raise." };
+                const allInAmount = player.chips;
+                player.chips = 0;
+                player.currentBet += allInAmount;
+                player.totalHandContribution = (player.totalHandContribution || 0) + allInAmount;
+                this.potManager.currentHighestBet = player.currentBet;
+            } else {
+                player.chips -= diff;
+                player.currentBet = amount;
+                this.potManager.currentHighestBet = amount;
+                player.totalHandContribution = (player.totalHandContribution || 0) + diff;
             }
-            player.chips -= diff;
-            player.currentBet = amount;
-            this.potManager.currentHighestBet = amount;
-            this.potManager.pot += diff;
             this.aggressorIndex = this.playerManager.players.indexOf(playerId);
             for (const id of this.playerManager.players) {
                 if (id !== playerId) {
@@ -276,7 +412,11 @@ class ActiveTable {
             }
         }
 
-        player.hasActed = true;
+        if (action !== "Fold") {
+            player.hasActed = true;
+        }
+
+        this.potManager.buildPots(this.playerManager.players, this.playerManager);
 
         this.actionHistory.push({
             playerId,
@@ -299,13 +439,16 @@ class ActiveTable {
             return { success: true, roundAdvanced: true, ...roundResult };
         }
 
-        let safety = 0;
-        do {
-            this.currentTurnIndex = (this.currentTurnIndex + 1) % this.playerManager.players.length;
-            safety++;
-        } while (this.playerManager.getPlayer(this.playerManager.players[this.currentTurnIndex])?.folded && safety < this.playerManager.players.length);
+        if (action !== "Fold") {
+            let safety = 0;
+            do {
+                this.currentTurnIndex = (this.currentTurnIndex + 1) % this.playerManager.players.length;
+                safety++;
+            } while (this.playerManager.getPlayer(this.playerManager.players[this.currentTurnIndex])?.folded && safety < this.playerManager.players.length);
+        }
 
         this.turnStartTime = Date.now();
+        this.turnToken++;
 
         return { success: true, roundAdvanced: false };
     }
@@ -318,7 +461,7 @@ class ActiveTable {
         if (activeNonFolded.length <= 1) return true;
 
         for (const p of activeNonFolded) {
-            if (!p.hasActed || p.currentBet !== this.currentHighestBet) {
+            if (!p.folded && p.chips > 0 && (!p.hasActed || p.currentBet !== this.currentHighestBet)) {
                 return false;
             }
         }
@@ -341,6 +484,7 @@ class ActiveTable {
             safety++;
         }
         this.turnStartTime = Date.now();
+        this.turnToken++;
     }
 
     nextRound() {
@@ -420,8 +564,10 @@ class ActiveTable {
             const p = this.playerManager.getPlayer(playerId);
             if (p) {
                 p.folded = false;
+                p.mucked = false;
                 p.currentBet = 0; 
                 p.hasActed = false;
+                p.totalHandContribution = 0;
             }
         }
 
@@ -430,6 +576,8 @@ class ActiveTable {
             const blindIndices = this.potManager.postBlinds(this.playerManager.players, this.playerManager, this.dealerIndex);
             this.recordedSbIndex = blindIndices.sbIndex;
             this.recordedBbIndex = blindIndices.bbIndex;
+
+            this.potManager.buildPots(this.playerManager.players, this.playerManager);
 
             let sbIndex = (n === 2) ? this.dealerIndex : (this.dealerIndex + 1) % n;
             if (n > 2) {
@@ -441,6 +589,7 @@ class ActiveTable {
         }
 
         this.turnStartTime = Date.now();
+        this.turnToken++;
     }
 
     resetToLobby() {
@@ -455,13 +604,16 @@ class ActiveTable {
         this.potManager.reset();
         this.currentTurnIndex = 0;
         this.turnStartTime = null;
+        this.turnToken++;
         this.playerManager.consecutiveTimeouts.clear();
         this.playerManager.updateQueueDistribution(this.gameInProgress);
         
         for (const [_, p] of this.playerManager.playerObjects) {
             p.folded = false;
+            p.mucked = false;
             p.currentBet = 0;
             p.hasActed = false;
+            p.totalHandContribution = 0;
         }
     }
 
@@ -473,12 +625,12 @@ class ActiveTable {
         let winners = [];
         let maxScore = 0;
 
+        const commonCards = this.deck.commonCards(this.roundPlayerCount);
+
         if (activeNonFolded.length === 1) {
             winners = [activeNonFolded[0].id];
         } else {
-            const commonCards = this.deck.commonCards(this.roundPlayerCount);
             let highest = -1;
-
             for (const playerId of this.playerManager.players) {
                 const p = this.playerManager.getPlayer(playerId);
                 if (!p || p.folded) continue;
@@ -497,8 +649,27 @@ class ActiveTable {
             }
         }
 
-        const resultPot = this.potManager.distributePot(winners, this.playerManager);
+        const resultPot = this.potManager.distributePot(
+            winners, 
+            this.playerManager, 
+            commonCards, 
+            this.playerHands
+        );
         this.gameOver = true;
+
+        const showdownHands = {};
+        for (const playerId of this.playerManager.players) {
+            const p = this.playerManager.getPlayer(playerId);
+            if (p && !p.folded) {
+                const hand = this.playerHands.get(playerId);
+                if (hand) {
+                    if (p.muckPreference && !winners.includes(playerId)) {
+                        continue;
+                    }
+                    showdownHands[playerId] = hand.map(c => Deck.cardToText(c));
+                }
+            }
+        }
 
         GameDao.create({
             tableId: this.tableId,
@@ -515,7 +686,7 @@ class ActiveTable {
         });
 
         this.playerManager.processPendingRemovals(this.gameInProgress);
-        return { winners, maxScore, pot: resultPot };
+        return { winners, maxScore, pot: resultPot, showdownHands };
     }
 }
 

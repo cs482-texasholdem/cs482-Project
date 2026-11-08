@@ -110,6 +110,13 @@
             Player: <strong id="header-player-name">Player123</strong>
             &nbsp; | &nbsp;
             Account Chips: <strong id="account-chips">2,450</strong>
+            <!-- The save points button will be shown only if the user is logged in -->
+            <span id="save-points-container" style="display: none;">
+                &nbsp; | &nbsp;
+                <button type="button" id="save-points-btn" class="btn btn-save-points fw-bold ms-1 shadow-none">
+                    <i class="bi bi-person-plus-fill me-1"></i> Save Points (Sign Up)
+                </button>
+            </span>
         </div>
     </header>
 
@@ -227,6 +234,14 @@
                 <div class="scale-labels">
                     <span id="raise-min-label">--</span>
                     <span id="raise-max-label">--</span>
+                </div>
+
+                <div class="muck-switch-container">
+                    <label for="muck-toggle" style="cursor: pointer;">Muck Losing Cards</label>
+                    <label class="muck-switch">
+                        <input type="checkbox" id="muck-toggle">
+                        <span class="muck-slider"></span>
+                    </label>
                 </div>
 
                 <div class="action-buttons">
