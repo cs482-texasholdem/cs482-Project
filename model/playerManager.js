@@ -1,9 +1,9 @@
 /**
-- ============================================================================
-- File Name: playerManager.js
-- Purpose: Manages player seating, queue distribution, spectators, and 
--          deferred removals with defensive safe accessors.
-- ============================================================================
+ * ============================================================================
+ * File Name: playerManager.js
+ * Purpose: Manages player seating, queue distribution, spectators, and 
+ *          deferred removals with defensive safe accessors.
+ * ============================================================================
  */
 
 class Player {
@@ -13,7 +13,8 @@ class Player {
         this.folded = false;
         this.currentBet = 0;
         this.hasActed = false;
-        this.mucked = false; // Muck flag for showdown / folding
+        this.mucked = false; 
+        this.muckPreference = false; // Default player mucking to false
     }
 }
 
@@ -37,13 +38,6 @@ class PlayerManager {
         return this.playerObjects.has(playerId.trim()) || this.queue.includes(playerId.trim());
     }
 
-    /**
-- Safely retrieves a Player instance by ID.
-- 
-@param {string} playerId The player ID to look up.
-- 
-@returns {Player|null} The player instance or null if not found.
-     */
     getPlayer(playerId) {
         if (!playerId || typeof playerId !== "string") return null;
         return this.playerObjects.get(playerId.trim()) || null;

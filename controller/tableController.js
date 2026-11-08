@@ -1,10 +1,8 @@
-/**
- * ============================================================================
- * File Name: tableController.js
- * Purpose: Express controller endpoints for table actions using safe 
- *          player lookups and returning showdown hand data for sequenced reveals.
- * ============================================================================
- */
+// ============================================================================
+// File Name: tableController.js
+// Purpose: Express controller endpoints for table actions using safe 
+//          player lookups, muck preferences, and returning showdown data.
+// ============================================================================
 
 const ActiveTable = require("../model/activeTable");
 const Deck = require("../util/pokerLogic");
@@ -184,11 +182,15 @@ function startGame(req, res) {
     });
 }
 
-//[cite: 2] Updated tableController.js action handlers to broadcast automated showdown results
 function playerAction(req, res) {
-    const { playerId, action, amount } = req.body;
+    const { playerId, action, amount, muckPreference } = req.body;
     if (!playerId || !action) {
         return res.status(400).json({ error: "Player ID and action are required." });
+    }
+
+    const p = mainTable.playerManager.getPlayer(playerId);
+    if (p && typeof muckPreference === 'boolean') {
+        p.muckPreference = muckPreference;
     }
 
     const result = mainTable.recordAction(playerId, action, Number(amount) || 0);
@@ -207,7 +209,6 @@ function playerAction(req, res) {
 
     broadcastTableUpdate(req);
 
-    const p = mainTable.playerManager.getPlayer(playerId);
     return res.status(200).json({
         message: `Action ${action} recorded successfully.`,
         chips: p ? p.chips : 0,

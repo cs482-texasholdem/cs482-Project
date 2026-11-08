@@ -2,8 +2,8 @@
  * ============================================================================
  * File Name: activeTable.js
  * Purpose: Manages table session, records action history, tracks positional 
- *          indices (dealer, blinds, seating order), persists game records,
- *          manages multi-tier side-pots, and packages showdown hands for Stage 2.
+ *          indices, persists game records, manages multi-tier side-pots, and 
+ *          respects player muck preferences during showdown reveals.
  * ============================================================================
  */
 
@@ -662,6 +662,9 @@ class ActiveTable {
             if (p && !p.folded) {
                 const hand = this.playerHands.get(playerId);
                 if (hand) {
+                    if (p.muckPreference && !winners.includes(playerId)) {
+                        continue;
+                    }
                     showdownHands[playerId] = hand.map(c => Deck.cardToText(c));
                 }
             }
