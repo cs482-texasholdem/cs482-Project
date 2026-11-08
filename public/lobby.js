@@ -9,13 +9,13 @@
 let joinSidebar;
 
 document.addEventListener("DOMContentLoaded", async function() {
-    // 1. Initialize Bootstrap Offcanvas Sidebar for Joining Tables
+    // Initialize Sidebar for Joining Tables
     const sidebarElement = document.getElementById('joinGameSidebar');
     if (sidebarElement) {
         joinSidebar = new bootstrap.Offcanvas(sidebarElement);
     }
 
-    // 2. Guest Session Checks & Navigation Restrictions
+    // Guest Session Checks & Navigation Restrictions
     const urlParams = new URLSearchParams(window.location.search);
     let playerId = urlParams.get("playerId");
 
@@ -26,6 +26,7 @@ document.addEventListener("DOMContentLoaded", async function() {
         localStorage.setItem("guestPlayerId", playerId);
     }
 
+    // Check with the backend server to see if a real user account is logged in
     try {
         const res = await fetch('/loggeduser');
         const user = await res.json();
@@ -34,7 +35,7 @@ document.addEventListener("DOMContentLoaded", async function() {
         const lobbyContainer = document.querySelector('.container.my-5');
         const isLoggedIn = user && (user.username || user.email || user.id);
 
-        // If no active server session user, but we have a guest playerId
+        // --- GUEST VIEW CONFIGURATION --- If no active server session user, but we have a guest playerId
         if (!isLoggedIn && playerId) {
             //guest view: disable dashboard link and show a banner
             if (dashboardNavItem) {
@@ -46,7 +47,7 @@ document.addEventListener("DOMContentLoaded", async function() {
             }
             if (saveContainer) saveContainer.style.display = "none";
 
-            // Poker themed banner for signing up
+            // Show guest banner encouraging them to sign up and save points
             if (lobbyContainer) {
                 const pokerBanner = document.createElement('div');
                 pokerBanner.className = 'alert alert-dismissible fade show mb-4 text-white shadow-lg border-0';
@@ -72,7 +73,12 @@ document.addEventListener("DOMContentLoaded", async function() {
                 `;
                 lobbyContainer.prepend(pokerBanner);
             }
+        // --- LOGGED-IN USER VIEW CONFIGURATION ---
         } else {
+            //logged-in user: clear any guest playerId from storage to avoid confusion
+            localStorage.removeItem("guestPlayerId");
+            sessionStorage.removeItem("guestPlayerId");
+
             // LOGGED-IN USER VIEW: Keep normal Dashboard link and hide guest save elements
             if (dashboardNavItem) {
                 dashboardNavItem.innerHTML = `
@@ -87,7 +93,7 @@ document.addEventListener("DOMContentLoaded", async function() {
         console.error("Session verification failed:", e);
     }
 
-    // Handle Save Points button click in the lobby header
+    //Handle Save Points button click in the lobby header
     const lobbySaveBtn = document.getElementById("lobby-save-btn");
     if (lobbySaveBtn) {
         lobbySaveBtn.addEventListener("click", () => {
@@ -111,12 +117,12 @@ document.addEventListener("DOMContentLoaded", async function() {
     }
 });
 
-// Open the table seating sidebar and populate values
+// helper function to open the table seating sidebar and populate values
 function openJoinSidebar(tableName, blinds, minBuyin) {
     document.getElementById('sidebarTableName').value = tableName;
     document.getElementById('sidebarTableBlinds').value = blinds;
     document.getElementById('sidebarTableMinBuyin').value = minBuyin;
-    let numericBuyin = parseInt(minBuyin.replace(/[^0-9]/g, '')) || 1000;
+    let numericBuyin = parseInt(minBuyin.replace(/[^0-9]/g, '')) || 1000; //parse numeric min buy-in, default is 1000
     document.getElementById('buyInAmount').value = numericBuyin;
     document.getElementById('buyInAmount').min = numericBuyin;
     if (joinSidebar) joinSidebar.show();
@@ -137,16 +143,42 @@ function togglePublicLobbies() {
 // Ensure table seating form appends the correct guest playerId when submitting
 const joinTableForm = document.getElementById("joinTableForm");
 if (joinTableForm) {
-    joinTableForm.addEventListener("submit", function(event) {
-        const urlParams = new URLSearchParams(window.location.search);
-        let playerId = urlParams.get("playerId") || localStorage.getItem("guestPlayerId");
-        
-        if (playerId && !this.querySelector('input[name="playerId"]')) {
-            const input = document.createElement("input");
-            input.type = "hidden";
-            input.name = "playerId";
-            input.value = playerId;
-            this.appendChild(input);
+    joinTableForm.addEventListener("submit", async function(event) {
+        event.preventDefault(); // Pause standard form submit briefly so we can attach the user identity
+        let resolvedPlayerId = "";
+
+        // Check if there is a logged in user
+        try {
+            const res = await fetch('/loggeduser');
+            const user = await res.json();
+
+            if (user && (user.username || user.email || user.id)) {
+                resolvedPlayerId = user.username || user.email.split('@')[0];
+            }
+        } catch (error) {
+            console.error('Session check during table join failed:', error);
         }
+
+        // If not logged in, check URL or localStorage for existing guest ID
+        if (!resolvedPlayerId) {
+            const urlParams = new URLSearchParams(window.location.search);
+            resolvedPlayerId = urlParams.get("playerId") || localStorage.getItem("guestPlayerId") || `Guest_${Math.floor(1000 + Math.random() * 9000)}`;
+        }
+
+        //Remove any old hidden input to prevent duplicate parameters
+        const existingInput = this.querySelector('input[name="playerId"]');
+        if (existingInput) {
+            existingInput.remove();
+        }
+
+        // Append resolved player ID as a hidden input
+        const input = document.createElement("input");
+        input.type = "hidden";
+        input.name = "playerId";
+        input.value = resolvedPlayerId;
+        this.appendChild(input);
+
+        // Manually submit form
+        HTMLFormElement.prototype.submit.call(this);
     });
 }
