@@ -1,3 +1,14 @@
+// Get the selected table from the URL
+const urlParams = new URLSearchParams(window.location.search);
+const currentTableId = urlParams.get("tableId")?.trim();
+
+if (!currentTableId) {
+    throw new Error(
+        "Missing tableId in URL. Open a table through the dashboard or lobby."
+    );
+}
+
+/*
 function getPlayerIdFromUrl() {
     const urlParams = new URLSearchParams(window.location.search);
     let id = urlParams.get("playerId");
@@ -11,6 +22,10 @@ function getPlayerIdFromUrl() {
     
     return id ? decodeURIComponent(id.trim()) : "";
 }
+*/
+function getPlayerIdFromUrl() {
+    return urlParams.get("playerId")?.trim() || "";
+}
 
 let currentPlayerId = getPlayerIdFromUrl();
 
@@ -18,7 +33,9 @@ function checkBlankName() {
     if (!currentPlayerId) {
         const name = prompt("Enter your Player ID to join the table:");
         if (name && name.trim()) {
-            window.location.href = `tableDisplay.html?playerId=${encodeURIComponent(name.trim())}`;
+            const nextParams = new URLSearchParams(window.location.search);
+            nextParams.set("playerId", name.trim());
+            window.location.href = `tableDisplay.html?${nextParams.toString()}`;
             return false;
         } else {
             alert("A valid Player ID is required to play.");
@@ -67,7 +84,10 @@ async function leaveTable(destination) {
         const response = await fetch("/api/table/leave", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ playerId: currentPlayerId })
+            body: JSON.stringify({ 
+                tableId: currentTableId,
+                playerId: currentPlayerId 
+            })
         });
 
         if (!response.ok) {
@@ -107,6 +127,12 @@ document.getElementById("lobby-link")
         leaveTable("lobby.html");
     });
 
+// table link -> !defualt
+document.getElementById("table-link")
+    .addEventListener("click", (event) => {
+        event.preventDefault();
+    });
+
 
 let modalTimeout = null;
 let currentTimerRemaining = 30;
@@ -131,13 +157,43 @@ function updateTimerDisplay(rem) {
 
 async function fetchTableStatus() {
     try {
-        const response = await fetch(`/api/table/status?playerId=${encodeURIComponent(currentPlayerId)}`);
-        if (!response.ok) throw new Error("Failed to fetch table status.");
+        const params = new URLSearchParams({
+            tableId: currentTableId,
+            playerId: currentPlayerId
+        });
+
+        const response = await fetch(
+            `/api/table/status?${params.toString()}`
+        );
+
+        if (!response.ok) {
+            throw new Error("Failed to fetch table status.");
+        }
+
         return await response.json();
+
     } catch (error) {
         console.error("Error fetching table status:", error);
         return null;
     }
+}
+
+function renderTableDetails(status) {
+    const elements = {
+        "table-name": status.tableName,
+        "small-blind": status.smallBlind,
+        "big-blind": status.bigBlind,
+        "table-buy-in": status.buyIn,
+        "max-players": status.maxPlayers
+    };
+
+    Object.entries(elements).forEach(([elementId, value]) => {
+        const element = document.getElementById(elementId);
+
+        if (element && value !== undefined && value !== null) {
+            element.textContent = value;
+        }
+    });
 }
 
 function renderActivePlayers(status) {
@@ -235,7 +291,10 @@ async function joinTable() {
         const response = await fetch("/api/table/join", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ playerId: currentPlayerId })
+            body: JSON.stringify({ 
+                tableId: currentTableId,
+                playerId: currentPlayerId 
+            })
         });
         if (!response.ok) throw new Error("Failed to join table.");
         const data = await response.json();
@@ -329,6 +388,9 @@ async function refreshUI() {
     const status = await fetchTableStatus();
     if (!status) return;
 
+    // Update the selected table's displayed configuration
+    renderTableDetails(status);
+
     if (!status.inTable) {
         showJoinPrompt(status.gameInProgress);
         return;
@@ -349,12 +411,22 @@ socket.on("connect", () => {
     refreshUI();
 });
 //when any player acts, the server emits a TABLE_UPDATED event to all clients, prompting them to refresh their UI
-socket.on("TABLE_UPDATED", () => {
+socket.on("TABLE_UPDATED", (data) => {
+    // Ignore updates explicitly belonging to another table
+    if (data?.tableId && data.tableId !== currentTableId) {
+        return;
+    }
+
     refreshUI();
 });
-//listen for turn timer updates from the server and update the UI accordingly
+
 socket.on("TURN_TIMER", (data) => {
-    if (data && typeof data.turnTimeRemaining === "number") {
+    // Only update the timer for the selected table
+    if (data?.tableId !== currentTableId) {
+        return;
+    }
+
+    if (typeof data.turnTimeRemaining === "number") {
         updateTimerDisplay(data.turnTimeRemaining);
     }
 });
@@ -406,7 +478,7 @@ actionButtons.forEach((button) => {
             const res = await fetch("/api/table/action", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ playerId: currentPlayerId, action, amount })
+                body: JSON.stringify({ tableId: currentTableId, playerId: currentPlayerId, action, amount })
             });
 
             if (!res.ok) {
