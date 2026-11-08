@@ -684,3 +684,59 @@ body.table-page {
     color: #adb5bd !important;
     opacity: 1;
 }
+
+.muck-switch-container {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    margin-bottom: 16px;
+    font-size: 13px;
+    color: var(--secondary-text);
+}
+
+.muck-switch {
+    position: relative;
+    display: inline-block;
+    width: 36px;
+    height: 20px;
+}
+
+.muck-switch input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+.muck-slider {
+    position: absolute;
+    cursor: pointer;
+    top: 0; 
+    left: 0; 
+    right: 0; 
+    bottom: 0;
+    background-color: var(--disconnected-player);
+    transition: 0.3s;
+    border-radius: 20px;
+    border: 1px solid var(--border-blue);
+}
+
+.muck-slider:before {
+    position: absolute;
+    content: "";
+    height: 14px;
+    width: 14px;
+    left: 2px;
+    bottom: 2px;
+    background-color: var(--main-text);
+    transition: 0.3s;
+    border-radius: 50%;
+}
+
+.muck-switch input:checked + .muck-slider {
+    background-color: var(--success-green);
+}
+
+.muck-switch input:checked + .muck-slider:before {
+    transform: translateX(16px);
+}

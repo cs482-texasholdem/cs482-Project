@@ -1,10 +1,8 @@
-/**
- * ============================================================================
- * File Name: tableController.js
- * Purpose: Express controller endpoints for table actions using safe 
- *          player lookups and returning showdown hand data for sequenced reveals.
- * ============================================================================
- */
+// ============================================================================
+// File Name: tableController.js
+// Purpose: Express controller endpoints for table actions using safe 
+//          player lookups, muck preferences, and returning showdown data.
+// ============================================================================
 
 const ActiveTable = require("../model/activeTable");
 const Deck = require("../util/pokerLogic");
@@ -184,24 +182,15 @@ function startGame(req, res) {
     });
 }
 
-function finishGame(req, res) {
-    const result = mainTable.finishGame();
-    if (!result.success) {
-        return res.status(400).json({ error: result.error });
-    }
-
-    broadcastTableUpdate(req);
-
-    return res.status(200).json({
-        message: "Game finished successfully.",
-        winnerData: result.winnerData
-    });
-}
-
 function playerAction(req, res) {
-    const { playerId, action, amount } = req.body;
+    const { playerId, action, amount, muckPreference } = req.body;
     if (!playerId || !action) {
         return res.status(400).json({ error: "Player ID and action are required." });
+    }
+
+    const p = mainTable.playerManager.getPlayer(playerId);
+    if (p && typeof muckPreference === 'boolean') {
+        p.muckPreference = muckPreference;
     }
 
     const result = mainTable.recordAction(playerId, action, Number(amount) || 0);
@@ -209,13 +198,16 @@ function playerAction(req, res) {
         return res.status(400).json({ error: result.error });
     }
 
-    broadcastTableUpdate(req);
-
-    const p = mainTable.playerManager.getPlayer(playerId);
     const winnerData = result.winnerData;
     if (winnerData && winnerData.winners) {
+        const io = req.app.get('io');
+        if (io) {
+            io.to(`table_${mainTable.tableId}`).emit('SHOWDOWN_REVEAL', winnerData);
+        }
         mainTable.resetToLobby();
     }
+
+    broadcastTableUpdate(req);
 
     return res.status(200).json({
         message: `Action ${action} recorded successfully.`,
@@ -244,6 +236,10 @@ function nextRound(req, res) {
 
     const winnerData = result.winnerData;
     if (winnerData && winnerData.winners) {
+        const io = req.app.get('io');
+        if (io) {
+            io.to(`table_${mainTable.tableId}`).emit('SHOWDOWN_REVEAL', winnerData);
+        }
         mainTable.resetToLobby();
     }
 
@@ -255,6 +251,25 @@ function nextRound(req, res) {
         winnerData: winnerData,
         pot: result.pot,
         playerHand
+    });
+}
+
+function finishGame(req, res) {
+    const result = mainTable.finishGame();
+    if (!result.success) {
+        return res.status(400).json({ error: result.error });
+    }
+
+    const io = req.app.get('io');
+    if (io) {
+        io.to(`table_${mainTable.tableId}`).emit('SHOWDOWN_REVEAL', result.winnerData);
+    }
+
+    broadcastTableUpdate(req);
+
+    return res.status(200).json({
+        message: "Game finished successfully.",
+        winnerData: result.winnerData
     });
 }
 

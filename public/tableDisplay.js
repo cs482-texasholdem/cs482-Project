@@ -1,3 +1,8 @@
+// ============================================================================
+// File Name: tableDisplay.js
+// Purpose: Frontend controller for tableDisplay.html. Manages identity, 
+//          socket connections, UI rendering, timer display, and action handling.
+// ============================================================================
 let currentPlayerId = "";
 let socket = null;
 
@@ -50,7 +55,6 @@ async function initializePlayerIdentity() {
         sessionStorage.setItem("guestPlayerId", currentPlayerId);
     }
 
-    // Update UI headers immediately
     const headerName = document.getElementById("header-player-name");
     const displayName = document.getElementById("display-player-id");
     if (headerName) headerName.textContent = currentPlayerId;
@@ -72,7 +76,6 @@ async function registerPlayerToTable(playerId) {
 
     initializeSocketAndUI();
 }
-
 
 function initializeSocketAndUI() {
     if (socket) {
@@ -99,7 +102,6 @@ function initializeSocketAndUI() {
     refreshUI();
 }
 
-// Run initialization on load
 initializePlayerIdentity();
 
 document.getElementById("header-player-name").textContent = currentPlayerId;
@@ -144,24 +146,21 @@ async function leaveTable(destination) {
     }
 }
 
-document.getElementById("leave-table-btn")
-    .addEventListener("click", () => {
-        leaveTable("lobby.html");
-    });
+const leaveBtn = document.getElementById("leave-table-btn");
+if (leaveBtn) leaveBtn.addEventListener("click", () => leaveTable("lobby.html"));
 
-document.getElementById("home-link")
-    .addEventListener("click", (event) => {
-        event.preventDefault();
-        leaveTable("index.html");
-    });
+const homeLink = document.getElementById("home-link");
+if (homeLink) homeLink.addEventListener("click", (event) => {
+    event.preventDefault();
+    leaveTable("index.html");
+});
 
-document.getElementById("lobby-link")
-    .addEventListener("click", (event) => {
-        event.preventDefault();
-        leaveTable("lobby.html");
-    });
+const lobbyLink = document.getElementById("lobby-link");
+if (lobbyLink) lobbyLink.addEventListener("click", (event) => {
+    event.preventDefault();
+    leaveTable("lobby.html");
+});
 
-let resetTimeout = null;
 let currentTimerRemaining = 30;
 
 function updateTimerDisplay(rem) {
@@ -243,11 +242,11 @@ function renderActivePlayers(status) {
         }
     });
 
-    totalPotElem.textContent = status.pot || 0;
-    yourChipsElem.textContent = (status.playerChips || 0).toLocaleString();
-    availableChipsElem.textContent = (status.playerChips || 0).toLocaleString();
-    yourBetElem.textContent = status.playerBet || 0;
-    currentBetElem.textContent = status.currentHighestBet || 0;
+    if (totalPotElem) totalPotElem.textContent = status.pot || 0;
+    if (yourChipsElem) yourChipsElem.textContent = (status.playerChips || 0).toLocaleString();
+    if (availableChipsElem) availableChipsElem.textContent = (status.playerChips || 0).toLocaleString();
+    if (yourBetElem) yourBetElem.textContent = status.playerBet || 0;
+    if (currentBetElem) currentBetElem.textContent = status.currentHighestBet || 0;
 
     if (currentTurnPlayerElem) {
         currentTurnPlayerElem.textContent = status.currentTurnPlayer || "None";
@@ -257,7 +256,7 @@ function renderActivePlayers(status) {
         updateTimerDisplay(status.turnTimeRemaining);
     }
 
-    // Gate all action buttons (including Fold) when game is not in progress or not player's turn
+    // Gate all action buttons properly based on status.buttonsBlocked and applicability
     actionButtons.forEach(btn => {
         const action = btn.dataset.action;
         if (status.buttonsBlocked) {
@@ -292,7 +291,7 @@ function renderActivePlayers(status) {
         renderCards("player-cards", status.playerHand);
     }
 
-    if (status.currentTurnPlayer) {
+    if (status.currentTurnPlayer && tableMessage) {
         tableMessage.textContent = `Current turn: ${status.currentTurnPlayer}`;
     }
 }
@@ -306,12 +305,12 @@ async function joinTable() {
         });
         if (!response.ok) throw new Error("Failed to join table.");
         const data = await response.json();
-        tableMessage.textContent = data.message;
+        if (tableMessage) tableMessage.textContent = data.message;
         hideJoinPrompt();
         refreshUI();
     } catch (error) {
         console.error("Error joining table:", error);
-        tableMessage.textContent = "Could not join table.";
+        if (tableMessage) tableMessage.textContent = "Could not join table.";
     }
 }
 
@@ -363,34 +362,6 @@ function renderStartGameButton(status) {
     }
 }
 
-function renderFinishGameButton(status) {
-    let finishBtnContainer = document.getElementById("finish-game-container");
-    const communityCards = status.communityCards || [];
-    // Block Finish Game / Showdown button until the last round is reached (5 community cards present and valid)
-    const reachedLastRound = communityCards.length === 5 && !communityCards.includes("🂠");
-
-    if (status.gameInProgress && status.isPlayer) {
-        if (!finishBtnContainer) {
-            finishBtnContainer = document.createElement("div");
-            finishBtnContainer.id = "finish-game-container";
-            finishBtnContainer.style.textAlign = "center";
-            finishBtnContainer.style.margin = "10px 0";
-            const heading = document.querySelector(".game-heading");
-            if (heading) heading.appendChild(finishBtnContainer);
-        }
-
-        finishBtnContainer.innerHTML = `
-            <button type="button" id="finish-game-btn" class="action-button fold" style="width: auto; height: auto; padding: 10px 20px; border-radius: 8px; background: ${reachedLastRound ? '#d42c25' : '#555'}; border-color: ${reachedLastRound ? '#961e19' : '#333'}; cursor: ${reachedLastRound ? 'pointer' : 'not-allowed'}; opacity: ${reachedLastRound ? '1' : '0.5'};" ${reachedLastRound ? '' : 'disabled'}>Finish Game / Showdown</button>
-        `;
-
-        if (reachedLastRound) {
-            document.getElementById("finish-game-btn").addEventListener("click", finishGame);
-        }
-    } else if (finishBtnContainer) {
-        finishBtnContainer.remove();
-    }
-}
-
 async function startGame() {
     try {
         const response = await fetch("/api/table/start", {
@@ -413,31 +384,34 @@ async function startGame() {
         if (data.turnTimeRemaining !== undefined) {
             updateTimerDisplay(data.turnTimeRemaining);
         }
-        tableMessage.textContent = "Game started! Place your bets or check.";
+        if (tableMessage) tableMessage.textContent = "Game started! Place your bets or check.";
         refreshUI();
     } catch (error) {
         alert(error.message);
     }
 }
 
-// Sequenced Reveal & Winner Highlighting without Popup Modal
+let isShowingShowdown = false;
+
 async function handleSequencedShowdown(winnerData) {
     if (!winnerData || !winnerData.winners) return;
+
+    isShowingShowdown = true;
 
     const showdownHands = winnerData.showdownHands || {};
     const playerIds = Object.keys(showdownHands);
     const winnersList = winnerData.winners || [];
 
-    tableMessage.textContent = "Showdown: Revealing active hands...";
+    if (tableMessage) tableMessage.textContent = "Showdown: Revealing active hands...";
 
     for (let i = 0; i < playerIds.length; i++) {
         const pid = playerIds[i];
         const cards = showdownHands[pid];
         
-        tableMessage.textContent = `Revealing cards for ${pid}...`;
+        if (tableMessage) tableMessage.textContent = `Revealing cards for ${pid}...`;
         
         const seatElem = document.getElementById(`seat-${pid}`);
-        if (seatElem && cards) {
+        if (seatElem && cards && Array.isArray(cards)) {
             let revealBox = seatElem.querySelector(".revealed-cards");
             if (!revealBox) {
                 revealBox = document.createElement("div");
@@ -445,24 +419,29 @@ async function handleSequencedShowdown(winnerData) {
                 revealBox.style.display = "flex";
                 revealBox.style.gap = "3px";
                 revealBox.style.justifyContent = "center";
-                revealBox.style.marginTop = "4px";
+                revealBox.style.marginTop = "6px";
                 seatElem.appendChild(revealBox);
             }
             revealBox.innerHTML = "";
             cards.forEach(c => {
-                const cDiv = document.createElement("span");
-                cDiv.style.fontSize = "10px";
-                cDiv.style.background = "#fff";
-                cDiv.style.color = c.includes("♥") || c.includes("♦") ? "#D42C25" : "#202B40";
-                cDiv.style.padding = "2px 4px";
-                cDiv.style.borderRadius = "3px";
+                const cDiv = document.createElement("div");
+                cDiv.style.width = "24px";
+                cDiv.style.height = "34px";
+                cDiv.style.display = "flex";
+                cDiv.style.alignItems = "center";
+                cDiv.style.justifyContent = "center";
+                cDiv.style.fontSize = "11px";
+                cDiv.style.background = "#F4F7FC";
+                cDiv.style.border = "1px solid #315CA8";
+                cDiv.style.borderRadius = "4px";
+                cDiv.style.color = (c.includes("♥") || c.includes("♦")) ? "#D42C25" : "#202B40";
                 cDiv.style.fontWeight = "bold";
                 cDiv.textContent = c;
                 revealBox.appendChild(cDiv);
             });
         }
 
-        await new Promise(resolve => setTimeout(resolve, 600));
+        await new Promise(resolve => setTimeout(resolve, 1200));
     }
 
     winnersList.forEach(wId => {
@@ -473,38 +452,17 @@ async function handleSequencedShowdown(winnerData) {
     });
 
     const winnersText = winnersList.join(", ");
-    tableMessage.textContent = `Winner(s): ${winnersText} | Pot Won: ${winnerData.pot}`;
+    if (tableMessage) tableMessage.textContent = `Winner(s): ${winnersText} | Pot Won: ${winnerData.pot}`;
 
-    if (resetTimeout) clearTimeout(resetTimeout);
-    resetTimeout = setTimeout(() => {
-        document.querySelectorAll(".winner-seat").forEach(el => {
-            el.classList.remove("winner-seat");
-        });
+    setTimeout(() => {
+        isShowingShowdown = false;
         refreshUI();
-    }, 4500);
-}
-
-async function finishGame() {
-    try {
-        const response = await fetch("/api/table/finish", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ playerId: currentPlayerId })
-        });
-        if (!response.ok) {
-            const err = await response.json();
-            throw new Error(err.error || "Failed to finish game.");
-        }
-        const data = await response.json();
-        if (data.winnerData && data.winnerData.winners) {
-            await handleSequencedShowdown(data.winnerData);
-        }
-    } catch (error) {
-        alert(error.message);
-    }
+    }, 4000);
 }
 
 async function refreshUI() {
+    if (isShowingShowdown) return;
+
     const status = await fetchTableStatus();
     if (!status) return;
 
@@ -514,12 +472,11 @@ async function refreshUI() {
     }
 
     if (status.isSpectator) {
-        tableMessage.textContent = "You are spectating. You will join active players when the next game starts.";
+        if (tableMessage) tableMessage.textContent = "You are spectating. You will join active players when the next game starts.";
     }
 
     renderActivePlayers(status);
     renderStartGameButton(status);
-    renderFinishGameButton(status);
 }
 
 function renderCards(containerId, cards) {
@@ -541,26 +498,32 @@ function renderCards(containerId, cards) {
     });
 }
 
-betScale.addEventListener("input", () => {
-    raiseAmount.value = betScale.value;
-});
+if (betScale) {
+    betScale.addEventListener("input", () => {
+        if (raiseAmount) raiseAmount.value = betScale.value;
+    });
+}
 
-raiseAmount.addEventListener("input", () => {
-    const amount = Number(raiseAmount.value);
-    if (amount >= 20 && amount <= 1000) {
-        betScale.value = amount;
-    }
-});
+if (raiseAmount) {
+    raiseAmount.addEventListener("input", () => {
+        const amount = Number(raiseAmount.value);
+        if (amount >= 20 && amount <= 1000) {
+            betScale.value = amount;
+        }
+    });
+}
 
 actionButtons.forEach((button) => {
     button.addEventListener("click", async () => {
         const action = button.dataset.action;
         let amount = 0;
+        const muckToggleElem = document.getElementById("muck-toggle");
+        const muckPreference = muckToggleElem ? muckToggleElem.checked : false;
 
         if (action === "Raise") {
             amount = Number(raiseAmount.value);
             if (!Number.isFinite(amount) || amount < 20) {
-                tableMessage.textContent = "Enter a valid raise amount.";
+                if (tableMessage) tableMessage.textContent = "Enter a valid raise amount.";
                 return;
             }
         }
@@ -569,12 +532,12 @@ actionButtons.forEach((button) => {
             const res = await fetch("/api/table/action", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ playerId: currentPlayerId, action, amount })
+                body: JSON.stringify({ playerId: currentPlayerId, action, amount, muckPreference })
             });
 
             if (!res.ok) {
                 const err = await res.json();
-                tableMessage.textContent = err.error || "Action failed.";
+                if (tableMessage) tableMessage.textContent = err.error || "Action failed.";
                 return;
             }
 
@@ -585,7 +548,7 @@ actionButtons.forEach((button) => {
                 return;
             }
 
-            tableMessage.textContent = `${action} successful. Turn updated.`;
+            if (tableMessage) tableMessage.textContent = `${action} successful. Turn updated.`;
             refreshUI();
         } catch (error) {
             console.error("Error executing action:", error);
@@ -593,20 +556,26 @@ actionButtons.forEach((button) => {
     });
 });
 
-document.getElementById("chat-form").addEventListener("submit", (event) => {
-    event.preventDefault();
-    const input = document.getElementById("chat-input");
-    const message = input.value.trim();
-    if (!message) return;
+const chatForm = document.getElementById("chat-form");
+if (chatForm) {
+    chatForm.addEventListener("submit", (event) => {
+        event.preventDefault();
+        const input = document.getElementById("chat-input");
+        if (!input) return;
+        const message = input.value.trim();
+        if (!message) return;
 
-    const messageElement = document.createElement("div");
-    messageElement.className = "chat-message";
-    const sender = document.createElement("strong");
-    sender.textContent = currentPlayerId + ": ";
-    messageElement.append(sender, document.createTextNode(message));
+        const messageElement = document.createElement("div");
+        messageElement.className = "chat-message";
+        const sender = document.createElement("strong");
+        sender.textContent = currentPlayerId + ": ";
+        messageElement.append(sender, document.createTextNode(message));
 
-    const chatMessages = document.getElementById("chat-messages");
-    chatMessages.appendChild(messageElement);
-    chatMessages.scrollTop = chatMessages.scrollHeight;
-    input.value = "";
-});
+        const chatMessages = document.getElementById("chat-messages");
+        if (chatMessages) {
+            chatMessages.appendChild(messageElement);
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+        }
+        input.value = "";
+    });
+}
