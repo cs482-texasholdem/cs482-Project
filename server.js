@@ -21,10 +21,25 @@ async function startServer() {
         });
         app.set('io', io);
 
+        const getTurnTimeRemaining = () => {
+            if (!mainTable.gameInProgress || mainTable.gameOver || !mainTable.turnStartTime) {
+                return null;
+            }
+
+            const elapsed = Math.floor((Date.now() - mainTable.turnStartTime) / 1000);
+            return Math.max(0, mainTable.timeLimit - elapsed);
+        };
+
         io.on('connection', (socket) => {
             console.log('A user connected:', socket.id);
             socket.on('join_table', (tableId) => {
                 socket.join(`table_${tableId}`);
+
+                // Immediately send the current countdown to the joining player
+                const turnTimeRemaining = getTurnTimeRemaining();
+                if (turnTimeRemaining !== null) {
+                    socket.emit('TURN_TIMER', { turnTimeRemaining });
+                }
             });
             socket.on('leave_table', (tableId) => {
                 socket.leave(`table_${tableId}`);
@@ -33,13 +48,25 @@ async function startServer() {
         });
 
         setInterval(() => {
-            const timeOut = mainTable.checkTimeout();
-            if (timeOut) {
-                io.to(`table_${mainTable.tableId}`).emit('TABLE_UPDATED');
+            try {
+                const room = `table_${mainTable.tableId}`;
+                const timeOut = mainTable.checkTimeout();
+
+                if (timeOut && timeOut.timedOut) {
+                    if (timeOut.winnerData && timeOut.winnerData.winners) {
+                        io.to(room).emit('SHOWDOWN_REVEAL', timeOut.winnerData);
+                        mainTable.resetToLobby();
+                    }
+                    io.to(room).emit('TABLE_UPDATED');
+                }
+
+                const turnTimeRemaining = getTurnTimeRemaining();
+                if (turnTimeRemaining !== null) {
+                    io.to(room).emit('TURN_TIMER', { turnTimeRemaining });
+                }
+            } catch (err) {
+                console.error('Turn timer tick failed:', err);
             }
-            const elapsed = mainTable.turnStartTime ? Math.floor((Date.now() - mainTable.turnStartTime) / 1000) : 0;
-            const turnTimeRemaining = Math.max(0, 30 - elapsed);
-            io.to(`table_${mainTable.tableId}`).emit('TURN_TIMER', { turnTimeRemaining });
         }, 1000);
 
         server.listen(PORT, () => {
