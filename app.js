@@ -55,7 +55,7 @@ app.get('/api/user/messages', UserCont.getUserMessages);
 app.delete('/api/user/messages/:msgId', UserCont.deleteUserMessage);
 
 // Table Actions (Single Table Architecture)
-const {joinTable, leaveTable, playerAction, startGame, nextRound, getTableStatus} = require("./controller/tableController");
+const {createTable, joinTable, leaveTable, playerAction, startGame, nextRound, getTableStatus} = require("./controller/tableController");
 app.get("/api/table/status", getTableStatus);
 app.post("/api/table/join", joinTable);
 app.post("/api/table/leave", leaveTable);
@@ -64,6 +64,8 @@ app.post("/api/table/start", startGame);
 app.get("/api/table/next-round", nextRound);
 
 // Table Actions (Multiple Tables)
+app.post("/api/tables/create", createTable);
+
 app.get("/api/tables/:tableId/status", getTableStatus);
 app.post("/api/tables/:tableId/join", joinTable);
 app.post("/api/tables/:tableId/leave", leaveTable);

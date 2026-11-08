@@ -118,6 +118,79 @@ function broadcastTableUpdate(req) {
     }
 }
 
+
+function createTable(req, res) {
+    const { tableName, maxPlayers, buyIn, smallBlind, bigBlind, visibility } = req.body;
+
+    // Validate required table settings
+    if (!tableName || !maxPlayers || !buyIn || !smallBlind || !bigBlind) {
+        return res.status(400).json({
+            error: "Missing required table settings."
+        });
+    }
+
+    // Validate table name
+    if (typeof tableName !== "string" || !tableName.trim()) {
+        return res.status(400).json({
+            error: "Invalid table name."
+        });
+    }
+
+    // Convert numerical settings
+    const playerLimit = Number(maxPlayers);
+    const buyInAmount = Number(buyIn);
+    const smallBlindAmount = Number(smallBlind);
+    const bigBlindAmount = Number(bigBlind);
+
+    // Validate numerical settings
+    if (
+        !Number.isInteger(playerLimit) ||
+        playerLimit < 2 ||
+        playerLimit > 9 ||
+        !Number.isFinite(buyInAmount) ||
+        !Number.isFinite(smallBlindAmount) ||
+        !Number.isFinite(bigBlindAmount) ||
+        buyInAmount <= 0 ||
+        smallBlindAmount <= 0 ||
+        bigBlindAmount <= smallBlindAmount ||
+        buyInAmount < bigBlindAmount
+    ) {
+        return res.status(400).json({
+            error: "Invalid table settings."
+        });
+    }
+
+    // Validate visibility
+    if (!["public", "private"].includes(visibility)) {
+        return res.status(400).json({
+            error: "Invalid table visibility."
+        });
+    }
+
+    // Create custom table through TableManager
+    const table = tableManager.createTable("general", 30, "custom");
+
+    // Assign custom table settings
+    table.tableName = tableName.trim();
+    table.maxPlayers = playerLimit;
+    table.buyIn = buyInAmount;
+    table.smallBlind = smallBlindAmount;
+    table.bigBlind = bigBlindAmount;
+    table.visibility = visibility;
+
+    // Notify connected clients
+    broadcastTableUpdate(req);
+
+    return res.status(201).json({
+        message: "Table created successfully.",
+        tableId: table.tableId,
+        tableName: table.tableName,
+        gameMode: table.gameMode,
+        maxPlayers: table.maxPlayers
+    });
+}
+
+
 function joinTable(req, res) {
     const table = getRequestedTable(req);
 
@@ -285,4 +358,4 @@ function nextRound(req, res) {
     });
 }
 
-module.exports = { joinTable, leaveTable, startGame, playerAction, nextRound, getTableStatus, tableManager, mainTable };
+module.exports = { createTable, joinTable, leaveTable, startGame, playerAction, nextRound, getTableStatus, tableManager, mainTable };
