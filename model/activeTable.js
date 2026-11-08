@@ -285,7 +285,6 @@ class ActiveTable {
                 return { success: false, error: "No game in progress to finish." };
             }
             const winnerData = this.handleWinner();
-            this.resetToLobby();
             return { success: true, winnerData };
         });
     }

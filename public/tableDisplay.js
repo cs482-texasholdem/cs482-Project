@@ -293,34 +293,6 @@ function renderStartGameButton(status) {
     }
 }
 
-function renderFinishGameButton(status) {
-    let finishBtnContainer = document.getElementById("finish-game-container");
-    const communityCards = status.communityCards || [];
-    // Block Finish Game / Showdown button until the last round is reached (5 community cards present and valid)
-    const reachedLastRound = communityCards.length === 5 && !communityCards.includes("🂠");
-
-    if (status.gameInProgress && status.isPlayer) {
-        if (!finishBtnContainer) {
-            finishBtnContainer = document.createElement("div");
-            finishBtnContainer.id = "finish-game-container";
-            finishBtnContainer.style.textAlign = "center";
-            finishBtnContainer.style.margin = "10px 0";
-            const heading = document.querySelector(".game-heading");
-            if (heading) heading.appendChild(finishBtnContainer);
-        }
-
-        finishBtnContainer.innerHTML = `
-            <button type="button" id="finish-game-btn" class="action-button fold" style="width: auto; height: auto; padding: 10px 20px; border-radius: 8px; background: ${reachedLastRound ? '#d42c25' : '#555'}; border-color: ${reachedLastRound ? '#961e19' : '#333'}; cursor: ${reachedLastRound ? 'pointer' : 'not-allowed'}; opacity: ${reachedLastRound ? '1' : '0.5'};" ${reachedLastRound ? '' : 'disabled'}>Finish Game / Showdown</button>
-        `;
-
-        if (reachedLastRound) {
-            document.getElementById("finish-game-btn").addEventListener("click", finishGame);
-        }
-    } else if (finishBtnContainer) {
-        finishBtnContainer.remove();
-    }
-}
-
 async function startGame() {
     try {
         const response = await fetch("/api/table/start", {
@@ -350,9 +322,12 @@ async function startGame() {
     }
 }
 
-// Sequenced Reveal & Winner Highlighting without Popup Modal
+let isShowingShowdown = false;
+
 async function handleSequencedShowdown(winnerData) {
     if (!winnerData || !winnerData.winners) return;
+
+    isShowingShowdown = true; // Lock UI updates during showdown sequence
 
     const showdownHands = winnerData.showdownHands || {};
     const playerIds = Object.keys(showdownHands);
@@ -367,7 +342,7 @@ async function handleSequencedShowdown(winnerData) {
         tableMessage.textContent = `Revealing cards for ${pid}...`;
         
         const seatElem = document.getElementById(`seat-${pid}`);
-        if (seatElem && cards) {
+        if (seatElem && cards && Array.isArray(cards)) {
             let revealBox = seatElem.querySelector(".revealed-cards");
             if (!revealBox) {
                 revealBox = document.createElement("div");
@@ -375,24 +350,29 @@ async function handleSequencedShowdown(winnerData) {
                 revealBox.style.display = "flex";
                 revealBox.style.gap = "3px";
                 revealBox.style.justifyContent = "center";
-                revealBox.style.marginTop = "4px";
+                revealBox.style.marginTop = "6px";
                 seatElem.appendChild(revealBox);
             }
             revealBox.innerHTML = "";
             cards.forEach(c => {
-                const cDiv = document.createElement("span");
-                cDiv.style.fontSize = "10px";
-                cDiv.style.background = "#fff";
-                cDiv.style.color = c.includes("♥") || c.includes("♦") ? "#D42C25" : "#202B40";
-                cDiv.style.padding = "2px 4px";
-                cDiv.style.borderRadius = "3px";
+                const cDiv = document.createElement("div");
+                cDiv.style.width = "24px";
+                cDiv.style.height = "34px";
+                cDiv.style.display = "flex";
+                cDiv.style.alignItems = "center";
+                cDiv.style.justifyContent = "center";
+                cDiv.style.fontSize = "11px";
+                cDiv.style.background = "#F4F7FC";
+                cDiv.style.border = "1px solid #315CA8";
+                cDiv.style.borderRadius = "4px";
+                cDiv.style.color = (c.includes("♥") || c.includes("♦")) ? "#D42C25" : "#202B40";
                 cDiv.style.fontWeight = "bold";
                 cDiv.textContent = c;
                 revealBox.appendChild(cDiv);
             });
         }
 
-        await new Promise(resolve => setTimeout(resolve, 600));
+        await new Promise(resolve => setTimeout(resolve, 1200));
     }
 
     winnersList.forEach(wId => {
@@ -404,29 +384,16 @@ async function handleSequencedShowdown(winnerData) {
 
     const winnersText = winnersList.join(", ");
     tableMessage.textContent = `Winner(s): ${winnersText} | Pot Won: ${winnerData.pot}`;
-}
 
-async function finishGame() {
-    try {
-        const response = await fetch("/api/table/finish", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ playerId: currentPlayerId })
-        });
-        if (!response.ok) {
-            const err = await response.json();
-            throw new Error(err.error || "Failed to finish game.");
-        }
-        const data = await response.json();
-        if (data.winnerData && data.winnerData.winners) {
-            await handleSequencedShowdown(data.winnerData);
-        }
-    } catch (error) {
-        alert(error.message);
-    }
+    setTimeout(() => {
+        isShowingShowdown = false; // Unlock UI updates after showdown finishes
+        refreshUI();
+    }, 4000);
 }
 
 async function refreshUI() {
+    if (isShowingShowdown) return; // Skip refreshing UI while showdown cards are being revealed
+
     const status = await fetchTableStatus();
     if (!status) return;
 
@@ -441,7 +408,6 @@ async function refreshUI() {
 
     renderActivePlayers(status);
     renderStartGameButton(status);
-    renderFinishGameButton(status);
 }
 
 const socket = io();
@@ -459,6 +425,10 @@ socket.on("TURN_TIMER", (data) => {
     if (data && typeof data.turnTimeRemaining === "number") {
         updateTimerDisplay(data.turnTimeRemaining);
     }
+});
+
+socket.on("SHOWDOWN_REVEAL", async (winnerData) => {
+    await handleSequencedShowdown(winnerData);
 });
 
 function renderCards(containerId, cards) {

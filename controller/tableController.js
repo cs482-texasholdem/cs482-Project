@@ -184,25 +184,7 @@ function startGame(req, res) {
     });
 }
 
-function finishGame(req, res) {
-    const result = mainTable.finishGame();
-    if (!result.success) {
-        return res.status(400).json({ error: result.error });
-    }
-
-    const io = req.app.get('io');
-    if (io) {
-        io.to(`table_${mainTable.tableId}`).emit('SHOWDOWN_REVEAL', result.winnerData);
-    }
-
-    broadcastTableUpdate(req);
-
-    return res.status(200).json({
-        message: "Game finished successfully.",
-        winnerData: result.winnerData
-    });
-}
-
+//[cite: 2] Updated tableController.js action handlers to broadcast automated showdown results
 function playerAction(req, res) {
     const { playerId, action, amount } = req.body;
     if (!playerId || !action) {
@@ -214,14 +196,18 @@ function playerAction(req, res) {
         return res.status(400).json({ error: result.error });
     }
 
-    broadcastTableUpdate(req);
-
-    const p = mainTable.playerManager.getPlayer(playerId);
     const winnerData = result.winnerData;
     if (winnerData && winnerData.winners) {
+        const io = req.app.get('io');
+        if (io) {
+            io.to(`table_${mainTable.tableId}`).emit('SHOWDOWN_REVEAL', winnerData);
+        }
         mainTable.resetToLobby();
     }
 
+    broadcastTableUpdate(req);
+
+    const p = mainTable.playerManager.getPlayer(playerId);
     return res.status(200).json({
         message: `Action ${action} recorded successfully.`,
         chips: p ? p.chips : 0,
@@ -249,6 +235,10 @@ function nextRound(req, res) {
 
     const winnerData = result.winnerData;
     if (winnerData && winnerData.winners) {
+        const io = req.app.get('io');
+        if (io) {
+            io.to(`table_${mainTable.tableId}`).emit('SHOWDOWN_REVEAL', winnerData);
+        }
         mainTable.resetToLobby();
     }
 
@@ -260,6 +250,25 @@ function nextRound(req, res) {
         winnerData: winnerData,
         pot: result.pot,
         playerHand
+    });
+}
+
+function finishGame(req, res) {
+    const result = mainTable.finishGame();
+    if (!result.success) {
+        return res.status(400).json({ error: result.error });
+    }
+
+    const io = req.app.get('io');
+    if (io) {
+        io.to(`table_${mainTable.tableId}`).emit('SHOWDOWN_REVEAL', result.winnerData);
+    }
+
+    broadcastTableUpdate(req);
+
+    return res.status(200).json({
+        message: "Game finished successfully.",
+        winnerData: result.winnerData
     });
 }
 
