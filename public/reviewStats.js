@@ -116,7 +116,7 @@ async function loadPlayerStatistics(playerId) {
     } catch (error) {
         console.error("Error computing player statistics:", error);
         document.getElementById("last-games-tbody").innerHTML = `
-            <tr><td colspan="6" class="text-center text-danger py-3">Failed to load statistics.</td></tr>
+            <tr><td colspan="5" class="text-center text-danger py-3">Failed to load statistics.</td></tr>
         `;
     }
 }
@@ -140,12 +140,7 @@ function renderLast5Games(games, playerId) {
             <td class="small text-white opacity-75">${dateStr}</td>
             <td>${outcomeBadge}</td>
             <td class="text-warning fw-bold">${g.potFinal || 0} Chips</td>
-            <td class="text-info">${actionCount} Player Actions</td>
-            <td class="text-end pe-3">
-                <a href="reviewGame.html?id=${g._id}" class="btn btn-sm btn-outline-warning shadow-none">
-                    <i class="bi bi-eye"></i> Audit
-                </a>
-            </td>
+            <td class="text-end pe-3 text-info">${actionCount} Player Actions</td>
         `;
         tbody.appendChild(tr);
     });
@@ -161,6 +156,6 @@ function renderEmptyStats() {
     document.getElementById("stat-dealer-win-rate").textContent = "N/A";
 
     document.getElementById("last-games-tbody").innerHTML = `
-        <tr><td colspan="6" class="text-center text-muted py-3">No game history found for this player.</td></tr>
+        <tr><td colspan="5" class="text-center text-muted py-3">No game history found for this player.</td></tr>
     `;
 }
