@@ -3,6 +3,8 @@
 // Purpose: Frontend controller for tableDisplay.html. Manages identity, 
 //          socket connections, UI rendering, timer display, and action handling.
 // ============================================================================
+let currentPlayerId = "";
+let socket = null;
 
 function getPlayerIdFromUrl() {
     const urlParams = new URLSearchParams(window.location.search);
@@ -10,30 +12,47 @@ function getPlayerIdFromUrl() {
     return id && id !== "buyInAmount" && id !== "tableName" ? decodeURIComponent(id.trim()) : "";
 }
 
+// Robust initialization: URL > Logged-In User Session > Guest Storage > Fallback Guest
 async function initializePlayerIdentity() {
-    currentPlayerId = getPlayerIdFromUrl();
+    const identityMode = sessionStorage.getItem("identityMode");
+    const savedGuestId = sessionStorage.getItem("guestPlayerId");
 
-    if (!currentPlayerId) {
-        try {
-            const res = await fetch('/loggeduser');
-            if (res.ok) {
-                const user = await res.json();
-                if (user && (user.username || user.email || user.id)) {
-                    currentPlayerId = user.username || user.email.split('@')[0];
+     // If this tab is already a guest, preserve that identity.
+    if (identityMode === "guest" && savedGuestId) {
+        currentPlayerId = savedGuestId;
+    } else {
+        currentPlayerId = getPlayerIdFromUrl();
+
+        // If the URL explicitly has a Guest ID, lock it in immediately and stop session checks
+        if (currentPlayerId && currentPlayerId.startsWith("Guest_")) {
+            const headerName = document.getElementById("header-player-name");
+            const displayName = document.getElementById("display-player-id");
+            if (headerName) headerName.textContent = currentPlayerId;
+            if (displayName) displayName.textContent = currentPlayerId;
+            
+            initializeSocketAndUI();
+            return;
+        } else if (!currentPlayerId) {
+
+            // Otherwise, check server session for logged-in users
+            try {
+                const res = await fetch('/loggeduser');
+                if (res.ok) {
+                    const user = await res.json();
+                    if (user && (user.username || user.email || user.id)) {
+                        currentPlayerId = user.id || user.username || (user.email ? user.email.split("@")[0] : "");
+                    }
                 }
+            } catch (e) {
+                console.error("Failed to fetch user session:", e);
             }
-        } catch (e) {
-            console.error("Failed to fetch user session:", e);
         }
     }
 
     if (!currentPlayerId) {
-        currentPlayerId = localStorage.getItem("guestPlayerId") || sessionStorage.getItem("guestPlayerId");
-    }
-
-    if (!currentPlayerId) {
         currentPlayerId = `Guest_${Math.floor(1000 + Math.random() * 9000)}`;
-        localStorage.setItem("guestPlayerId", currentPlayerId);
+        sessionStorage.setItem("identityMode", "guest");
+        sessionStorage.setItem("guestPlayerId", currentPlayerId);
     }
 
     const headerName = document.getElementById("header-player-name");
@@ -41,11 +60,29 @@ async function initializePlayerIdentity() {
     if (headerName) headerName.textContent = currentPlayerId;
     if (displayName) displayName.textContent = currentPlayerId;
 
+    await registerPlayerToTable(currentPlayerId);
+}
+
+//sends post requests to /api/table/join then initializes socket.io connection
+async function registerPlayerToTable(playerId) {
+    try {
+        const modeParam = isSpectatorMode ? "spectator" : "player";
+        await fetch(`/api/table/join?playerId=${encodeURIComponent(playerId)}&mode=${modeParam}`, {
+            method: "POST"
+        });
+    } catch (error) {
+        console.error("Error joining table:", error);
+    }
+
     initializeSocketAndUI();
 }
 
 function initializeSocketAndUI() {
-    const socket = io();
+    if (socket) {
+        return;
+    }
+
+    socket = io();
     socket.on("connect", () => {
         console.log("Connected to server via Socket.io");
         socket.emit("join_table", "main");
@@ -67,30 +104,8 @@ function initializeSocketAndUI() {
 
 initializePlayerIdentity();
 
-let currentPlayerId = getPlayerIdFromUrl();
-
-function checkBlankName() {
-    if (!currentPlayerId) {
-        const name = prompt("Enter your Player ID to join the table:");
-        if (name && name.trim()) {
-            window.location.href = `tableDisplay.html?playerId=${encodeURIComponent(name.trim())}`;
-            return false;
-        } else {
-            alert("A valid Player ID is required to play.");
-            return checkBlankName();
-        }
-    }
-    return true;
-}
-
-if (!checkBlankName()) {
-    // halts execution until redirection
-}
-
-const headerElem = document.getElementById("header-player-name");
-const displayElem = document.getElementById("display-player-id");
-if (headerElem) headerElem.textContent = currentPlayerId;
-if (displayElem) displayElem.textContent = currentPlayerId;
+document.getElementById("header-player-name").textContent = currentPlayerId;
+document.getElementById("display-player-id").textContent = currentPlayerId;
 
 const betScale = document.getElementById("bet-scale");
 const raiseAmount = document.getElementById("raise-amount");
@@ -463,27 +478,6 @@ async function refreshUI() {
     renderActivePlayers(status);
     renderStartGameButton(status);
 }
-
-const tableSocket = io();
-tableSocket.on("connect", () => {
-    console.log("Connected to server via Socket.io");
-    tableSocket.emit("join_table", "main");
-    refreshUI();
-});
-
-tableSocket.on("TABLE_UPDATED", () => {
-    refreshUI();
-});
-
-tableSocket.on("TURN_TIMER", (data) => {
-    if (data && typeof data.turnTimeRemaining === "number") {
-        updateTimerDisplay(data.turnTimeRemaining);
-    }
-});
-
-tableSocket.on("SHOWDOWN_REVEAL", async (winnerData) => {
-    await handleSequencedShowdown(winnerData);
-});
 
 function renderCards(containerId, cards) {
     const container = document.getElementById(containerId);

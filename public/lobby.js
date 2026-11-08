@@ -19,81 +19,102 @@ document.addEventListener("DOMContentLoaded", async function() {
     const urlParams = new URLSearchParams(window.location.search);
     let playerId = urlParams.get("playerId");
 
-    // Fallback: check localStorage/sessionStorage if missing from URL query
-    if (!playerId) {
-        playerId = localStorage.getItem("guestPlayerId") || sessionStorage.getItem("guestPlayerId");
-    } else {
-        localStorage.setItem("guestPlayerId", playerId);
+    // If ID is in URL, save it to localStorage
+    if (playerId && playerId.startsWith("Guest_")) {
+        sessionStorage.setItem("guestPlayerId", playerId);
+        sessionStorage.setItem("identityMode", "guest");
+    } else { 
+        // Otherwise, check localStorage/sessionStorage
+        playerId = sessionStorage.getItem("guestPlayerId");
+    }
+
+    // If the URL explicitly has a Guest ID, lock this tab into Guest mode 
+    if (playerId && playerId.startsWith("Guest_")) {
+        setupGuestLobbyView(playerId);
+        setupCommonLobbyListeners(playerId);
+        return;
     }
 
     // Check with the backend server to see if a real user account is logged in
-    try {
-        const res = await fetch('/loggeduser');
-        const user = await res.json();
-        const dashboardNavItem = document.getElementById('dashboard-nav-item');
-        const saveContainer = document.getElementById('lobby-save-container');
-        const lobbyContainer = document.querySelector('.container.my-5');
-        const isLoggedIn = user && (user.username || user.email || user.id);
+    if (sessionStorage.getItem("identityMode") !== "guest") {
+        try {
+            const res = await fetch('/loggeduser');
+            const user = await res.json();
+            const isLoggedIn = user && (user.username || user.email || user.id);
 
-        // --- GUEST VIEW CONFIGURATION --- If no active server session user, but we have a guest playerId
-        if (!isLoggedIn && playerId) {
-            //guest view: disable dashboard link and show a banner
-            if (dashboardNavItem) {
-                dashboardNavItem.innerHTML = `
-                    <span class="nav-link text-muted" style="cursor: not-allowed;" title="Create an account to unlock your dashboard">
-                        <span class="bi-lock-fill me-1 text-warning"></span> Dashboard (Locked)
-                    </span>
-                `;
+            if (!isLoggedIn) {
+                localStorage.removeItem("guestPlayerId");
+                sessionStorage.removeItem("guestPlayerId");
+                setupGuestLobbyView(playerId);
             }
-            if (saveContainer) saveContainer.style.display = "none";
-
-            // Show guest banner encouraging them to sign up and save points
-            if (lobbyContainer) {
-                const pokerBanner = document.createElement('div');
-                pokerBanner.className = 'alert alert-dismissible fade show mb-4 text-white shadow-lg border-0';
-                pokerBanner.style.background = 'linear-gradient(135deg, #1b2a47 0%, #315CA8 100%)';
-                pokerBanner.style.borderLeft = '5px solid #f1c40f';
-                pokerBanner.innerHTML = `
-                    <div class="d-flex align-items-center">
-                        <div class="fs-2 me-3 text-warning">
-                            <i class="bi bi-suit-spade-fill"></i><i class="bi bi-suit-heart-fill text-danger ms-n2"></i>
-                        </div>
-                        <div>
-                            <h5 class="fw-bold mb-1 text-warning">Playing as Guest (${encodeURIComponent(playerId)})</h5>
-                            <p class="mb-0 text-white opacity-90 small">
-                                Your chip stack is currently temporary! <strong>Create an account</strong> to save your points, lock in your stats, and unlock your personal player dashboard.
-                            </p>
-                        </div>
-                        <div class="ms-auto">
-                            <a href="signup.html?playerId=${encodeURIComponent(playerId)}" class="btn btn-save-points fw-bold text-dark px-3 py-2 text-nowrap">
-                                <i class="bi bi-person-plus-fill me-1"></i> Save Points & Sign Up
-                            </a>
-                        </div>
-                    </div>
-                `;
-                lobbyContainer.prepend(pokerBanner);
-            }
-        // --- LOGGED-IN USER VIEW CONFIGURATION ---
-        } else {
-            //logged-in user: clear any guest playerId from storage to avoid confusion
-            localStorage.removeItem("guestPlayerId");
-            sessionStorage.removeItem("guestPlayerId");
-
-            // LOGGED-IN USER VIEW: Keep normal Dashboard link and hide guest save elements
-            if (dashboardNavItem) {
-                dashboardNavItem.innerHTML = `
-                    <a class="nav-link fw-semibold text-white" href="index.html">
-                        <span class="bi-house-fill me-1"></span> Dashboard
-                    </a>
-                `;
-            }
-            if (saveContainer) saveContainer.style.display = "none";
+        } catch (e) {
+            console.error("Session verification failed:", e);
         }
-    } catch (e) {
-        console.error("Session verification failed:", e);
     }
 
-    //Handle Save Points button click in the lobby header
+    setupCommonLobbyListeners(playerId);
+});
+
+//helper function for guest view
+function setupGuestLobbyView(playerId) {
+    const dashboardNavItem = document.getElementById('dashboard-nav-item');
+    const saveContainer = document.getElementById('lobby-save-container');
+    const lobbyContainer = document.querySelector('.container.my-5');
+
+    //disable dashboard link and show a banner
+    if (dashboardNavItem) {
+        dashboardNavItem.innerHTML = `
+            <span class="nav-link text-muted" style="cursor: not-allowed;" title="Create an account to unlock your dashboard">
+                <span class="bi-lock-fill me-1 text-warning"></span> Dashboard (Locked)
+            </span>
+        `;
+    }
+    if (saveContainer) saveContainer.style.display = "none";
+
+    // Show guest banner encouraging them to sign up and save points
+    if (lobbyContainer) {
+        const pokerBanner = document.createElement('div');
+        pokerBanner.className = 'alert alert-dismissible fade show mb-4 text-white shadow-lg border-0';
+        pokerBanner.style.background = 'linear-gradient(135deg, #1b2a47 0%, #315CA8 100%)';
+        pokerBanner.style.borderLeft = '5px solid #f1c40f';
+        pokerBanner.innerHTML = `
+            <div class="d-flex align-items-center">
+                <div class="fs-2 me-3 text-warning">
+                    <i class="bi bi-suit-spade-fill"></i><i class="bi bi-suit-heart-fill text-danger ms-n2"></i>
+                </div>
+                <div>
+                    <h5 class="fw-bold mb-1 text-warning">Playing as Guest (${encodeURIComponent(playerId)})</h5>
+                    <p class="mb-0 text-white opacity-90 small">
+                        Your chip stack is currently temporary! <strong>Create an account</strong> to save your points.
+                    </p>
+                </div>
+                <div class="ms-auto">
+                    <a href="signup.html?playerId=${encodeURIComponent(playerId)}" class="btn btn-save-points fw-bold text-dark px-3 py-2 text-nowrap">
+                        <i class="bi bi-person-plus-fill me-1"></i> Save Points & Sign Up
+                    </a>
+                </div>
+            </div>
+        `;
+        lobbyContainer.prepend(pokerBanner);
+    }
+}
+
+//helper function for logged in user view
+function setUpLoggedInLobbyView(user) {
+    const dashboardNavItem = document.getElementById('dashboard-nav-item');
+    const saveContainer = document.getElementById('lobby-save-container');
+    if (dashboardNavItem) {
+        dashboardNavItem.innerHTML = `
+            <a class="nav-link fw-semibold text-white" href="index.html">
+                <span class="bi-house-fill me-1"></span> Dashboard
+            </a>
+        `;
+    }
+    if (saveContainer) saveContainer.style.display = "none";
+}
+
+function setupCommonLobbyListeners(playerId) {
+    //handle Save Points button click in the lobby header
     const lobbySaveBtn = document.getElementById("lobby-save-btn");
     if (lobbySaveBtn) {
         lobbySaveBtn.addEventListener("click", () => {
@@ -109,13 +130,11 @@ document.addEventListener("DOMContentLoaded", async function() {
             e.preventDefault();
             localStorage.clear();
             sessionStorage.clear();
-            if (typeof socket !== 'undefined' && socket) {
-                socket.disconnect();
-            }
             window.location.href = "/logout";
         });
     }
-});
+}
+
 
 // helper function to open the table seating sidebar and populate values
 function openJoinSidebar(tableName, blinds, minBuyin) {
@@ -140,32 +159,51 @@ function togglePublicLobbies() {
     }
 }
 
-// Ensure table seating form appends the correct guest playerId when submitting
+// Ensure table seating form appends the correct playerId when submitting
 const joinTableForm = document.getElementById("joinTableForm");
+
 if (joinTableForm) {
     joinTableForm.addEventListener("submit", async function(event) {
-        event.preventDefault(); // Pause standard form submit briefly so we can attach the user identity
+        event.preventDefault();
+
         let resolvedPlayerId = "";
 
-        // Check if there is a logged in user
-        try {
-            const res = await fetch('/loggeduser');
-            const user = await res.json();
+        // Check whether this tab is in Guest mode
+        if (sessionStorage.getItem("identityMode") === "guest") {
+            resolvedPlayerId = sessionStorage.getItem("guestPlayerId");
 
-            if (user && (user.username || user.email || user.id)) {
-                resolvedPlayerId = user.username || user.email.split('@')[0];
+        } else {
+            // Check if there is a logged-in user
+            try {
+                const res = await fetch('/loggeduser');
+                const user = await res.json();
+
+                if (user && (user.username || user.email || user.id)) {
+                    resolvedPlayerId = user.username || 
+                        (user.email ? user.email.split('@')[0] : user.id);
+                }
+            } catch (error) {
+                console.error('Session check during table join failed:', error);
             }
-        } catch (error) {
-            console.error('Session check during table join failed:', error);
         }
 
-        // If not logged in, check URL or localStorage for existing guest ID
+        // If no identity was found, check the URL for an existing guest ID
         if (!resolvedPlayerId) {
             const urlParams = new URLSearchParams(window.location.search);
-            resolvedPlayerId = urlParams.get("playerId") || localStorage.getItem("guestPlayerId") || `Guest_${Math.floor(1000 + Math.random() * 9000)}`;
+            const urlPlayerId = urlParams.get("playerId");
+
+            if (urlPlayerId && urlPlayerId.startsWith("Guest_")) {
+                resolvedPlayerId = urlPlayerId;
+                sessionStorage.setItem("guestPlayerId", resolvedPlayerId);
+                sessionStorage.setItem("identityMode", "guest");
+            } else {
+                resolvedPlayerId = `Guest_${Math.floor(1000 + Math.random() * 9000)}`;
+                sessionStorage.setItem("guestPlayerId", resolvedPlayerId);
+                sessionStorage.setItem("identityMode", "guest");
+            }
         }
 
-        //Remove any old hidden input to prevent duplicate parameters
+        // Remove any old hidden input to prevent duplicate parameters
         const existingInput = this.querySelector('input[name="playerId"]');
         if (existingInput) {
             existingInput.remove();
