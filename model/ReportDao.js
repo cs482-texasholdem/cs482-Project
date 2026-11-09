@@ -66,5 +66,5 @@ exports.readAll = async function() {
  * @returns {Promise<Object|null>} The updated report document or null if not found
  */
 exports.findByIdAndUpdate = async function(id, updateData) {
-    return await Report.findByIdAndUpdate(id, updateData, { new: true });
+    return await Report.findByIdAndUpdate(id, updateData, { returnDocument: 'after' });
 };

@@ -220,13 +220,14 @@ test('loggedUser should send null JSON when no user session is active', function
 });
 
 test('logout should clear session user and redirect to index.html', function(){
-    let req = { session: { user: { username: 'activeUser', email: 'active@mail.com' } } };
-    let res = { redirect: jest.fn() };
+    const req = { session: { user: { username: 'activeUser'}, destroy: jest.fn((callback) => callback(null)) } };
+    const res = { redirect: jest.fn(), clearCookie: jest.fn(), setHeader: jest.fn() };
 
     controller.logout(req, res);
 
     expect(req.session.user).toBeNull();
-    expect(res.redirect).toHaveBeenCalledWith('index.html');
+    expect(req.session.destroy).toHaveBeenCalled();
+    expect(res.redirect).toHaveBeenCalledWith('/login.html');
 });
 
 // ==========================================

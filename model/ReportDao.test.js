@@ -105,7 +105,7 @@ describe('ReportDao Unit Tests', () => {
             expect(ReportModel.findByIdAndUpdate).toHaveBeenCalledWith(
                 reportId,
                 updateData,
-                { new: true }
+                { returnDocument: 'after' }
             );
             expect(result).toEqual(updatedDocument);
         });

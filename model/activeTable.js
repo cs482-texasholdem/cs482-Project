@@ -321,11 +321,15 @@ class ActiveTable {
     }
 
     checkTimeout() {
+        if (this.isLocked) {
+            return false;
+        }
         return this._acquireLock(() => {
             if (!this.gameInProgress || this.playerManager.players.length === 0) return false;
             const now = Date.now();
+            const timeoutDuration = this.timeLimit * 1000;
             
-            if (this.turnStartTime && (now - this.turnStartTime >= 30000)) {
+            if (this.turnStartTime && (now - this.turnStartTime >= timeoutDuration)) {
                 const currentId = this.playerManager.players[this.currentTurnIndex];
                 const player = this.playerManager.getPlayer(currentId);
                 
@@ -336,12 +340,23 @@ class ActiveTable {
                     const timeouts = (this.playerManager.consecutiveTimeouts.get(currentId) || 0) + 1;
                     this.playerManager.consecutiveTimeouts.set(currentId, timeouts);
 
-                    this._executeActionInternal(currentId, action, 0);
+                    const actionResult = this._executeActionInternal(currentId, action, 0);
 
+                    //remove player after 2 timeouts consecutively
                     if (timeouts >= 2) {
-                        this.removePlayer(currentId);
+                        this.playerManager.removePlayer(currentId, this.gameInProgress);
                     }
-                    return true;
+
+                    // Force reset the timer for the next turn so it doesn't instantly re-trigger
+                    this.turnStartTime = Date.now();
+                    this.turnToken++;
+
+                    return {
+                        timedOut: true,
+                        playerId: currentId,
+                        action: action,
+                        winnerData: actionResult.winnerData || null
+                    };
                 }
             }
             return false;
@@ -364,13 +379,16 @@ class ActiveTable {
                 return { success: false, error: "You have already acted this round." };
             }
 
+            // Reset the timeout count when the player performs a real action.
+            this.playerManager.consecutiveTimeouts.set(playerId, 0);
+
             return this._executeActionInternal(playerId, action, amount);
         });
     }
 
     _executeActionInternal(playerId, action, amount = 0) {
         const player = this.playerManager.getPlayer(playerId);
-        this.playerManager.consecutiveTimeouts.set(playerId, 0);
+        const wasCurrentTurn = (this.playerManager.players[this.currentTurnIndex] === playerId);
 
         if (action === "Fold") {
             player.folded = true;
@@ -456,7 +474,7 @@ class ActiveTable {
             return { success: true, roundAdvanced: true, ...roundResult };
         }
 
-        if (action !== "Fold") {
+        if (wasCurrentTurn) {
             let safety = 0;
             do {
                 this.currentTurnIndex = (this.currentTurnIndex + 1) % this.playerManager.players.length;
