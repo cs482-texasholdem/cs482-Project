@@ -110,10 +110,10 @@ exports.deleteAll = async function(){
  */
 exports.update = async function(idOrQuery, updateData){
     if (typeof idOrQuery === 'object') {
-        let updatedUser = await userModel.findOneAndUpdate(idOrQuery, updateData, { new: true, runValidators: true });
+        let updatedUser = await userModel.findOneAndUpdate(idOrQuery, updateData, { returnDocument: 'after', runValidators: true });
         return updatedUser;
     } else {
-        let updatedUser = await userModel.findByIdAndUpdate(idOrQuery, updateData, { new: true, runValidators: true });
+        let updatedUser = await userModel.findByIdAndUpdate(idOrQuery, updateData, { returnDocument: 'after', runValidators: true });
         return updatedUser;
     }
 };

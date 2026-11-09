@@ -69,6 +69,10 @@ async function startServer() {
             }
         }, 1000);
 
+        if (intervalId.unref) {
+            intervalId.unref();
+        }
+
         server.listen(PORT, () => {
             console.log(`Server is running live on port ${PORT}`);
         });

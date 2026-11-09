@@ -1,9 +1,13 @@
+jest.mock('./GameDao');
+const GameDao = require('./GameDao');
 const ActiveTable = require('./activeTable.js');
 
 describe('ActiveTable Class (Delegated PlayerManager & Game Engine with Side-Pots)', () => {
     let table;
 
     beforeEach(() => {
+        jest.clearAllMocks();
+        GameDao.create.mockResolvedValue({});
         table = new ActiveTable('main-table', 'general', 30);
     });
 
@@ -133,14 +137,18 @@ describe('ActiveTable Class (Delegated PlayerManager & Game Engine with Side-Pot
         expect(round1.communityCards).toHaveLength(5);
         expect(table.displayedCards).toHaveLength(3);
 
-        const round2 = table.nextRound();
+        table.nextRound(); //round 2
         expect(table.displayedCards).toHaveLength(4);
 
-        const round3 = table.nextRound();
+        table.nextRound(); //round 3
         expect(table.displayedCards).toHaveLength(5);
 
-        const round4 = table.nextRound();
-        expect(round4.winnerData).toBeDefined();
+        const showdown = table.nextRound();
+        expect(showdown.winnerData).toBeDefined();
+
+        expect(GameDao.create).toHaveBeenCalledWith(
+        expect.objectContaining({ tableId: 'main-table' })
+    );
     });
 
     test('displayCards formats valid cards and throws on invalid card numbers', () => {

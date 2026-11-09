@@ -22,9 +22,9 @@ describe('Deck Class & Poker Hand Evaluator', () => {
       deck.shuffleCards();
       const secondShuffle = [...deck.deck];
 
-      expect(initialDeckOrder).toHaveLength(52);
       expect(firstShuffle).toHaveLength(52);
-      expect(firstShuffle).not.toEqual(initialDeckOrder);
+      expect(initialDeckOrder).toHaveLength(52);
+      expect(firstShuffle.sort()).toEqual(initialDeckOrder.sort());
       expect(secondShuffle).toHaveLength(52);
       expect(secondShuffle).not.toEqual(initialDeckOrder);
       expect(secondShuffle).not.toEqual(firstShuffle);

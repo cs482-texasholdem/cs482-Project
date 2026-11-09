@@ -1,9 +1,15 @@
+jest.mock('../model/GameDao');
+const GameDao = require('../model/GameDao');
 const { getTableStatus, joinTable, leaveTable, startGame, playerAction, nextRound } = require('../controller/tableController.js');
 
 describe('Table Controller Unit Tests', () => {
     let req, res, mockIo;
 
     beforeEach(() => {
+        jest.clearAllMocks();
+        // Prevent tests from making real database writes
+        GameDao.create.mockResolvedValue({})
+
         //set up mock io for testing broadcasts
         mockIo = {
             emit: jest.fn(),
