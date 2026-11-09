@@ -369,8 +369,15 @@ class ActiveTable {
             if (!player || !this.playerManager.players.includes(playerId)) {
                 return { success: false, error: "Invalid player or inactive in this round." };
             }
-            if (action !== "Fold" && player.folded) {
-                return { success: false, error: "Player has already folded." };
+            if (player.hasActed && action !== "Fold") {
+                const facingNewBet = player.currentBet < this.currentHighestBet;
+
+                if (!facingNewBet || action !== "Call") {
+                    return {
+                        success: false,
+                        error: "You have already acted this round."
+                    };
+                }
             }
             if (action !== "Fold" && this.playerManager.players[this.currentTurnIndex] !== playerId) {
                 return { success: false, error: "Not your turn." };
@@ -419,29 +426,52 @@ class ActiveTable {
                 player.totalHandContribution = (player.totalHandContribution || 0) + diff;
             }
         } else if (action === "Raise") {
-            if (amount <= this.currentHighestBet) {
+            const previousHighestBet = this.currentHighestBet;
+            const diff = amount - player.currentBet;
+
+            if (amount <= previousHighestBet) {
                 return { success: false, error: "Raise amount must exceed current highest bet." };
             }
-            const diff = amount - player.currentBet;
-            if (player.chips < diff) {
-                const allInAmount = player.chips;
-                player.chips = 0;
-                player.currentBet += allInAmount;
-                player.totalHandContribution = (player.totalHandContribution || 0) + allInAmount;
-                this.potManager.currentHighestBet = Math.max(
-                    this.currentHighestBet,
-                    player.currentBet
-                );
-                player.chips -= diff;
-                player.currentBet = amount;
-                this.potManager.currentHighestBet = amount;
-                player.totalHandContribution = (player.totalHandContribution || 0) + diff;
+
+            if (player.chips <= 0) {
+                return {
+                    success: false,
+                    error: "Player does not have enough chips to raise."
+                };
             }
-            this.aggressorIndex = this.playerManager.players.indexOf(playerId);
-            for (const id of this.playerManager.players) {
-                if (id !== playerId) {
-                    const p = this.playerManager.getPlayer(id);
-                    if (p && !p.folded) p.hasActed = false;
+            
+            const canAffordRaise = player.chips >= diff;
+            // A regular raise must meet the minimum raise size.
+            if (canAffordRaise && (amount - previousHighestBet) < this.lastRaiseSize) {
+                return {
+                    success: false,
+                    error: "Raise amount is below the minimum raise size."
+                };
+            }
+
+            // Calculate the player's actual contribution.
+            const actualContribution = Math.min(diff, player.chips);
+            player.chips -= actualContribution;
+            player.currentBet += actualContribution;
+            player.totalHandContribution = (player.totalHandContribution || 0) + actualContribution;
+
+            // Only update the highest bet if the player actually exceeds it.
+            if (player.currentBet > previousHighestBet) {
+                const raiseSize = player.currentBet - previousHighestBet;
+
+                this.potManager.currentHighestBet = player.currentBet;
+
+                // A full raise allows other players to act again.
+                if (raiseSize >= this.lastRaiseSize) {
+                    this.lastRaiseSize = raiseSize;
+                    this.aggressorIndex = this.playerManager.players.indexOf(playerId);
+
+                    for (const id of this.playerManager.players) {
+                        if (id !== playerId) {
+                            const p = this.playerManager.getPlayer(id);
+                            if (p && !p.folded && p.chips > 0) { p.hasActed = false; }
+                        }
+                    }
                 }
             }
         }
@@ -512,6 +542,7 @@ class ActiveTable {
             }
         }
         this.potManager.currentHighestBet = 0;
+        this.lastRaiseSize = this.bigBlind;
         this.currentTurnIndex = (this.dealerIndex + 1) % this.playerManager.players.length;
         let safety = 0;
         while (this.playerManager.getPlayer(this.playerManager.players[this.currentTurnIndex])?.folded && safety < this.playerManager.players.length) {
@@ -583,6 +614,7 @@ class ActiveTable {
         this.gameStarted = true;
         this.gameInProgress = true;
         this.potManager.reset();
+        this.lastRaiseSize = this.bigBlind;
 
         this.playerManager.updateQueueDistribution(this.gameInProgress);
         this.roundPlayerCount = this.playerManager.players.length;
@@ -628,7 +660,6 @@ class ActiveTable {
     }
 
     resetToLobby() {
-        this.playerManager.processPendingRemovals(this.gameInProgress);
         this.deck = new Deck();
         this.displayedCards = [];
         this.roundPlayerCount = null;
