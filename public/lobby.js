@@ -138,9 +138,21 @@ function setupCommonLobbyListeners(playerId) {
 
 // helper function to open the table seating sidebar and populate values
 function openJoinSidebar(tableId, tableName, blinds, minBuyin) {
-    document.getElementById('sidebarTableName').value = tableName;
-    document.getElementById('sidebarTableBlinds').value = blinds;
-    document.getElementById('sidebarTableMinBuyin').value = minBuyin;
+    // Only allow the three ranked table selections
+    const rankedTables = [
+        "ranked-beginner",
+        "ranked-intermediate",
+        "ranked-advanced"
+    ];
+
+    if (!rankedTables.includes(tableId)) {
+        console.error("Invalid ranked table:", tableId);
+        return;
+    }
+    
+    document.getElementById('sidebarTableName').textContent = tableName;
+    document.getElementById('sidebarTableBlinds').textContent = blinds;
+    document.getElementById('sidebarTableMinBuyin').textContent = minBuyin;
     
     let numericBuyin = parseInt(minBuyin.replace(/[^0-9]/g, '')) || 1000; //parse numeric min buy-in, default is 1000
     
