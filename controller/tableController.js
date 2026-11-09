@@ -9,6 +9,7 @@ const Deck = require("../util/pokerLogic");
 const TableManager = require("../model/tableManager");
 const tableManager = new TableManager();
 
+//defualt main table
 const mainTable = new ActiveTable("main", "general");
 tableManager.addTable(mainTable.tableId, mainTable);
 
@@ -21,6 +22,34 @@ function getRequestedTable(req) {
 
     return tableManager.getTable(tableId);
 }
+
+// ============================================================================
+// HELPER FUNCTIONS
+// ============================================================================
+
+
+//helper function to broadcast table updates to all connected clients
+function broadcastTableUpdate(req, tableId) {
+    const io = req.app.get('io');
+
+    if (io) {
+        io.emit('TABLE_UPDATED', { tableId });
+    }
+}
+
+// Send showdown results to the correct table
+function broadcastShowdown(req, table, winnerData) {
+    const io = req.app.get("io");
+
+    if (io) {
+        io.to(`table_${table.tableId}`)
+            .emit("SHOWDOWN_REVEAL", winnerData);
+    }
+}
+
+// ============================================================================
+// GET TABLE STATUS
+// ============================================================================
 
 function getTableStatus(req, res) {
     //call helper function to retrieved table ID
@@ -52,6 +81,7 @@ function getTableStatus(req, res) {
         }
     }
 
+    // Retrieve the requesting player's cards
     if (playerId && isPlayer && table.gameInProgress) {
         let hand = table.dealHandToPlayer(playerId);
         if (hand) {
@@ -62,15 +92,17 @@ function getTableStatus(req, res) {
     const currentTurnPlayer = (table.gameInProgress && table.players.length > 0) ? table.players[table.currentTurnIndex] : null;
     const dealerPlayerId = (table.gameInProgress && table.players.length > 0) ? table.players[table.dealerIndex] : null;
     const isCurrentTurn = playerId === currentTurnPlayer;
-    const buttonsBlocked = !isPlayer || isSpectator || !mainTable.gameInProgress || !isCurrentTurn || playerHasActed;
+    const buttonsBlocked = !isPlayer || isSpectator || !table.gameInProgress || !isCurrentTurn || playerHasActed;
 
+    // Determine which betting actions are available
     let canCheck = false;
     let canCall = false;
+
     if (isCurrentTurn && !buttonsBlocked) {
-        const currentPlayer = mainTable.playerManager.getPlayer(playerId);
+        const currentPlayer = table.playerManager.getPlayer(playerId);
         if (currentPlayer) {
-            canCheck = (currentPlayer.currentBet === mainTable.currentHighestBet);
-            const callAmountNeeded = mainTable.currentHighestBet - currentPlayer.currentBet;
+            canCheck = (currentPlayer.currentBet === table.currentHighestBet);
+            const callAmountNeeded = table.currentHighestBet - currentPlayer.currentBet;
             canCall = (callAmountNeeded > 0 && currentPlayer.chips >= callAmountNeeded);
             if (callAmountNeeded > 0 && currentPlayer.chips > 0) {
                 canCall = true;
@@ -81,6 +113,7 @@ function getTableStatus(req, res) {
     const elapsed = table.turnStartTime ? Math.floor((Date.now() - table.turnStartTime) / 1000) : 0;
     const turnTimeRemaining = Math.max(0, 30 - elapsed);
 
+    // Format player information
     const allPlayersData = table.players.map(id => {
         const p = table.playerManager.getPlayer(id);
         const isDealer = id === dealerPlayerId;
@@ -107,20 +140,28 @@ function getTableStatus(req, res) {
         bigBlind: table.bigBlind,
         visibility: table.visibility,
 
+        //players and spectators
         playerCount: table.getPlayerCount(),
         spectatorCount: table.getSpectatorCount(),
-        
         players: allPlayersData,
         spectators: spectatorsData,
+
         inTable,
         isPlayer,
         isSpectator,
+
+        //game information
         gameStarted: table.gameStarted,
         gameInProgress: table.gameInProgress,
         pot: table.pot,
+
+        //player info
         playerChips,
         playerBet,
         playerHasActed,
+        playerHand,
+
+        // Turn information
         currentTurnPlayer,
         isCurrentTurn,
         buttonsBlocked,
@@ -128,18 +169,16 @@ function getTableStatus(req, res) {
         canCall,
         turnTimeRemaining,
         currentHighestBet: table.currentHighestBet,
-        communityCards: table.displayCards(),
-        playerHand
+        
+        //community cards
+        communityCards: table.displayCards()
+        
     });
 }
 
-//helper function to broadcast table updates to all connected clients
-function broadcastTableUpdate(req) {
-    const io = req.app.get('io');
-    if (io) {
-        io.emit('TABLE_UPDATED', { tableId });
-    }
-}
+// ============================================================================
+// CREATE CUSTOM TABLE
+// ============================================================================
 
 
 function createTable(req, res) {
@@ -191,14 +230,11 @@ function createTable(req, res) {
     }
 
     // Create custom table through TableManager
-    const table = tableManager.createTable("general", 30, "custom");
+    const table = tableManager.createTable("general", 30, "custom", playerLimit, smallBlind, bigBlind);
 
     // Assign custom table settings
     table.tableName = tableName.trim();
-    table.maxPlayers = playerLimit;
     table.buyIn = buyInAmount;
-    table.smallBlind = smallBlindAmount;
-    table.bigBlind = bigBlindAmount;
     table.visibility = visibility;
 
     // Notify connected clients
@@ -212,6 +248,10 @@ function createTable(req, res) {
         maxPlayers: table.maxPlayers
     });
 }
+
+// ============================================================================
+// TABLE LOGIC
+// ============================================================================
 
 
 function joinTable(req, res) {
@@ -316,18 +356,13 @@ function playerAction(req, res) {
         return res.status(404).json({ error: "Table not found." });
     }
 
-    
-    const { playerId, action, amount } = req.body;
     if (!playerId || !action) {
         return res.status(400).json({ error: "Player ID and action are required." });
     }
 
-    const p = mainTable.playerManager.getPlayer(playerId);
-    if (p && typeof muckPreference === 'boolean') {
-        p.muckPreference = muckPreference;
-    }
+    // Retrieve player from the requested table
+    const p = table.playerManager.getPlayer(playerId);
 
-    const p = mainTable.playerManager.getPlayer(playerId);
     if (p && typeof muckPreference === 'boolean') {
         p.muckPreference = muckPreference;
     }
@@ -337,19 +372,14 @@ function playerAction(req, res) {
         return res.status(400).json({ error: result.error });
     }
 
-    broadcastTableUpdate(req, table.tableId); // Notify all clients of the table update
-
-    const p = table.playerManager.getPlayer(playerId);
     const winnerData = result.winnerData;
+
     if (winnerData && winnerData.winners) {
-        const io = req.app.get('io');
-        if (io) {
-            io.to(`table_${mainTable.tableId}`).emit('SHOWDOWN_REVEAL', winnerData);
-        }
-        mainTable.resetToLobby();
+        broadcastShowdown(req, table, winnerData); // Notify all clients of the table update
+        table.resetToLobby();
     }
 
-    broadcastTableUpdate(req);
+    broadcastTableUpdate(req, table.tableId);
 
     return res.status(200).json({
         message: `Action ${action} recorded successfully.`,
@@ -373,10 +403,12 @@ function nextRound(req, res) {
         return res.status(400).json({ error: result.error });
     }
 
-    const playerId = req.query.playerId;
+    const playerId = req.query?.playerId;
     let playerHand = [];
+
     if (playerId && table.players.includes(playerId)) {
-        let hand = table.dealHandToPlayer(playerId);
+        const hand = table.dealHandToPlayer(playerId);
+        
         if (hand) {
             playerHand = hand.map(card => Deck.cardToText(card));
         }
@@ -384,11 +416,7 @@ function nextRound(req, res) {
 
     const winnerData = result.winnerData;
     if (winnerData && winnerData.winners) {
-        const io = req.app.get('io');
-        if (io) {
-            io.to(`table_${mainTable.tableId}`).emit('SHOWDOWN_REVEAL', winnerData);
-        }
-        mainTable.resetToLobby();
+        broadcastShowdown(req, table, winnerData);
         table.resetToLobby();
     }
 
@@ -404,17 +432,25 @@ function nextRound(req, res) {
 }
 
 function finishGame(req, res) {
-    const result = mainTable.finishGame();
+    const table = getRequestedTable(req);
+
+    if (!table) {
+        return res.status(404).json({
+            error: "Table not found."
+        });
+    }
+    
+    const result = table.finishGame();
+
     if (!result.success) {
         return res.status(400).json({ error: result.error });
     }
 
-    const io = req.app.get('io');
-    if (io) {
-        io.to(`table_${mainTable.tableId}`).emit('SHOWDOWN_REVEAL', result.winnerData);
+    if (result.winnerData) {
+        broadcastShowdown(req, table, result.winnerData);
     }
 
-    broadcastTableUpdate(req);
+    broadcastTableUpdate(req, table.tableId);
 
     return res.status(200).json({
         message: "Game finished successfully.",

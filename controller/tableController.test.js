@@ -102,7 +102,12 @@ describe('Table Controller Unit Tests', () => {
         req.body = { playerId: 'ControllerPlayer1', action: 'Call' };
         playerAction(req, res);
         expect(res.status).toHaveBeenCalledWith(200);
-        expect(mockIo.emit).toHaveBeenCalledWith('TABLE_UPDATED');
+        
+        expect(mockIo.emit).toHaveBeenCalledWith(
+            "TABLE_UPDATED",
+            { tableId: "main" }
+        );
+
     });
 
     test('playerAction broadcasts PLAYER_FOLDED when a player folds', () => {
@@ -115,7 +120,11 @@ describe('Table Controller Unit Tests', () => {
         req.body = { playerId: 'ControllerPlayer1', action: 'Fold' };
         playerAction(req, res);
         expect(res.status).toHaveBeenCalledWith(200);
-        expect(mockIo.emit).toHaveBeenCalledWith('TABLE_UPDATED');
+        
+        expect(mockIo.emit).toHaveBeenCalledWith(
+            "TABLE_UPDATED",
+            { tableId: "main" }
+        );
     });
 });
 

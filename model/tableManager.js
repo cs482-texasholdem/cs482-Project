@@ -54,7 +54,7 @@ class TableManager {
     }
 
     // Creates a new ActiveTable
-    createTable(skillLevel = "general", timeLimit = 30, gameMode = "custom") {
+    createTable(skillLevel = "general", timeLimit = 30, gameMode = "custom", maxPlayer = 9, smallBlind = 10, bigBlind = 20) {
         //error checking
         if (typeof skillLevel !== "string" || skillLevel.trim() === "") {
             throw new Error("Invalid skill level.");
@@ -76,7 +76,7 @@ class TableManager {
 
         //create table logic
         const tableId = randomUUID();
-        const table = new ActiveTable(tableId, skillLevel, timeLimit, gameMode);
+        const table = new ActiveTable(tableId, skillLevel, timeLimit, gameMode, maxPlayer, smallBlind, bigBlind);
 
         if (!this.addTable(tableId, table)) {
             throw new Error("Failed to add table.");

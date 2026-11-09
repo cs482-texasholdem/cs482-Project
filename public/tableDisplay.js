@@ -16,11 +16,9 @@ if (!currentTableId) {
     );
 }
 
-/*
+
 function getPlayerIdFromUrl() {
-    const urlParams = new URLSearchParams(window.location.search);
-    let id = urlParams.get("playerId");
-    return id && id !== "buyInAmount" && id !== "tableName" ? decodeURIComponent(id.trim()) : "";
+   return urlParams.get("playerId")?.trim() || "";
 }
 
 // Robust initialization: URL > Logged-In User Session > Guest Storage > Fallback Guest
@@ -34,18 +32,8 @@ async function initializePlayerIdentity() {
     } else {
         currentPlayerId = getPlayerIdFromUrl();
 
-        // If the URL explicitly has a Guest ID, lock it in immediately and stop session checks
-        if (currentPlayerId && currentPlayerId.startsWith("Guest_")) {
-            const headerName = document.getElementById("header-player-name");
-            const displayName = document.getElementById("display-player-id");
-            if (headerName) headerName.textContent = currentPlayerId;
-            if (displayName) displayName.textContent = currentPlayerId;
-            
-            initializeSocketAndUI();
-            return;
-        } else if (!currentPlayerId) {
-
-            // Otherwise, check server session for logged-in users
+        if (!currentPlayerId) {
+            //check server session for logged-in users
             try {
                 const res = await fetch('/loggeduser');
                 if (res.ok) {
@@ -77,10 +65,25 @@ async function initializePlayerIdentity() {
 //sends post requests to /api/table/join then initializes socket.io connection
 async function registerPlayerToTable(playerId) {
     try {
-        const modeParam = isSpectatorMode ? "spectator" : "player";
-        await fetch(`/api/table/join?playerId=${encodeURIComponent(playerId)}&mode=${modeParam}`, {
-            method: "POST"
+        const response = await fetch("/api/table/join", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+                tableId: currentTableId,
+                playerId: playerId
+            })
         });
+
+        if (!response.ok) {
+            throw new Error("Failed to join table.");
+        }
+
+        const data = await response.json();
+
+        console.log("Table join result:", data);
+
     } catch (error) {
         console.error("Error joining table:", error);
     }
@@ -96,27 +99,36 @@ function initializeSocketAndUI() {
     socket = io();
     socket.on("connect", () => {
         console.log("Connected to server via Socket.io");
-        socket.emit("join_table", "main");
+        socket.emit("join_table", currentTableId);
         refreshUI();
     });
 
-    socket.on("TABLE_UPDATED", () => {
+    socket.on("TABLE_UPDATED", (data) => {
+        if (data?.tableId && data.tableId !== currentTableId) {
+            return;
+        }
+
         refreshUI();
     });
 
     socket.on("TURN_TIMER", (data) => {
-        if (data && typeof data.turnTimeRemaining === "number") {
+        if (data?.tableId !== currentTableId) {
+            return;
+        }
+
+        if (typeof data.turnTimeRemaining === "number") {
             updateTimerDisplay(data.turnTimeRemaining);
+        }
+    });
+
+    socket.on("SHOWDOWN_REVEAL", (winnerData) => {
+        if (!isShowingShowdown) {
+            handleSequencedShowdown(winnerData);
         }
     });
 
     refreshUI();
 }
-
-initializePlayerIdentity();
-
-document.getElementById("header-player-name").textContent = currentPlayerId;
-document.getElementById("display-player-id").textContent = currentPlayerId;
 
 const betScale = document.getElementById("bet-scale");
 const raiseAmount = document.getElementById("raise-amount");
@@ -175,12 +187,12 @@ if (lobbyLink) lobbyLink.addEventListener("click", (event) => {
     leaveTable("lobby.html");
 });
 
-// table link -> !defualt
-document.getElementById("table-link")
-    .addEventListener("click", (event) => {
-        event.preventDefault();
-    });
+// Table link -> Current Table
+const tableLink = document.getElementById("table-link");
 
+if (tableLink) {
+    tableLink.href = `tableDisplay.html?tableId=${encodeURIComponent(currentTableId)}`;
+}
 
 let modalTimeout = null;
 let currentTimerRemaining = 30;
@@ -336,12 +348,8 @@ function renderActivePlayers(status) {
         }
     });
 
-    if (status.communityCards) {
-        renderCards("community-cards", status.communityCards);
-    }
-    if (status.playerHand && status.playerHand.length > 0) {
-        renderCards("player-cards", status.playerHand);
-    }
+    renderCards("community-cards", status.communityCards || []);
+    renderCards("player-cards", status.playerHand || []);
 
     if (status.currentTurnPlayer && tableMessage) {
         tableMessage.textContent = `Current turn: ${status.currentTurnPlayer}`;
@@ -422,7 +430,7 @@ async function startGame() {
         const response = await fetch("/api/table/start", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ playerId: currentPlayerId })
+            body: JSON.stringify({ tableId: currentTableId, playerId: currentPlayerId})
         });
         if (!response.ok) {
             const err = await response.json();
@@ -449,7 +457,7 @@ async function startGame() {
 let isShowingShowdown = false;
 
 async function handleSequencedShowdown(winnerData) {
-    if (!winnerData || !winnerData.winners) return;
+    if (!winnerData || !winnerData.winners || isShowingShowdown) return;
 
     isShowingShowdown = true;
 
@@ -518,51 +526,31 @@ async function handleSequencedShowdown(winnerData) {
 async function refreshUI() {
     if (isShowingShowdown) return;
 
-    const status = await fetchTableStatus();
-    if (!status) return;
+        const status = await fetchTableStatus();
+        if (!status || isShowingShowdown) return;
 
-    // Update the selected table's displayed configuration
-    renderTableDetails(status);
+        // Update the selected table configuration
+        renderTableDetails(status);
 
-    if (!status.inTable) {
-        showJoinPrompt(status.gameInProgress);
-        return;
-    }
+        if (!status.inTable) {
+            showJoinPrompt(status.gameInProgress);
+            return;
+        }
 
-    if (status.isSpectator) {
-        if (tableMessage) tableMessage.textContent = "You are spectating. You will join active players when the next game starts.";
-    }
+        hideJoinPrompt();
 
-    renderActivePlayers(status);
-    renderStartGameButton(status);
+        renderActivePlayers(status);
+        renderStartGameButton(status);
+
+        if (status.isSpectator) {
+            renderCards("player-cards", []);
+
+            if (tableMessage) {
+                tableMessage.textContent =
+                    "You are spectating. You will join active players when the next game starts.";
+            }
+        }
 }
-
-const socket = io();
-//When client connects, request the current table status to update the UI
-socket.on("connect", () => {
-    console.log("Connected to server via Socket.io");
-    refreshUI();
-});
-//when any player acts, the server emits a TABLE_UPDATED event to all clients, prompting them to refresh their UI
-socket.on("TABLE_UPDATED", (data) => {
-    // Ignore updates explicitly belonging to another table
-    if (data?.tableId && data.tableId !== currentTableId) {
-        return;
-    }
-
-    refreshUI();
-});
-
-socket.on("TURN_TIMER", (data) => {
-    // Only update the timer for the selected table
-    if (data?.tableId !== currentTableId) {
-        return;
-    }
-
-    if (typeof data.turnTimeRemaining === "number") {
-        updateTimerDisplay(data.turnTimeRemaining);
-    }
-});
 
 function renderCards(containerId, cards) {
     const container = document.getElementById(containerId);
@@ -617,7 +605,7 @@ actionButtons.forEach((button) => {
             const res = await fetch("/api/table/action", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ tableId: currentTableId, playerId: currentPlayerId, action, amount, muckPreference })
+                body: JSON.stringify({ tableId: currentTableId, playerId: currentPlayerId, action, amount, muckPreference})
             });
 
             if (!res.ok) {
@@ -664,3 +652,6 @@ if (chatForm) {
         input.value = "";
     });
 }
+
+// Initialize after all UI elements and listeners are configured
+initializePlayerIdentity();

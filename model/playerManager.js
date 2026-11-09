@@ -19,7 +19,7 @@ class Player {
 }
 
 class PlayerManager {
-    constructor(maxPlayers = 10) {
+    constructor(maxPlayers = 9) {
         this.maxPlayers = maxPlayers;
         this.queue = [];
         this.players = [];
