@@ -579,6 +579,8 @@ body.table-page {
 .table-page #bet-scale {
     display: block;
     width: 100%;
+    box-sizing: border-box;
+    padding: 0;
     margin: 12px 0 8px;
     accent-color: var(--button-hover-blue);
     cursor: pointer;
@@ -739,4 +741,31 @@ body.table-page {
 
 .muck-switch input:checked + .muck-slider:before {
     transform: translateX(16px);
+}
+
+/* ============================================================================
+   Dashboard - Create Custom Table Form
+   ============================================================================ */
+
+#createTableForm .midnight-input {
+    background-color: #131b2e !important;
+    border-color: #3a506b !important;
+    color: #ffffff !important;
+}
+
+#createTableForm .midnight-input:focus {
+    background-color: #131b2e !important;
+    border-color: #6c757d !important;
+    color: #ffffff !important;
+    box-shadow: 0 0 0 0.25rem rgba(226, 234, 252, 0.15) !important;
+}
+
+#createTableForm .midnight-input::placeholder {
+    color: #adb5bd !important;
+    opacity: 1;
+}
+
+#createTableForm select option {
+    background-color: #0b132b;
+    color: #ffffff;
 }

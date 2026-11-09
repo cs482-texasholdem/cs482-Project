@@ -6,10 +6,19 @@
 let currentPlayerId = "";
 let socket = null;
 
+// Get the selected table from the URL
+const urlParams = new URLSearchParams(window.location.search);
+const currentTableId = urlParams.get("tableId")?.trim();
+
+if (!currentTableId) {
+    throw new Error(
+        "Missing tableId in URL. Open a table through the dashboard or lobby."
+    );
+}
+
+
 function getPlayerIdFromUrl() {
-    const urlParams = new URLSearchParams(window.location.search);
-    let id = urlParams.get("playerId");
-    return id && id !== "buyInAmount" && id !== "tableName" ? decodeURIComponent(id.trim()) : "";
+   return urlParams.get("playerId")?.trim() || "";
 }
 
 // Robust initialization: URL > Logged-In User Session > Guest Storage > Fallback Guest
@@ -23,18 +32,8 @@ async function initializePlayerIdentity() {
     } else {
         currentPlayerId = getPlayerIdFromUrl();
 
-        // If the URL explicitly has a Guest ID, lock it in immediately and stop session checks
-        if (currentPlayerId && currentPlayerId.startsWith("Guest_")) {
-            const headerName = document.getElementById("header-player-name");
-            const displayName = document.getElementById("display-player-id");
-            if (headerName) headerName.textContent = currentPlayerId;
-            if (displayName) displayName.textContent = currentPlayerId;
-            
-            initializeSocketAndUI();
-            return;
-        } else if (!currentPlayerId) {
-
-            // Otherwise, check server session for logged-in users
+        if (!currentPlayerId) {
+            //check server session for logged-in users
             try {
                 const res = await fetch('/loggeduser');
                 if (res.ok) {
@@ -60,7 +59,8 @@ async function initializePlayerIdentity() {
     if (headerName) headerName.textContent = currentPlayerId;
     if (displayName) displayName.textContent = currentPlayerId;
 
-    await registerPlayerToTable(currentPlayerId);
+    // Initialize the table interface without automatically joining
+    initializeSocketAndUI();
 }
 
 //sends post requests to /api/table/join then initializes socket.io connection
@@ -85,34 +85,68 @@ function initializeSocketAndUI() {
     socket = io();
     socket.on("connect", () => {
         console.log("Connected to server via Socket.io");
-        socket.emit("join_table", "main");
+        socket.emit("join_table", currentTableId);
         refreshUI();
     });
 
-    socket.on("TABLE_UPDATED", () => {
+    socket.on("TABLE_UPDATED", (data) => {
+        if (data?.tableId && data.tableId !== currentTableId) {
+            return;
+        }
+
         refreshUI();
     });
 
     socket.on("TURN_TIMER", (data) => {
-        if (data && typeof data.turnTimeRemaining === "number") {
+        if (data?.tableId !== currentTableId) {
+            return;
+        }
+
+        if (typeof data.turnTimeRemaining === "number") {
             updateTimerDisplay(data.turnTimeRemaining);
         }
     });
 
     socket.on("SHOWDOWN_REVEAL", (winnerData) => {
-       if (!isShowingShowdown) handleSequencedShowdown(winnerData);
+        if (!isShowingShowdown) {
+            handleSequencedShowdown(winnerData);
+        }
     });
 
     refreshUI();
 }
 
-initializePlayerIdentity();
-
-document.getElementById("header-player-name").textContent = currentPlayerId;
-document.getElementById("display-player-id").textContent = currentPlayerId;
-
 const betScale = document.getElementById("bet-scale");
 const raiseAmount = document.getElementById("raise-amount");
+
+function updateRaiseControls(status) {
+    const min = status.minRaise;
+    const max = status.maxRaise;
+    const enabled = status.canRaise;
+
+    betScale.min = min;
+    betScale.max = Math.max(min, max);
+
+    raiseAmount.min = min;
+    raiseAmount.max = Math.max(min, max);
+
+    betScale.disabled = !enabled;
+    raiseAmount.disabled = !enabled;
+
+    const currentAmount = Number(raiseAmount.value);
+
+    const amount = enabled
+        ? Math.max(min, Math.min(currentAmount || min, max))
+        : 0;
+    
+    betScale.value = amount;
+    raiseAmount.value = amount;
+
+    document.getElementById("raise-min-label").textContent = min;
+    document.getElementById("raise-max-label").textContent = max;
+}
+
+
 const tableMessage = document.getElementById("table-message");
 const leftSideContainer = document.getElementById("left-player-side");
 const rightSideContainer = document.getElementById("right-player-side");
@@ -135,7 +169,10 @@ async function leaveTable(destination) {
         const response = await fetch("/api/table/leave", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ playerId: currentPlayerId })
+            body: JSON.stringify({ 
+                tableId: currentTableId,
+                playerId: currentPlayerId 
+            })
         });
 
         if (!response.ok) {
@@ -165,7 +202,66 @@ if (lobbyLink) lobbyLink.addEventListener("click", (event) => {
     leaveTable("lobby.html");
 });
 
+// Table link -> Add a test player to the current table
+document.getElementById("table-link")
+    .addEventListener("click", async (event) => {
+        event.preventDefault();
+
+        const testPlayerId = `Guest_${crypto.randomUUID().slice(0, 8)}`;
+
+        try {
+            const response = await fetch("/api/table/join", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({
+                    tableId: currentTableId,
+                    playerId: testPlayerId
+                })
+            });
+
+            const data = await response.json();
+
+            if (!response.ok) {
+                throw new Error(data.error || "Failed to add test player.");
+            }
+
+            console.log("Test player added:", testPlayerId);
+
+            if (tableMessage) {
+                tableMessage.textContent =
+                    `${testPlayerId} joined the table!`;
+            }
+
+            refreshUI();
+
+        } catch (error) {
+            console.error("Error adding test player:", error);
+
+            if (tableMessage) {
+                tableMessage.textContent = error.message;
+            }
+        }
+    });
+
+let modalTimeout = null;
 let currentTimerRemaining = 30;
+
+let countdownInterval = null;
+
+function startTurnCountdown() {
+    // Prevent multiple timers from running
+    if (countdownInterval) {
+        clearInterval(countdownInterval);
+    }
+
+    countdownInterval = setInterval(() => {
+        if (currentTimerRemaining > 0) {
+            updateTimerDisplay(currentTimerRemaining - 1);
+        }
+    }, 1000);
+}
 
 function updateTimerDisplay(rem) {
     currentTimerRemaining = rem;
@@ -186,13 +282,43 @@ function updateTimerDisplay(rem) {
 
 async function fetchTableStatus() {
     try {
-        const response = await fetch(`/api/table/status?playerId=${encodeURIComponent(currentPlayerId)}`);
-        if (!response.ok) throw new Error("Failed to fetch table status.");
+        const params = new URLSearchParams({
+            tableId: currentTableId,
+            playerId: currentPlayerId
+        });
+
+        const response = await fetch(
+            `/api/table/status?${params.toString()}`
+        );
+
+        if (!response.ok) {
+            throw new Error("Failed to fetch table status.");
+        }
+
         return await response.json();
+
     } catch (error) {
         console.error("Error fetching table status:", error);
         return null;
     }
+}
+
+function renderTableDetails(status) {
+    const elements = {
+        "table-name": status.tableName,
+        "small-blind": status.smallBlind,
+        "big-blind": status.bigBlind,
+        "table-buy-in": status.buyIn,
+        "max-players": status.maxPlayers
+    };
+
+    Object.entries(elements).forEach(([elementId, value]) => {
+        const element = document.getElementById(elementId);
+
+        if (element && value !== undefined && value !== null) {
+            element.textContent = value;
+        }
+    });
 }
 
 function renderActivePlayers(status) {
@@ -258,7 +384,16 @@ function renderActivePlayers(status) {
 
     if (status.turnTimeRemaining !== undefined) {
         updateTimerDisplay(status.turnTimeRemaining);
+
+        if (status.gameInProgress && status.currentTurnPlayer) {
+            startTurnCountdown();
+        } else if (countdownInterval) {
+            clearInterval(countdownInterval);
+            countdownInterval = null;
+        }
     }
+
+    updateRaiseControls(status);
 
     // Gate all action buttons properly based on status.buttonsBlocked and applicability
     actionButtons.forEach(btn => {
@@ -276,6 +411,10 @@ function renderActivePlayers(status) {
                 isApplicable = false;
             }
 
+            if (action === "Raise" && !status.canRaise) {
+                isApplicable = false;
+            }
+
             if (!isApplicable) {
                 btn.disabled = true;
                 btn.style.opacity = "0.3";
@@ -288,12 +427,8 @@ function renderActivePlayers(status) {
         }
     });
 
-    if (status.communityCards) {
-        renderCards("community-cards", status.communityCards);
-    }
-    if (status.playerHand && status.playerHand.length > 0) {
-        renderCards("player-cards", status.playerHand);
-    }
+    renderCards("community-cards", status.communityCards || []);
+    renderCards("player-cards", status.playerHand || []);
 
     if (status.currentTurnPlayer && tableMessage) {
         tableMessage.textContent = `Current turn: ${status.currentTurnPlayer}`;
@@ -305,7 +440,10 @@ async function joinTable() {
         const response = await fetch("/api/table/join", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ playerId: currentPlayerId })
+            body: JSON.stringify({ 
+                tableId: currentTableId,
+                playerId: currentPlayerId 
+            })
         });
         if (!response.ok) throw new Error("Failed to join table.");
         const data = await response.json();
@@ -371,7 +509,7 @@ async function startGame() {
         const response = await fetch("/api/table/start", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ playerId: currentPlayerId })
+            body: JSON.stringify({ tableId: currentTableId, playerId: currentPlayerId})
         });
         if (!response.ok) {
             const err = await response.json();
@@ -398,7 +536,7 @@ async function startGame() {
 let isShowingShowdown = false;
 
 async function handleSequencedShowdown(winnerData) {
-    if (!winnerData || !winnerData.winners) return;
+    if (!winnerData || !winnerData.winners || isShowingShowdown) return;
 
     isShowingShowdown = true;
 
@@ -467,20 +605,30 @@ async function handleSequencedShowdown(winnerData) {
 async function refreshUI() {
     if (isShowingShowdown) return;
 
-    const status = await fetchTableStatus();
-    if (!status) return;
+        const status = await fetchTableStatus();
+        if (!status || isShowingShowdown) return;
 
-    if (!status.inTable) {
-        showJoinPrompt(status.gameInProgress);
-        return;
-    }
+        // Update the selected table configuration
+        renderTableDetails(status);
 
-    if (status.isSpectator) {
-        if (tableMessage) tableMessage.textContent = "You are spectating. You will join active players when the next game starts.";
-    }
+        if (!status.inTable) {
+            showJoinPrompt(status.gameInProgress);
+            return;
+        }
 
-    renderActivePlayers(status);
-    renderStartGameButton(status);
+        hideJoinPrompt();
+
+        renderActivePlayers(status);
+        renderStartGameButton(status);
+
+        if (status.isSpectator) {
+            renderCards("player-cards", []);
+
+            if (tableMessage) {
+                tableMessage.textContent =
+                    "You are spectating. You will join active players when the next game starts.";
+            }
+        }
 }
 
 function renderCards(containerId, cards) {
@@ -510,10 +658,7 @@ if (betScale) {
 
 if (raiseAmount) {
     raiseAmount.addEventListener("input", () => {
-        const amount = Number(raiseAmount.value);
-        if (amount >= 20 && amount <= 1000) {
-            betScale.value = amount;
-        }
+        betScale.value = raiseAmount.value;
     });
 }
 
@@ -526,17 +671,19 @@ actionButtons.forEach((button) => {
 
         if (action === "Raise") {
             amount = Number(raiseAmount.value);
-            if (!Number.isFinite(amount) || amount < 20) {
-                if (tableMessage) tableMessage.textContent = "Enter a valid raise amount.";
+            if (!Number.isSafeInteger(amount) ||
+                amount < Number(raiseAmount.min) ||
+                amount > Number(raiseAmount.max)) {
+                tableMessage.textContent = "Enter a valid raise amount.";
                 return;
-            }
-        }
+            } 
+        } 
 
         try {
             const res = await fetch("/api/table/action", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ playerId: currentPlayerId, action, amount, muckPreference })
+                body: JSON.stringify({ tableId: currentTableId, playerId: currentPlayerId, action, amount, muckPreference})
             });
 
             if (!res.ok) {
@@ -583,3 +730,6 @@ if (chatForm) {
         input.value = "";
     });
 }
+
+// Initialize after all UI elements and listeners are configured
+initializePlayerIdentity();

@@ -54,14 +54,24 @@ app.post('/api/reports/warn', reportCont.warnUser);
 app.get('/api/user/messages', UserCont.getUserMessages);
 app.delete('/api/user/messages/:msgId', UserCont.deleteUserMessage);
 
-// Table Actions (Single Table Architecture)
-const {joinTable, leaveTable, playerAction, startGame, nextRound, getTableStatus} = require("./controller/tableController");
+// Table Actions (Query/Body Table ID)
+const {createTable, joinTable, leaveTable, playerAction, startGame, nextRound, getTableStatus} = require("./controller/tableController");
 app.get("/api/table/status", getTableStatus);
 app.post("/api/table/join", joinTable);
 app.post("/api/table/leave", leaveTable);
 app.post("/api/table/action", playerAction);
 app.post("/api/table/start", startGame);
 app.get("/api/table/next-round", nextRound);
+
+// Table Actions (URL Parameter Table ID)
+app.post("/api/tables/create", createTable);
+
+app.get("/api/tables/:tableId/status", getTableStatus);
+app.post("/api/tables/:tableId/join", joinTable);
+app.post("/api/tables/:tableId/leave", leaveTable);
+app.post("/api/tables/:tableId/action", playerAction);
+app.post("/api/tables/:tableId/start", startGame);
+app.get("/api/tables/:tableId/next-round", nextRound);
 
 // Game History Route for Admin Dashboard
 const GameDao = require("./model/GameDao");

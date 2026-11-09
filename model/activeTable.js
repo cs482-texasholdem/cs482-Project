@@ -34,7 +34,7 @@ class PotManager {
         this.currentHighestBet = 0;
     }
 
-    postBlinds(players, playerManager, dealerIndex) {
+    postBlinds(players, playerManager, dealerIndex,  smallBlind = 10, bigBlind = 20) {
         this.reset();
         const n = players.length;
         if (n < 2) return { sbIndex: 0, bbIndex: 0 };
@@ -46,14 +46,14 @@ class PotManager {
         const bbPlayer = playerManager.getPlayer(players[bbIndex]);
 
         if (sbPlayer) {
-            const sbAmount = Math.min(10, sbPlayer.chips);
+            const sbAmount = Math.min(smallBlind, sbPlayer.chips);
             sbPlayer.chips -= sbAmount;
             sbPlayer.currentBet = sbAmount;
             sbPlayer.totalHandContribution = (sbPlayer.totalHandContribution || 0) + sbAmount;
         }
 
         if (bbPlayer) {
-            const bbAmount = Math.min(20, bbPlayer.chips);
+            const bbAmount = Math.min(bigBlind, bbPlayer.chips);
             bbPlayer.chips -= bbAmount;
             bbPlayer.currentBet = bbAmount;
             this.currentHighestBet = bbAmount;
@@ -162,12 +162,24 @@ class PotManager {
 }
 
 class ActiveTable {
-    constructor(tableId = "main", skillLevel = "general", timeLimit = 30) {
+    constructor(tableId = "main", skillLevel = "general", timeLimit = 30, gameMode = "custom", maxPlayer = 9,  smallBlind = 10,
+    bigBlind = 20) {
         this.tableId = tableId;
         this.skillLevel = skillLevel;
         this.timeLimit = timeLimit;
-        this.playerManager = new PlayerManager(10);
+        this.gameMode = gameMode;
+
+        //table settings
+        this.tableName = null;
+        this.buyIn = null;
+        this.smallBlind = smallBlind;
+        this.bigBlind = bigBlind;
+
+        //player manager
+        this.playerManager = new PlayerManager(maxPlayer);
         this.potManager = new PotManager();
+
+        //game
         this.displayedCards = [];
         this.deck = new Deck();
         this.currentShuffleSeed = this.deck.seed;
@@ -187,6 +199,9 @@ class ActiveTable {
         this.aggressorIndex = 0;
         this.gameCount = 0;
         this.turnStartTime = null;
+
+        // Tracks min raise inc
+        this.lastRaiseSize = this.bigBlind;
 
         this.isLocked = false;
         this.turnToken = 0;
@@ -413,8 +428,10 @@ class ActiveTable {
                 player.chips = 0;
                 player.currentBet += allInAmount;
                 player.totalHandContribution = (player.totalHandContribution || 0) + allInAmount;
-                this.potManager.currentHighestBet = player.currentBet;
-            } else {
+                this.potManager.currentHighestBet = Math.max(
+                    this.currentHighestBet,
+                    player.currentBet
+                );
                 player.chips -= diff;
                 player.currentBet = amount;
                 this.potManager.currentHighestBet = amount;
@@ -428,6 +445,7 @@ class ActiveTable {
                 }
             }
         }
+
 
         if (action !== "Fold") {
             player.hasActed = true;
@@ -590,7 +608,7 @@ class ActiveTable {
 
         const n = this.playerManager.players.length;
         if (n >= 2) {
-            const blindIndices = this.potManager.postBlinds(this.playerManager.players, this.playerManager, this.dealerIndex);
+            const blindIndices = this.potManager.postBlinds(this.playerManager.players, this.playerManager, this.dealerIndex, this.smallBlind, this.bigBlind);
             this.recordedSbIndex = blindIndices.sbIndex;
             this.recordedBbIndex = blindIndices.bbIndex;
 

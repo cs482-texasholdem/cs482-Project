@@ -101,7 +101,7 @@
         <nav class="navigation" aria-label="Main navigation">
             <a href="index.html" id="home-link">Home</a>
             <a href="lobby.html" id="lobby-link">Lobby</a>
-            <a href="tableDisplay.html" class="selected">Table</a>
+            <a href="tableDisplay.html" id="table-link" class="selected">Table</a>
             <button type="button" id="leave-table-btn" style="background: #d42c25; border-color: #961e19;">Leave Table</button>
             <button type="button" id="settings-button">Settings</button>
         </nav>
@@ -148,8 +148,16 @@
 
             <div class="game-heading">
                 <div>
-                    <h2>Main Table</h2>
-                    <p>No Limit Texas Hold'em · Blinds 10 / 20</p>
+                    <h2 id="table-name">Loading Table...</h2>
+                    <p>
+                        No Limit Texas Hold'em ·
+                        Blinds <span id="small-blind">--</span> /
+                        <span id="big-blind">--</span>
+                    </p>
+                    <p>
+                        Buy-in: <span id="table-buy-in">--</span> ·
+                        Max Players: <span id="max-players">--</span>
+                    </p>
                 </div>
             </div>
 
@@ -184,7 +192,7 @@
             <section class="panel your-hand">
                 <div>
                     <h3>Your Hand (<span id="display-player-id">Player123</span>)</h3>
-                    <p>Your Chips: <strong id="your-chips">1,000</strong></p>
+                    <p>Your Chips: <strong id="your-chips">--</strong></p>
                     <p>Your Bet: <strong id="your-bet">0</strong></p>
                 </div>
 
@@ -196,7 +204,7 @@
 
                 <div class="bet-summary">
                     <span>Current Bet: <strong id="current-bet">0</strong></span>
-                    <span>Chips Available: <strong id="available-chips">1,000</strong></span>
+                    <span>Chips Available: <strong id="available-chips">--</strong></span>
                 </div>
 
                 <div class="slider-heading">
@@ -205,29 +213,29 @@
                     <input
                         type="number"
                         id="raise-amount"
-                        min="20"
-                        max="1000"
-                        step="10"
-                        value="200"
+                        min="0"
+                        max="0"
+                        step="1"
+                        value="0"
                     >
                 </div>
-
-                <input
-                    type="range"
-                    id="bet-scale"
-                    min="20"
-                    max="1000"
-                    step="10"
-                    value="200"
-                    aria-label="Raise amount slider"
-                >
+                
+                <div class="raise-slider-container">
+                    <input
+                        type="range"
+                        id="bet-scale"
+                        min="0"
+                        max="1"
+                        step="1"
+                        value="0"
+                        aria-label="Raise amount slider"
+                        disabled
+                    >
+                <div>
 
                 <div class="scale-labels">
-                    <span>20</span>
-                    <span>250</span>
-                    <span>500</span>
-                    <span>750</span>
-                    <span>1,000</span>
+                    <span id="raise-min-label">--</span>
+                    <span id="raise-max-label">--</span>
                 </div>
 
                 <div class="muck-switch-container">

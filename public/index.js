@@ -355,3 +355,78 @@ async function deleteMessage(msgId) {
         console.error("Error deleting message:", err);
     }
 }
+
+
+ // ============================================================================
+ // Create Custom Poker Table
+ // ============================================================================
+
+ document.addEventListener("DOMContentLoaded", function() {
+     const createTableForm = document.getElementById("createTableForm");
+
+     if (createTableForm) {
+         createTableForm.addEventListener("submit", async function(e) {
+             e.preventDefault();
+
+             // Retrieve form values
+             const tableName = document.getElementById("newTableName").value.trim();
+             const blinds = document.getElementById("newTableBlinds").value.trim();
+             const buyIn = document.getElementById("newTableMinBuyin").value;
+             const maxPlayers = document.getElementById("newTableMaxPlayers").value;
+             const visibility = document.getElementById("newTableVisibility").value;
+
+             // Split blinds into small and big blind values
+             const blindValues = blinds.split("/").map(value =>
+                 Number(value.trim().replace("$", ""))
+             );
+
+             if (
+                 blindValues.length !== 2 ||
+                 blindValues.some(value => !Number.isFinite(value) || value <= 0)
+             ) {
+                 alert("Please enter blinds in the format $2 / $4.");
+                 return;
+             }
+
+             const tableData = {
+                 tableName,
+                 maxPlayers,
+                 buyIn,
+                 smallBlind: blindValues[0],
+                 bigBlind: blindValues[1],
+                 visibility
+             };
+
+             try {
+                 // Send request to backend
+                 const response = await fetch("/api/tables/create", {
+                     method: "POST",
+                     headers: {
+                         "Content-Type": "application/json"
+                     },
+                     body: JSON.stringify(tableData)
+                 });
+
+                 const result = await response.json();
+
+                 if (response.ok) {
+                     alert("Table created successfully!");
+                     createTableForm.reset();
+                     // Redirect to newly created table
+                    window.location.href =
+                        `tableDisplay.html?tableId=${encodeURIComponent(result.tableId)}`;
+                }
+
+                     // Table is now stored in TableManager.
+                     // We will connect My Created Tables next.
+                else {
+                     alert(result.error || "Failed to create table.");
+                 }
+
+             } catch (err) {
+                 console.error("Error creating table:", err);
+                 alert("Network error. Please try again.");
+             }
+         });
+     }
+ });

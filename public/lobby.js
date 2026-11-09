@@ -137,13 +137,31 @@ function setupCommonLobbyListeners(playerId) {
 
 
 // helper function to open the table seating sidebar and populate values
-function openJoinSidebar(tableName, blinds, minBuyin) {
+function openJoinSidebar(tableId, tableName, blinds, minBuyin) {
     document.getElementById('sidebarTableName').value = tableName;
     document.getElementById('sidebarTableBlinds').value = blinds;
     document.getElementById('sidebarTableMinBuyin').value = minBuyin;
+    
     let numericBuyin = parseInt(minBuyin.replace(/[^0-9]/g, '')) || 1000; //parse numeric min buy-in, default is 1000
-    document.getElementById('buyInAmount').value = numericBuyin;
-    document.getElementById('buyInAmount').min = numericBuyin;
+    
+    const buyInInput = document.getElementById('buyInAmount')
+    buyInInput.value = numericBuyin;
+    buyInInput.min = numericBuyin;
+
+    const form = document.getElementById("joinTableForm");
+
+    // Ensure the correct table ID is submitted
+    let hiddenInput = form.querySelector('input[name="tableId"]');
+
+    if (!hiddenInput) {
+        hiddenInput = document.createElement("input");
+        hiddenInput.type = "hidden";
+        hiddenInput.name = "tableId";
+        form.appendChild(hiddenInput);
+    }
+
+    hiddenInput.value = tableId;
+
     if (joinSidebar) joinSidebar.show();
 }
 

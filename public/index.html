@@ -144,12 +144,11 @@
                             <h5 class="fw-bold mb-0 text-white">
                                 <i class="bi bi-plus-circle text-primary me-2"></i> Create Custom Table
                             </h5>
-                            <span class="badge bg-secondary opacity-75">Coming Soon</span>
                         </div>
                         <div class="card-body p-4 d-flex flex-column">
                             <p class="small text-white opacity-90 mb-3">Set up your own custom poker room, configure blinds, and invite your circle.</p>
                             
-                            <form id="createTableForm" action="#" method="POST" onsubmit="event.preventDefault(); alert('Table creation feature coming soon!');" class="d-flex flex-column flex-grow-1">
+                            <form id="createTableForm" class="d-flex flex-column flex-grow-1">
                                 <div class="mb-3">
                                     <label for="newTableName" class="form-label small fw-semibold text-white">Table Name</label>
                                     <input type="text" class="form-control midnight-input text-white border-secondary shadow-none" id="newTableName" placeholder="e.g., Friday Showdown" required>
@@ -164,6 +163,31 @@
                                         <input type="number" class="form-control midnight-input text-white border-secondary shadow-none" id="newTableMinBuyin" placeholder="200" required>
                                     </div>
                                 </div>
+                                
+                                <!-- Maximum Players -->
+                                <div class="mb-3">
+                                    <label for="newTableMaxPlayers" class="form-label small fw-semibold text-white">
+                                        Maximum Players
+                                    </label>
+                                    <select id="newTableMaxPlayers" class="form-select midnight-input text-white border-secondary" required>
+                                        <option value="2">2 Players</option>
+                                        <option value="4">4 Players</option>
+                                        <option value="6" selected>6 Players</option>
+                                        <option value="9">9 Players</option>
+                                    </select>
+                                </div>
+
+                                <!-- Table Visibility -->
+                                <div class="mb-3">
+                                    <label for="newTableVisibility" class="form-label small fw-semibold text-white">
+                                        Table Visibility
+                                    </label>
+                                    <select id="newTableVisibility" class="form-select midnight-input text-white border-secondary" required>
+                                        <option value="public">Public</option>
+                                        <option value="private">Private</option>
+                                    </select>
+                                </div>
+
                                 <div class="mt-auto pt-2">
                                     <button type="submit" class="btn btn-outline-primary w-100 fw-bold shadow-none py-2">Create Poker Table</button>
                                 </div>

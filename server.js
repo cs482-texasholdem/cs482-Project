@@ -47,7 +47,7 @@ async function startServer() {
             });
         });
 
-        setInterval(() => {
+        const intervalId = setInterval(() => {
             try {
                 const room = `table_${mainTable.tableId}`;
                 const timeOut = mainTable.checkTimeout();
