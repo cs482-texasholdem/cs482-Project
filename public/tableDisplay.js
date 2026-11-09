@@ -248,6 +248,21 @@ document.getElementById("table-link")
 let modalTimeout = null;
 let currentTimerRemaining = 30;
 
+let countdownInterval = null;
+
+function startTurnCountdown() {
+    // Prevent multiple timers from running
+    if (countdownInterval) {
+        clearInterval(countdownInterval);
+    }
+
+    countdownInterval = setInterval(() => {
+        if (currentTimerRemaining > 0) {
+            updateTimerDisplay(currentTimerRemaining - 1);
+        }
+    }, 1000);
+}
+
 function updateTimerDisplay(rem) {
     currentTimerRemaining = rem;
     if (timerText) timerText.textContent = rem + "s";
@@ -369,6 +384,13 @@ function renderActivePlayers(status) {
 
     if (status.turnTimeRemaining !== undefined) {
         updateTimerDisplay(status.turnTimeRemaining);
+
+        if (status.gameInProgress && status.currentTurnPlayer) {
+            startTurnCountdown();
+        } else if (countdownInterval) {
+            clearInterval(countdownInterval);
+            countdownInterval = null;
+        }
     }
 
     updateRaiseControls(status);
