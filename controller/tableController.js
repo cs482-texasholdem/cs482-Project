@@ -143,6 +143,14 @@ function getTableStatus(req, res) {
     const isCurrentTurn = playerId === currentTurnPlayer;
     const buttonsBlocked = !isPlayer || isSpectator || !table.gameInProgress || !isCurrentTurn || playerHasActed;
 
+    // Calculate raise limits for the current player
+    const minRaise = table.currentHighestBet === 0
+        ? table.bigBlind
+        : table.currentHighestBet + table.bigBlind;
+
+    const maxRaise = playerBet + playerChips;
+    const canRaise = !buttonsBlocked && maxRaise >= minRaise;
+
     // Determine which betting actions are available
     let canCheck = false;
     let canCall = false;
@@ -216,6 +224,9 @@ function getTableStatus(req, res) {
         buttonsBlocked,
         canCheck,
         canCall,
+        canRaise,
+        minRaise,
+        maxRaise,
         turnTimeRemaining,
         currentHighestBet: table.currentHighestBet,
         

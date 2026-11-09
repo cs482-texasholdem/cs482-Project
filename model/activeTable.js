@@ -200,6 +200,9 @@ class ActiveTable {
         this.gameCount = 0;
         this.turnStartTime = null;
 
+        // Tracks min raise inc
+        this.lastRaiseSize = this.bigBlind;
+
         this.isLocked = false;
         this.turnToken = 0;
     }
@@ -398,7 +401,7 @@ class ActiveTable {
                 player.totalHandContribution = (player.totalHandContribution || 0) + diff;
             }
         } else if (action === "Raise") {
-            if (!Number.isFinite(amount) || amount <= this.currentHighestBet) {
+            if (amount <= this.currentHighestBet) {
                 return { success: false, error: "Raise amount must exceed current highest bet." };
             }
             const diff = amount - player.currentBet;
@@ -407,14 +410,10 @@ class ActiveTable {
                 player.chips = 0;
                 player.currentBet += allInAmount;
                 player.totalHandContribution = (player.totalHandContribution || 0) + allInAmount;
-                this.potManager.currentHighestBet = player.currentBet;
-                
-                // Never allow an all-in to lower the highest bet.
                 this.potManager.currentHighestBet = Math.max(
                     this.currentHighestBet,
                     player.currentBet
                 );
-            } else {
                 player.chips -= diff;
                 player.currentBet = amount;
                 this.potManager.currentHighestBet = amount;
@@ -428,6 +427,7 @@ class ActiveTable {
                 }
             }
         }
+
 
         if (action !== "Fold") {
             player.hasActed = true;

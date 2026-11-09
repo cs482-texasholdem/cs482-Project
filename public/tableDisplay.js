@@ -59,31 +59,17 @@ async function initializePlayerIdentity() {
     if (headerName) headerName.textContent = currentPlayerId;
     if (displayName) displayName.textContent = currentPlayerId;
 
-    await registerPlayerToTable(currentPlayerId);
+    // Initialize the table interface without automatically joining
+    initializeSocketAndUI();
 }
 
 //sends post requests to /api/table/join then initializes socket.io connection
 async function registerPlayerToTable(playerId) {
     try {
-        const response = await fetch("/api/table/join", {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json"
-            },
-            body: JSON.stringify({
-                tableId: currentTableId,
-                playerId: playerId
-            })
+        const modeParam = isSpectatorMode ? "spectator" : "player";
+        await fetch(`/api/table/join?playerId=${encodeURIComponent(playerId)}&mode=${modeParam}`, {
+            method: "POST"
         });
-
-        if (!response.ok) {
-            throw new Error("Failed to join table.");
-        }
-
-        const data = await response.json();
-
-        console.log("Table join result:", data);
-
     } catch (error) {
         console.error("Error joining table:", error);
     }
@@ -132,6 +118,35 @@ function initializeSocketAndUI() {
 
 const betScale = document.getElementById("bet-scale");
 const raiseAmount = document.getElementById("raise-amount");
+
+function updateRaiseControls(status) {
+    const min = status.minRaise;
+    const max = status.maxRaise;
+    const enabled = status.canRaise;
+
+    betScale.min = min;
+    betScale.max = Math.max(min, max);
+
+    raiseAmount.min = min;
+    raiseAmount.max = Math.max(min, max);
+
+    betScale.disabled = !enabled;
+    raiseAmount.disabled = !enabled;
+
+    const currentAmount = Number(raiseAmount.value);
+
+    const amount = enabled
+        ? Math.max(min, Math.min(currentAmount || min, max))
+        : 0;
+    
+    betScale.value = amount;
+    raiseAmount.value = amount;
+
+    document.getElementById("raise-min-label").textContent = min;
+    document.getElementById("raise-max-label").textContent = max;
+}
+
+
 const tableMessage = document.getElementById("table-message");
 const leftSideContainer = document.getElementById("left-player-side");
 const rightSideContainer = document.getElementById("right-player-side");
@@ -356,6 +371,8 @@ function renderActivePlayers(status) {
         updateTimerDisplay(status.turnTimeRemaining);
     }
 
+    updateRaiseControls(status);
+
     // Gate all action buttons properly based on status.buttonsBlocked and applicability
     actionButtons.forEach(btn => {
         const action = btn.dataset.action;
@@ -369,6 +386,10 @@ function renderActivePlayers(status) {
                 isApplicable = false;
             }
             if (action === "Call" && status.canCall === false) {
+                isApplicable = false;
+            }
+
+            if (action === "Raise" && !status.canRaise) {
                 isApplicable = false;
             }
 
@@ -615,10 +636,7 @@ if (betScale) {
 
 if (raiseAmount) {
     raiseAmount.addEventListener("input", () => {
-        const amount = Number(raiseAmount.value);
-        if (amount >= 20 && amount <= 1000) {
-            betScale.value = amount;
-        }
+        betScale.value = raiseAmount.value;
     });
 }
 
@@ -631,11 +649,13 @@ actionButtons.forEach((button) => {
 
         if (action === "Raise") {
             amount = Number(raiseAmount.value);
-            if (!Number.isFinite(amount) || amount < 20) {
-                if (tableMessage) tableMessage.textContent = "Enter a valid raise amount.";
+            if (!Number.isSafeInteger(amount) ||
+                amount < Number(raiseAmount.min) ||
+                amount > Number(raiseAmount.max)) {
+                tableMessage.textContent = "Enter a valid raise amount.";
                 return;
-            }
-        }
+            } 
+        } 
 
         try {
             const res = await fetch("/api/table/action", {

@@ -579,6 +579,8 @@ body.table-page {
 .table-page #bet-scale {
     display: block;
     width: 100%;
+    box-sizing: border-box;
+    padding: 0;
     margin: 12px 0 8px;
     accent-color: var(--button-hover-blue);
     cursor: pointer;
