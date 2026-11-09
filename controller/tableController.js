@@ -10,8 +10,6 @@ const Deck = require("../util/pokerLogic");
 const mainTable = new ActiveTable("main", "general");
 
 function getTableStatus(req, res) {
-    mainTable.checkTimeout();
-
     const playerId = req.query.playerId;
     const inTable = playerId ? mainTable.hasPlayer(playerId) : false;
     const isPlayer = playerId ? mainTable.players.includes(playerId) : false;

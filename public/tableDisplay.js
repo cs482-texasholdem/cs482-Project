@@ -99,6 +99,10 @@ function initializeSocketAndUI() {
         }
     });
 
+    socket.on("SHOWDOWN_REVEAL", (winnerData) => {
+       if (!isShowingShowdown) handleSequencedShowdown(winnerData);
+    });
+
     refreshUI();
 }
 
