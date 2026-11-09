@@ -448,3 +448,153 @@ test('declineFriendRequest should catch errors and redirect to index.html', asyn
 
     expect(res.redirect).toHaveBeenCalledWith('/index.html');
 });
+
+// ==========================================
+// 10. postCreateOrUpdate Tests
+// ==========================================
+test('postCreateOrUpdate should update user with password and admin permission when admin', async function(){
+    let req = {
+        session: { user: { permission: 1 } },
+        body: {
+            txt_email: 'update@mail.com',
+            txt_username: 'updateduser',
+            txt_perm: '1',
+            txt_points: '500',
+            txt_id: 'user123',
+            txt_pass: 'newpass123'
+        }
+    };
+    let res = { redirect: jest.fn() };
+    passUtil.hashPassword.mockReturnValue('hashedNewPass');
+    dao.update.mockResolvedValue(true);
+
+    await controller.postCreateOrUpdate(req, res);
+
+    expect(passUtil.hashPassword).toHaveBeenCalledWith('newpass123');
+    expect(dao.update).toHaveBeenCalledWith('user123', expect.objectContaining({
+        permission: 1,
+        points: 500,
+        password: 'hashedNewPass'
+    }));
+    expect(res.redirect).toHaveBeenCalledWith('/admin.html');
+});
+
+test('postCreateOrUpdate should update user keeping existing password when txt_pass is blank', async function(){
+    let req = {
+        session: { user: { permission: 1 } },
+        body: {
+            txt_email: 'update@mail.com',
+            txt_username: 'updateduser',
+            id: 'user123',
+            txt_pass: '   '
+        }
+    };
+    let res = { redirect: jest.fn() };
+    dao.read.mockResolvedValue({ password: 'existingHashedPass' });
+    dao.update.mockResolvedValue(true);
+
+    await controller.postCreateOrUpdate(req, res);
+
+    expect(dao.read).toHaveBeenCalledWith('user123');
+    expect(dao.update).toHaveBeenCalledWith('user123', expect.objectContaining({
+        password: 'existingHashedPass'
+    }));
+    expect(res.redirect).toHaveBeenCalledWith('/admin.html');
+});
+
+test('postCreateOrUpdate should create new user without admin rights and redirect to index.html', async function(){
+    let req = {
+        session: { user: { permission: 2 } },
+        body: {
+            txt_email: 'brandnew@mail.com',
+            txt_username: 'brandnew',
+            txt_pass: 'password123'
+        }
+    };
+    let res = { redirect: jest.fn() };
+    passUtil.hashPassword.mockReturnValue('hashedPass');
+    dao.create.mockResolvedValue(true);
+
+    await controller.postCreateOrUpdate(req, res);
+
+    expect(dao.create).toHaveBeenCalledWith(expect.objectContaining({
+        permission: 2,
+        password: 'hashedPass'
+    }));
+    expect(res.redirect).toHaveBeenCalledWith('index.html');
+});
+
+// ==========================================
+// 11. Messages Controller Tests
+// ==========================================
+test('getUserMessages should return 401 if unauthenticated', async function(){
+    let req = { session: {} };
+    let res = { status: jest.fn().mockReturnThis(), json: jest.fn() };
+
+    await controller.getUserMessages(req, res);
+
+    expect(res.status).toHaveBeenCalledWith(401);
+    expect(res.json).toHaveBeenCalledWith({ error: "Unauthorized" });
+});
+
+test('getUserMessages should return 404 if user not found', async function(){
+    let req = { session: { user: 'alice' } };
+    let res = { status: jest.fn().mockReturnThis(), json: jest.fn() };
+    dao.findOne.mockResolvedValue(null);
+
+    await controller.getUserMessages(req, res);
+
+    expect(res.status).toHaveBeenCalledWith(404);
+    expect(res.json).toHaveBeenCalledWith({ error: "User not found" });
+});
+
+test('getUserMessages should return messages array on success', async function(){
+    let req = { session: { user: 'alice' } };
+    let res = { status: jest.fn().mockReturnThis(), json: jest.fn() };
+    dao.findOne.mockResolvedValue({ messages: [{ text: 'Hi' }] });
+
+    await controller.getUserMessages(req, res);
+
+    expect(res.status).toHaveBeenCalledWith(200);
+    expect(res.json).toHaveBeenCalledWith([{ text: 'Hi' }]);
+});
+
+test('getUserMessages should handle errors and return 500', async function(){
+    let req = { session: { user: 'alice' } };
+    let res = { status: jest.fn().mockReturnThis(), json: jest.fn() };
+    dao.findOne.mockRejectedValue(new Error('fail'));
+
+    await controller.getUserMessages(req, res);
+
+    expect(res.status).toHaveBeenCalledWith(500);
+    expect(res.json).toHaveBeenCalledWith({ error: "Server error" });
+});
+
+test('deleteUserMessage should delete message successfully', async function(){
+    let req = {
+        session: { user: 'alice' },
+        params: { msgId: '507f1f77bcf86cd799439011' }
+    };
+    let res = { status: jest.fn().mockReturnThis(), json: jest.fn() };
+    dao.update.mockResolvedValue(true);
+
+    await controller.deleteUserMessage(req, res);
+
+    expect(dao.update).toHaveBeenCalled();
+    expect(res.status).toHaveBeenCalledWith(200);
+    expect(res.json).toHaveBeenCalledWith({ success: true, message: "Message deleted successfully." });
+});
+
+test('deleteUserMessage should handle errors and return 500', async function(){
+    let req = {
+        session: { user: 'alice' },
+        params: { msgId: '507f1f77bcf86cd799439011' }
+    };
+    let res = { status: jest.fn().mockReturnThis(), json: jest.fn() };
+    dao.update.mockRejectedValue(new Error('fail'));
+
+    await controller.deleteUserMessage(req, res);
+
+    expect(res.status).toHaveBeenCalledWith(500);
+    expect(res.json).toHaveBeenCalledWith({ error: "Server error while deleting message." });
+});

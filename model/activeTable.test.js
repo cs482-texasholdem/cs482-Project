@@ -2,7 +2,6 @@ jest.mock('./GameDao');
 const GameDao = require('./GameDao');
 const ActiveTable = require('./activeTable.js');
 const Deck = require('../util/pokerLogic');
-const GameDao = require('./GameDao');
 
 describe('ActiveTable Class (Delegated PlayerManager & Game Engine with Side-Pots)', () => {
     let table;
@@ -608,7 +607,8 @@ describe('ActiveTable Class (Delegated PlayerManager & Game Engine with Side-Pot
 
         const result = table.removePlayer(removedId);
 
-        expect(result).toBe(true);
+        expect(result.timedOut).toBe(true);
+        expect(result.action).toBe("Check");
         expect(table.pendingRemovals.has(removedId)).toBe(true);
 
         const nextId = table.players[table.currentTurnIndex];
@@ -732,7 +732,8 @@ describe('ActiveTable Class (Delegated PlayerManager & Game Engine with Side-Pot
 
         const result = table.checkTimeout();
 
-        expect(result).toBe(true);
+        expect(result.timedOut).toBe(true);
+        expect(result.action).toBe("Check");
         expect(player.folded).toBe(false);
         expect(player.hasActed).toBe(true);
 

@@ -1,6 +1,7 @@
 jest.mock('../model/GameDao');
 const GameDao = require('../model/GameDao');
-const { getTableStatus, joinTable, leaveTable, startGame, finishGame, playerAction, nextRound, mainTable} = require('../controller/tableController.js');
+const { getTableStatus, tableManager, joinTable, leaveTable, startGame, finishGame, playerAction, nextRound, mainTable} = require('../controller/tableController.js');
+const TableManager = require('../model/tableManager');
 
 describe('Table Controller Unit Tests', () => {
     let req, res, mockIo;
@@ -192,7 +193,10 @@ describe('Table Controller Unit Tests', () => {
         expect(finishGameSpy).toHaveBeenCalled();
         expect(mockIo.to).toHaveBeenCalledWith('table_main');
         expect(mockIo.emit).toHaveBeenCalledWith('SHOWDOWN_REVEAL', mockWinnerData);
-        expect(mockIo.emit).toHaveBeenCalledWith('TABLE_UPDATED');
+        expect(mockIo.emit).toHaveBeenCalledWith(
+            'TABLE_UPDATED',
+            { tableId: 'main' }
+        );
 
         expect(res.status).toHaveBeenCalledWith(200);
         expect(res.json).toHaveBeenCalledWith({
@@ -258,7 +262,10 @@ describe('Table Controller Unit Tests', () => {
             'SHOWDOWN_REVEAL',
             mockWinnerData
         );
-        expect(mockIo.emit).toHaveBeenCalledWith('TABLE_UPDATED');
+        expect(mockIo.emit).toHaveBeenCalledWith(
+            'TABLE_UPDATED',
+            { tableId: 'main' }
+        );
 
         expect(resetToLobbySpy).toHaveBeenCalled();
 
@@ -308,7 +315,10 @@ describe('Table Controller Unit Tests', () => {
             'SHOWDOWN_REVEAL',
             mockWinnerData
         );
-        expect(mockIo.emit).toHaveBeenCalledWith('TABLE_UPDATED');
+        expect(mockIo.emit).toHaveBeenCalledWith(
+            'TABLE_UPDATED',
+            { tableId: 'main' }
+        );
 
         expect(resetToLobbySpy).toHaveBeenCalled();
 
@@ -380,6 +390,109 @@ describe('Table Controller Unit Tests', () => {
             { tableId: "main" }
         );
     });
+
+    test('joinTable returns 404 when tableId does not exist in tableManager', () => {
+        req.params = { tableId: 'nonexistentTable' };
+        req.body = { playerId: 'PlayerX' };
+
+        joinTable(req, res);
+
+        expect(res.status).toHaveBeenCalledWith(404);
+        expect(res.json).toHaveBeenCalledWith({ error: "Table not found." });
+    });
+
+    test('joinTable handles table full or registration failure gracefully', () => {
+        // Mock addPlayer to return false (table full / error)
+        const addPlayerSpy = jest.spyOn(mainTable, 'addPlayer').mockReturnValue(false);
+        req.body = { playerId: 'OverflowPlayer' };
+
+        joinTable(req, res);
+
+        expect(res.status).toHaveBeenCalledWith(400);
+        expect(res.json).toHaveBeenCalledWith(
+            expect.objectContaining({ error: "Could not join table." })
+        );
+
+        addPlayerSpy.mockRestore();
+    });
+
+    test('leaveTable returns 400 when playerId is missing', () => {
+        req.body = {};
+        req.query = {};
+
+        leaveTable(req, res);
+
+        expect(res.status).toHaveBeenCalledWith(400);
+        expect(res.json).toHaveBeenCalledWith({ error: "Player ID is required." });
+    });
+
+    test('leaveTable handles table not found when params.tableId is invalid', () => {
+        req.params = { tableId: 'badTable' };
+        req.body = { playerId: 'Player1' };
+
+        leaveTable(req, res);
+
+        expect(res.status).toHaveBeenCalledWith(404);
+        expect(res.json).toHaveBeenCalledWith({ error: "Table not found." });
+    });
+
+    test('playerAction returns 400 when missing playerId or action parameters', () => {
+        req.body = { playerId: '' }; // missing action
+        playerAction(req, res);
+        expect(res.status).toHaveBeenCalledWith(400);
+
+        req.body = { action: 'Call' }; // missing playerId
+        playerAction(req, res);
+        expect(res.status).toHaveBeenCalledWith(400);
+    });
+
+    test('playerAction returns 404 if tableId is invalid', () => {
+        req.params = { tableId: 'ghostTable' };
+        req.body = { playerId: 'Player1', action: 'Call' };
+
+        playerAction(req, res);
+
+        expect(res.status).toHaveBeenCalledWith(404);
+        expect(res.json).toHaveBeenCalledWith({ error: "Table not found." });
+    });
+
+    test('playerAction handles action failure returned by table engine', () => {
+        req.body = { playerId: 'Player1' };
+        joinTable(req, res);
+        req.body = { playerId: 'Player2' };
+        joinTable(req, res);
+        startGame(req, res);
+
+        const recordActionSpy = jest.spyOn(mainTable, 'recordAction').mockReturnValue({
+            success: false,
+            error: "Not your turn."
+        });
+
+        req.body = { playerId: 'Player1', action: 'Raise', amount: 50 };
+        playerAction(req, res);
+
+        expect(res.status).toHaveBeenCalledWith(400);
+        expect(res.json).toHaveBeenCalledWith({ error: "Not your turn." });
+
+        recordActionSpy.mockRestore();
+        mainTable.resetToLobby();
+        mainTable.removePlayer('Player1');
+        mainTable.removePlayer('Player2');
+    });
+
+    test('nextRound handles error object returned by table nextRound', () => {
+        const nextRoundSpy = jest.spyOn(mainTable, 'nextRound').mockReturnValue({
+            error: "Game has not been started yet."
+        });
+
+        req.query = { playerId: 'Player1' };
+        nextRound(req, res);
+
+        expect(res.status).toHaveBeenCalledWith(400);
+        expect(res.json).toHaveBeenCalledWith({ error: "Game has not been started yet." });
+
+        nextRoundSpy.mockRestore();
+    });
 });
 
 
@@ -388,6 +501,9 @@ describe('Multi-Table Controller Tests', () => {
     let table1, table2, table3;
 
     beforeEach(() => {
+        tableManager.tables.clear();
+        tableManager.addTable("main", mainTable);
+        
         mockIo = {
             emit: jest.fn(),
             to: jest.fn().mockReturnThis()
