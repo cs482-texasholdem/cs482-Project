@@ -168,10 +168,18 @@ class ActiveTable {
         this.skillLevel = skillLevel;
         this.timeLimit = timeLimit;
         this.gameMode = gameMode;
+
+        //table settings
+        this.tableName = null;
+        this.buyIn = null;
         this.smallBlind = smallBlind;
         this.bigBlind = bigBlind;
+
+        //player manager
         this.playerManager = new PlayerManager(maxPlayer);
         this.potManager = new PotManager();
+
+        //game
         this.displayedCards = [];
         this.deck = new Deck();
         this.currentShuffleSeed = this.deck.seed;

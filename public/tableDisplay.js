@@ -187,12 +187,48 @@ if (lobbyLink) lobbyLink.addEventListener("click", (event) => {
     leaveTable("lobby.html");
 });
 
-// Table link -> Current Table
-const tableLink = document.getElementById("table-link");
+// Table link -> Add a test player to the current table
+document.getElementById("table-link")
+    .addEventListener("click", async (event) => {
+        event.preventDefault();
 
-if (tableLink) {
-    tableLink.href = `tableDisplay.html?tableId=${encodeURIComponent(currentTableId)}`;
-}
+        const testPlayerId = `Guest_${crypto.randomUUID().slice(0, 8)}`;
+
+        try {
+            const response = await fetch("/api/table/join", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({
+                    tableId: currentTableId,
+                    playerId: testPlayerId
+                })
+            });
+
+            const data = await response.json();
+
+            if (!response.ok) {
+                throw new Error(data.error || "Failed to add test player.");
+            }
+
+            console.log("Test player added:", testPlayerId);
+
+            if (tableMessage) {
+                tableMessage.textContent =
+                    `${testPlayerId} joined the table!`;
+            }
+
+            refreshUI();
+
+        } catch (error) {
+            console.error("Error adding test player:", error);
+
+            if (tableMessage) {
+                tableMessage.textContent = error.message;
+            }
+        }
+    });
 
 let modalTimeout = null;
 let currentTimerRemaining = 30;

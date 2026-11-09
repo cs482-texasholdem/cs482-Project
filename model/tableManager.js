@@ -86,13 +86,18 @@ class TableManager {
     }
 
     // Finds a table with available seats
-    findAvailableTable(skillLevel) {
+    findAvailableTable(skillLevel, gameMode) {
         if (typeof skillLevel !== "string" || skillLevel.trim() === "") {
             return null;
         }
 
+        // Validate game mode
+        if (!["ranked", "custom"].includes(gameMode)) {
+            return null;
+        }
+
         for (const table of this.tables.values()) {
-            if (table.skillLevel === skillLevel && !table.isFull()) {
+            if (table.skillLevel === skillLevel && table.gameMode === gameMode && !table.isFull()) {
                 return table;
             }
         }

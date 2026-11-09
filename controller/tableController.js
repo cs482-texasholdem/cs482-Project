@@ -13,6 +13,55 @@ const tableManager = new TableManager();
 const mainTable = new ActiveTable("main", "general");
 tableManager.addTable(mainTable.tableId, mainTable);
 
+//hardcode in rank
+const rankedPresets = [
+    {
+        id: "ranked-beginner",
+        name: "Beginner Lounge",
+        skill: "beginner",
+        smallBlind: 1,
+        bigBlind: 2,
+        buyIn: 100
+    },
+    {
+        id: "ranked-intermediate",
+        name: "Intermediate Lounge",
+        skill: "intermediate",
+        smallBlind: 25,
+        bigBlind: 50,
+        buyIn: 2500
+    },
+    {
+        id: "ranked-advanced",
+        name: "Advanced Lounge",
+        skill: "advanced",
+        smallBlind: 5,
+        bigBlind: 10,
+        buyIn: 500
+    }
+];
+
+// Register the three preset ranked tables
+for (const preset of rankedPresets) {
+    const table = new ActiveTable(
+        preset.id,
+        preset.skill,
+        30,
+        "ranked",
+        9,
+        preset.smallBlind,
+        preset.bigBlind
+    );
+
+    table.tableName = preset.name;
+    table.buyIn = preset.buyIn;
+
+    tableManager.addTable(table.tableId, table);
+}
+
+
+
+
 // Retrieve table based on ID
 function getRequestedTable(req) {
     const tableId = req.params?.tableId ||
