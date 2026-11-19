@@ -10,6 +10,9 @@ const ActiveTable = require("../model/activeTable");
 const Deck = require("../util/pokerLogic");
 
 const mainTable = new ActiveTable("main", "general");
+mainTable.chatMessages = [
+    { sender: "Dealer", text: "Welcome to the table!", timestamp: Date.now() }
+];
 
 function getTableStatus(req, res) {
     mainTable.checkTimeout();
@@ -85,7 +88,43 @@ function getTableStatus(req, res) {
         turnTimeRemaining,
         currentHighestBet: mainTable.currentHighestBet,
         communityCards: mainTable.displayCards(),
-        playerHand
+        playerHand,
+        chatMessages: mainTable.chatMessages || []
+    });
+}
+
+function postChatMessage(req, res) {
+    const playerId = req.body.playerId || (req.session && req.session.user && req.session.user.username);
+    const rawMessage = req.body.message;
+
+    if (!playerId || typeof playerId !== "string" || !playerId.trim()) {
+        return res.status(401).json({ error: "Player ID is required to send chat messages." });
+    }
+
+    if (typeof rawMessage !== "string" || !rawMessage.trim()) {
+        return res.status(400).json({ error: "Message cannot be empty." });
+    }
+
+    const sender = playerId.trim();
+    const text = rawMessage.trim().slice(0, 200);
+
+    if (!Array.isArray(mainTable.chatMessages)) {
+        mainTable.chatMessages = [];
+    }
+
+    mainTable.chatMessages.push({
+        sender,
+        text,
+        timestamp: Date.now()
+    });
+
+    if (mainTable.chatMessages.length > 50) {
+        mainTable.chatMessages.shift();
+    }
+
+    return res.status(200).json({
+        success: true,
+        chatMessages: mainTable.chatMessages
     });
 }
 
@@ -212,4 +251,4 @@ function nextRound(req, res) {
     });
 }
 
-module.exports = { joinTable, leaveTable, startGame, playerAction, nextRound, getTableStatus };
+module.exports = { joinTable, leaveTable, startGame, playerAction, nextRound, getTableStatus, postChatMessage };

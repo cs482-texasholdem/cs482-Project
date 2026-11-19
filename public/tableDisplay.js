@@ -1,14 +1,14 @@
 function getPlayerIdFromUrl() {
     const urlParams = new URLSearchParams(window.location.search);
     let id = urlParams.get("playerId");
-    
+
     if (!id) {
         const keys = Array.from(urlParams.keys());
         if (keys.length > 0) {
             id = keys[0];
         }
     }
-    
+
     return id ? decodeURIComponent(id.trim()) : "";
 }
 
@@ -32,8 +32,12 @@ if (!checkBlankName()) {
     // halts execution until redirection
 }
 
-document.getElementById("header-player-name").textContent = currentPlayerId;
-document.getElementById("display-player-id").textContent = currentPlayerId;
+const headerPlayerNameElem = document.getElementById("header-player-name");
+const accountChipsElem = document.getElementById("account-chips");
+const displayPlayerIdElem = document.getElementById("display-player-id");
+
+if (headerPlayerNameElem) headerPlayerNameElem.textContent = currentPlayerId;
+if (displayPlayerIdElem) displayPlayerIdElem.textContent = currentPlayerId;
 
 const betScale = document.getElementById("bet-scale");
 const raiseAmount = document.getElementById("raise-amount");
@@ -52,6 +56,58 @@ const currentTurnPlayerElem = document.getElementById("current-turn-player");
 const timerText = document.getElementById("turn-timer-text");
 const timerCircle = document.getElementById("turn-timer-circle");
 const actionButtons = document.querySelectorAll("[data-action]");
+
+let lastRenderedChatCount = 0;
+
+// Loads logged-in user points/username if available, without overriding URL playerId flow
+async function syncAccountPoints() {
+    try {
+        const res = await fetch("/loggeduser");
+        if (!res.ok) return;
+        const data = await res.json();
+        const user = data.user || data;
+
+        if (user && user.username) {
+            // Use the real account username for table seats, actions, and chat messages
+            currentPlayerId = user.username;
+            if (headerPlayerNameElem) headerPlayerNameElem.textContent = user.username;
+            if (displayPlayerIdElem) displayPlayerIdElem.textContent = user.username;
+        }
+
+        if (user && accountChipsElem) {
+            const balance = user.points !== undefined
+                ? user.points
+                : (user.chips !== undefined ? user.chips : null);
+            if (balance !== null) {
+                accountChipsElem.textContent = Number(balance).toLocaleString();
+            }
+        }
+    } catch (error) {
+        console.error("Failed to sync account points:", error);
+    }
+}
+
+function renderChatMessages(messages) {
+    const chatMessages = document.getElementById("chat-messages");
+    if (!chatMessages || !Array.isArray(messages)) return;
+
+    if (messages.length === lastRenderedChatCount) return;
+
+    chatMessages.innerHTML = "";
+    messages.forEach((msg) => {
+        const messageElement = document.createElement("div");
+        messageElement.className = "chat-message";
+
+        const sender = document.createElement("strong");
+        sender.textContent = `${msg.sender}: `;
+
+        messageElement.append(sender, document.createTextNode(msg.text));
+        chatMessages.appendChild(messageElement);
+    });
+
+    lastRenderedChatCount = messages.length;
+    chatMessages.scrollTop = chatMessages.scrollHeight;
+}
 
 // Dynamic Leave Button Injection to guarantee it loads without manual page refresh
 let leaveTableBtn = document.getElementById("leave-table-btn");
@@ -161,6 +217,10 @@ function renderActivePlayers(status) {
     yourBetElem.textContent = status.playerBet || 0;
     currentBetElem.textContent = status.currentHighestBet || 0;
 
+    if (accountChipsElem && accountChipsElem.textContent === "--") {
+        accountChipsElem.textContent = (status.playerChips || 0).toLocaleString();
+    }
+
     if (currentTurnPlayerElem) {
         currentTurnPlayerElem.textContent = status.currentTurnPlayer || "None";
     }
@@ -192,6 +252,10 @@ function renderActivePlayers(status) {
 
     if (status.currentTurnPlayer) {
         tableMessage.textContent = `Current turn: ${status.currentTurnPlayer}`;
+    }
+
+    if (status.chatMessages) {
+        renderChatMessages(status.chatMessages);
     }
 }
 
@@ -294,6 +358,10 @@ async function refreshUI() {
     const status = await fetchTableStatus();
     if (!status) return;
 
+    if (status.chatMessages) {
+        renderChatMessages(status.chatMessages);
+    }
+
     if (!status.inTable) {
         showJoinPrompt(status.gameInProgress);
         return;
@@ -307,13 +375,16 @@ async function refreshUI() {
     renderStartGameButton(status);
 }
 
-refreshUI();
-setInterval(refreshUI, 2500);
+(async function initTablePage() {
+    await syncAccountPoints();
+    await refreshUI();
+    setInterval(refreshUI, 2500);
+})();
 
 function renderCards(containerId, cards) {
     const container = document.getElementById(containerId);
     if (!container) return;
-    
+
     container.innerHTML = "";
 
     cards.forEach((cardText) => {
@@ -396,20 +467,32 @@ modalCloseBtn.addEventListener("click", () => {
     refreshUI();
 });
 
-document.getElementById("chat-form").addEventListener("submit", (event) => {
+document.getElementById("chat-form").addEventListener("submit", async (event) => {
     event.preventDefault();
     const input = document.getElementById("chat-input");
     const message = input.value.trim();
     if (!message) return;
 
-    const messageElement = document.createElement("div");
-    messageElement.className = "chat-message";
-    const sender = document.createElement("strong");
-    sender.textContent = currentPlayerId + ": ";
-    messageElement.append(sender, document.createTextNode(message));
-
-    const chatMessages = document.getElementById("chat-messages");
-    chatMessages.appendChild(messageElement);
-    chatMessages.scrollTop = chatMessages.scrollHeight;
     input.value = "";
+
+    try {
+        const res = await fetch("/api/table/chat", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ playerId: currentPlayerId, message })
+        });
+
+        if (!res.ok) {
+            const err = await res.json().catch(() => ({}));
+            tableMessage.textContent = err.error || "Could not send chat message.";
+            return;
+        }
+
+        const data = await res.json();
+        if (data.chatMessages) {
+            renderChatMessages(data.chatMessages);
+        }
+    } catch (error) {
+        console.error("Error sending chat message:", error);
+    }
 });

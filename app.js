@@ -55,13 +55,14 @@ app.get('/api/user/messages', UserCont.getUserMessages);
 app.delete('/api/user/messages/:msgId', UserCont.deleteUserMessage);
 
 // Table Actions (Single Table Architecture)
-const {joinTable, leaveTable, playerAction, startGame, nextRound, getTableStatus} = require("./controller/tableController");
+const {joinTable, leaveTable, playerAction, startGame, nextRound, getTableStatus, postChatMessage} = require("./controller/tableController");
 app.get("/api/table/status", getTableStatus);
 app.post("/api/table/join", joinTable);
 app.post("/api/table/leave", leaveTable);
 app.post("/api/table/action", playerAction);
 app.post("/api/table/start", startGame);
 app.get("/api/table/next-round", nextRound);
+app.post("/api/table/chat", postChatMessage);
 
 // Game History Route for Admin Dashboard
 const GameDao = require("./model/GameDao");
