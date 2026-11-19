@@ -1,7 +1,7 @@
 // ============================================================================
 // File Name: tableController.js
 // Purpose: Express controller endpoints for table actions using safe 
-//          player lookups, muck preferences, and returning showdown data.
+//          player lookups, muck preferences, returning showdown data, and chat.
 // ============================================================================
 
 const ActiveTable = require("../model/activeTable");
@@ -9,11 +9,23 @@ const Deck = require("../util/pokerLogic");
 const TableManager = require("../model/tableManager");
 const tableManager = new TableManager();
 
-//defualt main table
+const DEFAULT_CHAT_MESSAGES = [
+    { sender: "Dealer", text: "Welcome to the table!", timestamp: Date.now() }
+];
+
+function ensureTableChat(table) {
+    if (table && !Array.isArray(table.chatMessages)) {
+        table.chatMessages = DEFAULT_CHAT_MESSAGES.map(m => ({ ...m }));
+    }
+    return table ? table.chatMessages : [];
+}
+
+// Default main table
 const mainTable = new ActiveTable("main", "general");
+ensureTableChat(mainTable);
 tableManager.addTable(mainTable.tableId, mainTable);
 
-//hardcode in rank
+// Hardcoded ranked presets
 const rankedPresets = [
     {
         id: "ranked-beginner",
@@ -55,12 +67,10 @@ for (const preset of rankedPresets) {
 
     table.tableName = preset.name;
     table.buyIn = preset.buyIn;
+    ensureTableChat(table);
 
     tableManager.addTable(table.tableId, table);
 }
-
-
-
 
 // Retrieve table based on ID
 function getRequestedTable(req) {
@@ -76,8 +86,7 @@ function getRequestedTable(req) {
 // HELPER FUNCTIONS
 // ============================================================================
 
-
-//helper function to broadcast table updates to all connected clients
+// Helper function to broadcast table updates to all connected clients
 function broadcastTableUpdate(req, tableId) {
     const io = req.app.get('io');
 
@@ -101,21 +110,22 @@ function broadcastShowdown(req, table, winnerData) {
 // ============================================================================
 
 function getTableStatus(req, res) {
-    //call helper function to retrieved table ID
-    const table = getRequestedTable(req); 
+    // Call helper function to retrieve table ID
+    const table = getRequestedTable(req);
 
-    //no table
+    // No table
     if (!table) {
         return res.status(404).json({ error: "Table not found." });
     }
 
+    const chatMessages = ensureTableChat(table);
     table.checkTimeout();
-    
+
     const playerId = req.query.playerId;
     const inTable = playerId ? table.hasPlayer(playerId) : false;
     const isPlayer = playerId ? table.players.includes(playerId) : false;
     const isSpectator = playerId ? table.spectators.includes(playerId) : false;
-    
+
     let playerChips = 1000;
     let playerBet = 0;
     let playerHand = [];
@@ -197,7 +207,7 @@ function getTableStatus(req, res) {
         bigBlind: table.bigBlind,
         visibility: table.visibility,
 
-        //players and spectators
+        // Players and spectators
         playerCount: table.getPlayerCount(),
         spectatorCount: table.getSpectatorCount(),
         players: allPlayersData,
@@ -207,12 +217,12 @@ function getTableStatus(req, res) {
         isPlayer,
         isSpectator,
 
-        //game information
+        // Game information
         gameStarted: table.gameStarted,
         gameInProgress: table.gameInProgress,
         pot: table.pot,
 
-        //player info
+        // Player info
         playerChips,
         playerBet,
         playerHasActed,
@@ -229,17 +239,16 @@ function getTableStatus(req, res) {
         maxRaise,
         turnTimeRemaining,
         currentHighestBet: table.currentHighestBet,
-        
-        //community cards
-        communityCards: table.displayCards()
-        
+
+        // Community cards & chat history
+        communityCards: table.displayCards(),
+        chatMessages
     });
 }
 
 // ============================================================================
 // CREATE CUSTOM TABLE
 // ============================================================================
-
 
 function createTable(req, res) {
     const { tableName, maxPlayers, buyIn, smallBlind, bigBlind, visibility } = req.body;
@@ -296,6 +305,7 @@ function createTable(req, res) {
     table.tableName = tableName.trim();
     table.buyIn = buyInAmount;
     table.visibility = visibility;
+    ensureTableChat(table);
 
     // Notify connected clients
     broadcastTableUpdate(req, table.tableId);
@@ -310,9 +320,58 @@ function createTable(req, res) {
 }
 
 // ============================================================================
-// TABLE LOGIC
+// TABLE LOGIC & CHAT
 // ============================================================================
 
+function postChatMessage(req, res) {
+    const table = getRequestedTable(req);
+
+    if (!table) {
+        return res.status(404).json({ error: "Table not found." });
+    }
+
+    const sender =
+        (req.session && req.session.user && req.session.user.username) ||
+        (typeof req.body?.playerId === "string" && req.body.playerId.trim());
+    const rawMessage = req.body?.message;
+
+    if (!sender) {
+        return res.status(401).json({ error: "Player ID is required to chat." });
+    }
+
+    if (typeof rawMessage !== "string" || !rawMessage.trim()) {
+        return res.status(400).json({ error: "Message cannot be empty." });
+    }
+
+    const text = rawMessage.trim().slice(0, 200);
+    const chatMessages = ensureTableChat(table);
+
+    const chatEntry = {
+        sender,
+        text,
+        timestamp: Date.now()
+    };
+
+    chatMessages.push(chatEntry);
+
+    if (chatMessages.length > 50) {
+        chatMessages.shift();
+    }
+
+    const io = req.app.get("io");
+    if (io) {
+        io.emit("table-chat", {
+            tableId: table.tableId,
+            sender,
+            message: text
+        });
+    }
+
+    return res.status(200).json({
+        success: true,
+        chatMessages
+    });
+}
 
 function joinTable(req, res) {
     const table = getRequestedTable(req);
@@ -341,7 +400,7 @@ function joinTable(req, res) {
     }
 
     const isPlayer = table.players.includes(id);
-    
+
     broadcastTableUpdate(req, table.tableId); // Notify all clients of the table update
 
     return res.status(200).json({
@@ -390,7 +449,7 @@ function startGame(req, res) {
     if (!result.success) {
         return res.status(400).json({ error: result.error });
     }
-    
+
     broadcastTableUpdate(req, table.tableId); // Notify all clients of the table update
 
     const playerId = req.body.playerId || req.query.playerId || table.players[0];
@@ -468,7 +527,7 @@ function nextRound(req, res) {
 
     if (playerId && table.players.includes(playerId)) {
         const hand = table.dealHandToPlayer(playerId);
-        
+
         if (hand) {
             playerHand = hand.map(card => Deck.cardToText(card));
         }
@@ -499,7 +558,7 @@ function finishGame(req, res) {
             error: "Table not found."
         });
     }
-    
+
     const result = table.finishGame();
 
     if (!result.success) {
@@ -518,4 +577,16 @@ function finishGame(req, res) {
     });
 }
 
-module.exports = { createTable, joinTable, leaveTable, startGame, finishGame, playerAction, nextRound, getTableStatus, tableManager, mainTable };
+module.exports = {
+    createTable,
+    joinTable,
+    leaveTable,
+    startGame,
+    finishGame,
+    playerAction,
+    nextRound,
+    getTableStatus,
+    postChatMessage,
+    tableManager,
+    mainTable
+};

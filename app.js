@@ -55,13 +55,14 @@ app.get('/api/user/messages', UserCont.getUserMessages);
 app.delete('/api/user/messages/:msgId', UserCont.deleteUserMessage);
 
 // Table Actions (Query/Body Table ID)
-const {createTable, joinTable, leaveTable, playerAction, startGame, nextRound, getTableStatus} = require("./controller/tableController");
+const {createTable, joinTable, leaveTable, playerAction, startGame, nextRound, getTableStatus, postChatMessage} = require("./controller/tableController");
 app.get("/api/table/status", getTableStatus);
 app.post("/api/table/join", joinTable);
 app.post("/api/table/leave", leaveTable);
 app.post("/api/table/action", playerAction);
 app.post("/api/table/start", startGame);
 app.get("/api/table/next-round", nextRound);
+app.post("/api/table/chat", postChatMessage);
 
 // Table Actions (URL Parameter Table ID)
 app.post("/api/tables/create", createTable);
@@ -137,4 +138,5 @@ app.get('/api/games/:id/reconstruct', async (req, res) => {
     }
 });
 
+//module.exports = app;
 exports.app = app;
