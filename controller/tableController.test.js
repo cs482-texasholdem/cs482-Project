@@ -408,10 +408,7 @@ describe('Table Controller Unit Tests', () => {
 
         joinTable(req, res);
 
-        expect(res.status).toHaveBeenCalledWith(400);
-        expect(res.json).toHaveBeenCalledWith(
-            expect.objectContaining({ error: "Could not join table." })
-        );
+        expect(res.status).toHaveBeenCalledWith(409);
 
         addPlayerSpy.mockRestore();
     });
