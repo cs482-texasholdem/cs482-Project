@@ -124,8 +124,9 @@ exports.postCreateOrUpdate = async function(req, res){
 
 
 /**
- * Registers a new player account with default player permissions and starting chip stack,
- * hashes their password, establishes their session, and redirects to the lobby.
+ * Registers a new player account with default player permissions and a fixed
+ * 1000-point starting chip stack, hashes their password, establishes their
+ * session, and redirects to the lobby.
  * 
  * @param {Object} req request object containing registration body data
  * @param {Object} res response object
@@ -136,28 +137,12 @@ exports.register = async function(req, res){
         userData.email = req.body.txt_email;         // Email address
         userData.username = req.body.txt_username;   // Username handle
         userData.permission = 2;                     // Standard player
-        userData.points = 1000;                      // Starting points
+        userData.points = 1000;                      // Fixed starting points for all new users
 
-        // Read points submitted from the sign-up form, falling back to guest points stored in session
-        const formPoints = Number(req.body.txt_points);
-        const sessionPoints = Number(req.session.pendingGuestPoints);
-
-        if (req.body.txt_points !== undefined && req.body.txt_points !== "" && Number.isFinite(formPoints) && formPoints >= 0) {
-            userData.points = Math.floor(formPoints);
-        } else if (Number.isFinite(sessionPoints) && sessionPoints >= 0) {
-            userData.points = Math.floor(sessionPoints);
+        // Clear any temporary guest points from session so stale values don't linger
+        if (req.session) {
+            delete req.session.pendingGuestPoints;
         }
-
-        // Log registration points so we can confirm the exact balance persisted to MongoDB
-        console.log("Registering user with points:", {
-            username: userData.username,
-            txt_points: req.body.txt_points,
-            sessionPoints: req.session.pendingGuestPoints,
-            finalPoints: userData.points
-        });
-
-        // Clear the temporary guest points from session once claimed
-        delete req.session.pendingGuestPoints;
 
         if(req.body.txt_pass) {
             userData.password = passUtil.hashPassword(req.body.txt_pass);
@@ -220,6 +205,118 @@ exports.login = async function(req, res){
             res.redirect('login.html?error=1');
         }
     } 
+};
+
+const crypto = require('crypto');
+
+// Optional Nodemailer setup if SMTP credentials are configured in .env
+let mailTransporter = null;
+try {
+    if (process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS) {
+        const nodemailer = require('nodemailer');
+        mailTransporter = nodemailer.createTransport({
+            host: process.env.SMTP_HOST,
+            port: Number(process.env.SMTP_PORT || 587),
+            secure: process.env.SMTP_SECURE === 'true',
+            auth: {
+                user: process.env.SMTP_USER,
+                pass: process.env.SMTP_PASS
+            }
+        });
+    }
+} catch (err) {
+    console.warn("Nodemailer not configured; reset codes will log to server console.");
+}
+
+/**
+ * Generates a 6-digit password reset code, stores a 15-minute expiry,
+ * and delivers it via email (or logs in non-production if SMTP isn't configured).
+ */
+exports.requestPasswordReset = async function(req, res) {
+    try {
+        const email = typeof req.body?.email === "string" ? req.body.email.trim().toLowerCase() : "";
+        if (!email) {
+            return res.status(400).json({ error: "Please enter a valid email address." });
+        }
+
+        const user = await dao.findLogin(email);
+
+        // Return a consistent message even if the email isn't found
+        if (!user) {
+            return res.status(200).json({
+                message: "If an account exists for that email, a 6-digit reset code has been sent."
+            });
+        }
+
+        const code = String(crypto.randomInt(100000, 999999));
+        const expiresAt = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes
+
+        await dao.update(user._id, {
+            resetCode: code,
+            resetCodeExpires: expiresAt
+        });
+
+        if (mailTransporter) {
+            await mailTransporter.sendMail({
+                from: process.env.SMTP_FROM || process.env.SMTP_USER,
+                to: user.email,
+                subject: "Texas Hold'em Password Reset Code",
+                text: `Your password reset code is ${code}. It expires in 15 minutes.`
+            });
+        } else {
+            console.log(`[Password Reset] Code for ${user.email}: ${code} (expires ${expiresAt.toISOString()})`);
+        }
+
+        return res.status(200).json({
+            message: "If an account exists for that email, a 6-digit reset code has been sent."
+        });
+    } catch (error) {
+        console.error("Error requesting password reset:", error);
+        return res.status(500).json({ error: "Could not process password reset request." });
+    }
+};
+
+/**
+ * Verifies the 6-digit reset code and updates the user's hashed password.
+ */
+exports.resetPasswordWithCode = async function(req, res) {
+    try {
+        const email = typeof req.body?.email === "string" ? req.body.email.trim().toLowerCase() : "";
+        const code = typeof req.body?.code === "string" ? req.body.code.trim() : "";
+        const newPassword = typeof req.body?.newPassword === "string" ? req.body.newPassword : "";
+
+        if (!email || !code || !newPassword) {
+            return res.status(400).json({ error: "Email, reset code, and new password are required." });
+        }
+        if (newPassword.length < 6) {
+            return res.status(400).json({ error: "New password must be at least 6 characters long." });
+        }
+
+        const user = await dao.findLogin(email);
+        if (!user || !user.resetCode || !user.resetCodeExpires) {
+            return res.status(400).json({ error: "Invalid or expired reset code." });
+        }
+
+        const isExpired = new Date() > new Date(user.resetCodeExpires);
+        if (isExpired || user.resetCode !== code) {
+            return res.status(400).json({ error: "Invalid or expired reset code." });
+        }
+
+        const hashedPassword = passUtil.hashPassword(newPassword);
+
+        await dao.update(user._id, {
+            password: hashedPassword,
+            resetCode: null,
+            resetCodeExpires: null
+        });
+
+        return res.status(200).json({
+            message: "Password updated successfully. You can now log in with your new password."
+        });
+    } catch (error) {
+        console.error("Error resetting password:", error);
+        return res.status(500).json({ error: "Failed to reset password." });
+    }
 };
 
 

@@ -37,6 +37,8 @@ app.post('/loginuser', UserCont.login);
 app.get('/loggeduser', UserCont.loggedUser);
 app.get('/logout', UserCont.logout); 
 app.get('/deluser/:id', UserCont.deleteOne); 
+app.post('/api/auth/forgot-password', UserCont.requestPasswordReset);
+app.post('/api/auth/reset-password', UserCont.resetPasswordWithCode);
 
 // Social & Friend System Routes
 app.get('/api/users/search', UserCont.searchUsers);        
