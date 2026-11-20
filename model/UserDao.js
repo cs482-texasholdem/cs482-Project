@@ -4,8 +4,8 @@
  * Author: Bonita Rodrigues
  * Purpose: Data Access Object (DAO) layer for user management. Defines the Mongoose 
  *          schema and database interaction methods (CRUD operations, querying, 
- *          social lookups, and authentication lookups) connecting MongoDB Atlas to the 
- *          application controllers.
+ *          social lookups, authentication lookups, and password reset tokens) 
+ *          connecting MongoDB Atlas to the application controllers.
  * ============================================================================
  */
 
@@ -14,7 +14,7 @@ const mongoose = require('mongoose');
 /**
  * Mongoose Schema definition for application users.
  * Supports credentials, access control permissions, timestamps, chip points, 
- * active status, and social arrays for friends and requests.
+ * active status, password reset codes, and social arrays for friends and requests.
  */
 const userSchema = new mongoose.Schema({
     username: { type: String, required: true, trim: true },
@@ -24,6 +24,10 @@ const userSchema = new mongoose.Schema({
     creation: { type: Date, default: Date.now },
     points: { type: Number, default: 1000 },
     isActive: { type: Boolean, default: true },
+
+    // Password reset verification fields
+    resetCode: { type: String, default: null },
+    resetCodeExpires: { type: Date, default: null },
 
     // warnings
     warnings: { type: Number, default: 0 },
@@ -151,7 +155,16 @@ exports.findOne = async function(query){
  * @param {string} pemail The email address of the user
  * @returns {Promise<Object|null>} The matching user document or null
  */
+/**
+ * Finds and returns a single user record by their email address (case-insensitive)
+ * for login and password reset verification.
+ * 
+ * @param {string} pemail The email address of the user
+ * @returns {Promise<Object|null>} The matching user document or null
+ */
 exports.findLogin = async function(pemail){
-    let user = await userModel.findOne({ email: pemail });
+    if (!pemail) return null;
+    const escaped = String(pemail).trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    let user = await userModel.findOne({ email: new RegExp(`^${escaped}$`, 'i') });
     return user;
 };

@@ -25,7 +25,7 @@
         <link rel="stylesheet" href="style.css">
     </head>
 
-    <body>
+    <body style="visibility: hidden;">
 
         <!-- Header / Jumbotron -->
         <div class="p-5 custom-jumbotron text-white text-center">
@@ -414,6 +414,40 @@
                 </div>
             </div>
         </div>
+        </div>
+
+        <!-- POP-UP MODAL: Friend Direct Chat -->
+        <div class="modal fade" id="friendChatModal" tabindex="-1" aria-labelledby="friendChatModalLabel" aria-hidden="true">
+            <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
+                <div class="modal-content border-secondary text-white shadow-lg" style="background-color: #0b132b;">
+                    <div class="modal-header border-secondary">
+                        <h5 class="modal-title fw-bold text-white" id="friendChatModalLabel">
+                            <i class="bi bi-chat-dots-fill text-info me-2"></i>
+                            Chat with <span id="chatFriendName" class="text-info">Friend</span>
+                        </h5>
+                        <button type="button" class="btn-close btn-close-white shadow-none" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+
+                    <div class="modal-body p-3 d-flex flex-column gap-2" id="friendChatMessages" style="min-height: 280px; max-height: 360px; overflow-y: auto; background-color: #131b2e;">
+                        <p class="text-white opacity-75 text-center small fst-italic my-auto">Select a friend to start chatting.</p>
+                    </div>
+
+                    <div class="modal-footer border-secondary d-block p-3">
+                        <form id="friendChatForm" class="d-flex gap-2">
+                            <input
+                                type="text"
+                                id="friendChatInput"
+                                class="form-control midnight-input text-grey border-secondary shadow-none"
+                                placeholder="Type a message..."
+                                maxlength="500"
+                                autocomplete="off"
+                                required
+                            >
+                            <button type="submit" class="btn btn-primary fw-semibold shadow-none px-3">Send</button>
+                        </form>
+                    </div>
+                </div>
+            </div>
         </div>
 
         <!-- Footer -->

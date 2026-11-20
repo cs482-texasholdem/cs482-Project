@@ -3,8 +3,11 @@
 // Purpose: Frontend controller for tableDisplay.html. Manages identity, 
 //          socket connections, UI rendering, timer display, and action handling.
 // ============================================================================
+
 let currentPlayerId = "";
 let socket = null;
+let lastRenderedChatCount = 0;
+let allowNavigation = false;
 
 // Get the selected table from the URL
 const urlParams = new URLSearchParams(window.location.search);
@@ -16,35 +19,61 @@ if (!currentTableId) {
     );
 }
 
-
 function getPlayerIdFromUrl() {
-   return urlParams.get("playerId")?.trim() || "";
+    return urlParams.get("playerId")?.trim() || "";
+}
+
+// Fetch logged-in user account details to populate navbar points/chips & guest prompt
+async function syncAccountFromSession() {
+    const accountChipsElem = document.getElementById("account-chips");
+    const savePointsContainer = document.getElementById("save-points-container");
+
+    try {
+        const res = await fetch("/loggeduser");
+        if (!res.ok) {
+            if (savePointsContainer) savePointsContainer.style.display = "inline";
+            return null;
+        }
+
+        const data = await res.json();
+        const user = data.user || data;
+
+        if (user && accountChipsElem) {
+            const balance = user.points !== undefined
+                ? user.points
+                : (user.chips !== undefined ? user.chips : null);
+            if (balance !== null) {
+                accountChipsElem.textContent = Number(balance).toLocaleString();
+            }
+        }
+
+        if (savePointsContainer) {
+            const isGuest = !user || !user.username || user.isGuest === true;
+            savePointsContainer.style.display = isGuest ? "inline" : "none";
+        }
+
+        return user;
+    } catch (e) {
+        console.error("Failed to sync user account from session:", e);
+        return null;
+    }
 }
 
 // Robust initialization: URL > Logged-In User Session > Guest Storage > Fallback Guest
 async function initializePlayerIdentity() {
+    const sessionUser = await syncAccountFromSession();
+
     const identityMode = sessionStorage.getItem("identityMode");
     const savedGuestId = sessionStorage.getItem("guestPlayerId");
 
-     // If this tab is already a guest, preserve that identity.
+    // If this tab is already a guest, preserve that identity.
     if (identityMode === "guest" && savedGuestId) {
         currentPlayerId = savedGuestId;
     } else {
         currentPlayerId = getPlayerIdFromUrl();
 
-        if (!currentPlayerId) {
-            //check server session for logged-in users
-            try {
-                const res = await fetch('/loggeduser');
-                if (res.ok) {
-                    const user = await res.json();
-                    if (user && (user.username || user.email || user.id)) {
-                        currentPlayerId = user.id || user.username || (user.email ? user.email.split("@")[0] : "");
-                    }
-                }
-            } catch (e) {
-                console.error("Failed to fetch user session:", e);
-            }
+        if (!currentPlayerId && sessionUser) {
+            currentPlayerId = sessionUser.username || sessionUser.id || (sessionUser.email ? sessionUser.email.split("@")[0] : "");
         }
     }
 
@@ -59,11 +88,38 @@ async function initializePlayerIdentity() {
     if (headerName) headerName.textContent = currentPlayerId;
     if (displayName) displayName.textContent = currentPlayerId;
 
+    // Check whether the current player is in Guest mode
+    const isGuestPlayer = currentPlayerId.startsWith("Guest_") || sessionStorage.getItem("identityMode") === "guest";
+    const savePointsContainer = document.getElementById("save-points-container");
+    const savePointsBtn = document.getElementById("save-points-btn");
+
+    // Display the "Save Points (Sign Up)" button in the top navbar only for guests
+    if (savePointsContainer) {
+        savePointsContainer.style.display = isGuestPlayer ? "inline-flex" : "none";
+    }
+
+    // Redirect guest to the sign-up page with their current tableId, playerId, and chip total
+    // Remove the guest from the table first, then redirect to the sign-up page with their current points
+    if (savePointsBtn) {
+        savePointsBtn.addEventListener("click", async () => {
+            await exitTableAndRedirect(null, true);
+        });
+    }
+
+    // Warn guests before closing or refreshing the browser tab unless they are intentionally navigating via our buttons
+    if (isGuestPlayer) {
+        window.addEventListener("beforeunload", (event) => {
+            if (!allowNavigation) {
+                event.preventDefault();
+            }
+        });
+    }
+
     // Initialize the table interface without automatically joining
     initializeSocketAndUI();
 }
 
-//sends post requests to /api/table/join then initializes socket.io connection
+// Sends POST requests to /api/table/join then initializes Socket.io connection
 async function registerPlayerToTable(playerId) {
     try {
         const modeParam = isSpectatorMode ? "spectator" : "player";
@@ -75,6 +131,33 @@ async function registerPlayerToTable(playerId) {
     }
 
     initializeSocketAndUI();
+}
+
+function appendChatEntry(sender, text) {
+    const chatMessages = document.getElementById("chat-messages");
+    if (!chatMessages || !text) return;
+
+    const messageElement = document.createElement("div");
+    messageElement.className = "chat-message";
+
+    const senderStrong = document.createElement("strong");
+    senderStrong.textContent = `${sender}: `;
+
+    messageElement.append(senderStrong, document.createTextNode(text));
+    chatMessages.appendChild(messageElement);
+    chatMessages.scrollTop = chatMessages.scrollHeight;
+}
+
+function renderChatHistory(messages) {
+    const chatMessages = document.getElementById("chat-messages");
+    if (!chatMessages || !Array.isArray(messages)) return;
+    if (messages.length === lastRenderedChatCount) return;
+
+    chatMessages.innerHTML = "";
+    messages.forEach((msg) => {
+        appendChatEntry(msg.sender || "Player", msg.text || msg.message || "");
+    });
+    lastRenderedChatCount = messages.length;
 }
 
 function initializeSocketAndUI() {
@@ -113,6 +196,15 @@ function initializeSocketAndUI() {
         }
     });
 
+    // Listen for live chat messages broadcast to this table
+    socket.on("table-chat", (payload) => {
+        if (!payload || (payload.tableId && payload.tableId !== currentTableId)) {
+            return;
+        }
+        appendChatEntry(payload.sender || "Player", payload.message || payload.text || "");
+        lastRenderedChatCount++;
+    });
+
     refreshUI();
 }
 
@@ -146,7 +238,6 @@ function updateRaiseControls(status) {
     document.getElementById("raise-max-label").textContent = max;
 }
 
-
 const tableMessage = document.getElementById("table-message");
 const leftSideContainer = document.getElementById("left-player-side");
 const rightSideContainer = document.getElementById("right-player-side");
@@ -160,46 +251,78 @@ const timerText = document.getElementById("turn-timer-text");
 const timerCircle = document.getElementById("turn-timer-circle");
 const actionButtons = document.querySelectorAll("[data-action]");
 
-async function leaveTable(destination) {
+// Helper that removes the player from the active table on the server and navigates cleanly
+async function removeFromServerTable() {
+    try {
+        await fetch("/api/table/leave", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                tableId: currentTableId,
+                playerId: currentPlayerId
+            })
+        });
+    } catch (error) {
+        console.error("Error notifying server of table leave:", error);
+    }
+}
+
+// Unified exit handler for Leave Table, Home, Lobby, and Save Points (Sign Up)
+async function exitTableAndRedirect(destination, forceSignup = false) {
+    const isGuestPlayer = currentPlayerId.startsWith("Guest_") || sessionStorage.getItem("identityMode") === "guest";
+    const parsedChips = Number(yourChipsElem?.textContent?.replace(/[^0-9.-]+/g, ""));
+    const currentChips = Number.isFinite(parsedChips) ? parsedChips : 1000;
+
+    if (isGuestPlayer) {
+        // If triggered directly by the "Save Points (Sign Up)" button, skip the confirm dialog and go straight to sign-up
+        let goToSignup = forceSignup;
+
+        if (!forceSignup) {
+            goToSignup = confirm(
+                `You have ${currentChips.toLocaleString()} temporary guest points.\n\n` +
+                `Click OK to create an account and save your points, or Cancel to leave the table without saving.`
+            );
+        }
+
+        // Always remove the guest from the table first so they don't remain seated in-game
+        await removeFromServerTable();
+        allowNavigation = true;
+
+        if (goToSignup) {
+            // Transfer to sign-up page with guest ID, table ID, and chip balance
+            window.location.href = `signup.html?playerId=${encodeURIComponent(currentPlayerId)}&tableId=${encodeURIComponent(currentTableId)}&points=${encodeURIComponent(currentChips)}`;
+            return;
+        }
+
+        // Guest declined saving points: go straight to the lobby (never index.html or login.html)
+        window.location.href = "lobby.html";
+        return;
+    }
+
+    // Registered user flow
     if (!confirm("Are you sure you want to leave the table?")) {
         return;
     }
 
-    try {
-        const response = await fetch("/api/table/leave", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ 
-                tableId: currentTableId,
-                playerId: currentPlayerId 
-            })
-        });
-
-        if (!response.ok) {
-            throw new Error("Failed to leave table.");
-        }
-
-        window.location.href = destination;
-    } 
-    catch (error) {
-        console.error("Failed to leave table:", error);
-        alert("Unable to leave the table. Please try again.");
-    }
+    await removeFromServerTable();
+    allowNavigation = true;
+    window.location.href = destination || "lobby.html";
 }
 
 const leaveBtn = document.getElementById("leave-table-btn");
-if (leaveBtn) leaveBtn.addEventListener("click", () => leaveTable("lobby.html"));
+if (leaveBtn) leaveBtn.addEventListener("click", () => exitTableAndRedirect("lobby.html"));
 
 const homeLink = document.getElementById("home-link");
 if (homeLink) homeLink.addEventListener("click", (event) => {
     event.preventDefault();
-    leaveTable("index.html");
+    // Guests don't have an unlocked dashboard yet, so Home routes them to lobby.html after leaving
+    exitTableAndRedirect("index.html");
 });
 
 const lobbyLink = document.getElementById("lobby-link");
 if (lobbyLink) lobbyLink.addEventListener("click", (event) => {
     event.preventDefault();
-    leaveTable("lobby.html");
+    exitTableAndRedirect("lobby.html");
 });
 
 // Table link -> Add a test player to the current table
@@ -377,6 +500,12 @@ function renderActivePlayers(status) {
     if (availableChipsElem) availableChipsElem.textContent = (status.playerChips || 0).toLocaleString();
     if (yourBetElem) yourBetElem.textContent = status.playerBet || 0;
     if (currentBetElem) currentBetElem.textContent = status.currentHighestBet || 0;
+
+    // Keep the top navigation bar's "Account Chips" display synchronized with the player's live table chips
+    const accountChipsElem = document.getElementById("account-chips");
+    if (accountChipsElem && status.playerChips !== undefined) {
+        accountChipsElem.textContent = Number(status.playerChips).toLocaleString();
+    }
 
     if (currentTurnPlayerElem) {
         currentTurnPlayerElem.textContent = status.currentTurnPlayer || "None";
@@ -605,30 +734,34 @@ async function handleSequencedShowdown(winnerData) {
 async function refreshUI() {
     if (isShowingShowdown) return;
 
-        const status = await fetchTableStatus();
-        if (!status || isShowingShowdown) return;
+    const status = await fetchTableStatus();
+    if (!status || isShowingShowdown) return;
 
-        // Update the selected table configuration
-        renderTableDetails(status);
+    // Update the selected table configuration
+    renderTableDetails(status);
 
-        if (!status.inTable) {
-            showJoinPrompt(status.gameInProgress);
-            return;
+    if (Array.isArray(status.chatMessages)) {
+        renderChatHistory(status.chatMessages);
+    }
+
+    if (!status.inTable) {
+        showJoinPrompt(status.gameInProgress);
+        return;
+    }
+
+    hideJoinPrompt();
+
+    renderActivePlayers(status);
+    renderStartGameButton(status);
+
+    if (status.isSpectator) {
+        renderCards("player-cards", []);
+
+        if (tableMessage) {
+            tableMessage.textContent =
+                "You are spectating. You will join active players when the next game starts.";
         }
-
-        hideJoinPrompt();
-
-        renderActivePlayers(status);
-        renderStartGameButton(status);
-
-        if (status.isSpectator) {
-            renderCards("player-cards", []);
-
-            if (tableMessage) {
-                tableMessage.textContent =
-                    "You are spectating. You will join active players when the next game starts.";
-            }
-        }
+    }
 }
 
 function renderCards(containerId, cards) {
@@ -707,27 +840,45 @@ actionButtons.forEach((button) => {
     });
 });
 
+// Send chat messages to backend and broadcast via socket
 const chatForm = document.getElementById("chat-form");
 if (chatForm) {
-    chatForm.addEventListener("submit", (event) => {
+    chatForm.addEventListener("submit", async (event) => {
         event.preventDefault();
         const input = document.getElementById("chat-input");
         if (!input) return;
         const message = input.value.trim();
         if (!message) return;
 
-        const messageElement = document.createElement("div");
-        messageElement.className = "chat-message";
-        const sender = document.createElement("strong");
-        sender.textContent = currentPlayerId + ": ";
-        messageElement.append(sender, document.createTextNode(message));
-
-        const chatMessages = document.getElementById("chat-messages");
-        if (chatMessages) {
-            chatMessages.appendChild(messageElement);
-            chatMessages.scrollTop = chatMessages.scrollHeight;
-        }
         input.value = "";
+
+        try {
+            const res = await fetch("/api/table/chat", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    tableId: currentTableId,
+                    playerId: currentPlayerId,
+                    message
+                })
+            });
+
+            if (!res.ok) {
+                const err = await res.json().catch(() => ({}));
+                if (tableMessage) tableMessage.textContent = err.error || "Could not send message.";
+                return;
+            }
+
+            const data = await res.json();
+            if (Array.isArray(data.chatMessages)) {
+                renderChatHistory(data.chatMessages);
+            } else if (!socket || !socket.connected) {
+                appendChatEntry(currentPlayerId, message);
+                lastRenderedChatCount++;
+            }
+        } catch (error) {
+            console.error("Error sending chat message:", error);
+        }
     });
 }
 

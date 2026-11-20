@@ -11,6 +11,14 @@
 
 document.addEventListener("DOMContentLoaded", async function() {
 
+    const modalEl = document.getElementById("friendChatModal");
+    if (modalEl) {
+        modalEl.addEventListener("hidden.bs.modal", () => {
+            activeChatFriend = null;
+        });
+    }
+    
+    // Clear local storage and disconnect socket on logout to prevent session persistence
     const logoutLink = document.getElementById("logout-link");
     if (logoutLink) {
         logoutLink.addEventListener("click", () => {
@@ -28,27 +36,53 @@ document.addEventListener("DOMContentLoaded", async function() {
     // 1. Fetch & Populate Logged-In User Profile & Points
     // ------------------------------------------------------------------------
     try {
-        const response = await fetch('/loggeduser');
+        // Request the active session user from '/loggeduser' without stale browser caching
+        const response = await fetch('/loggeduser', { cache: 'no-store' });
         if (response.ok) {
             const user = await response.json();
             if (user) {
-                activeUsername = user.username || (user.email ? user.email.split('@')[0] : "Player");
+                // Clear leftover guest identifiers once a real account session is active
+                sessionStorage.removeItem('identityMode');
+                sessionStorage.removeItem('guestPlayerId');
+                localStorage.removeItem('guestPlayerId');
+
+                const resolvedName = user.username || (user.email ? user.email.split('@')[0] : '');
+                currentLoggedInUser = resolvedName || null;
+
                 const usernameDisplay = document.getElementById('dashboardUsername');
                 const pointsDisplay = document.getElementById('dashboardPoints');
 
                 if (usernameDisplay) {
-                    usernameDisplay.textContent = activeUsername;
+                    // Show the logged-in user's username on the dashboard banner
+                    usernameDisplay.textContent = resolvedName || 'Player';
                 }
                 if (pointsDisplay) {
+                    // Render the user's latest saved points balance
                     pointsDisplay.innerHTML = `<i class="bi bi-coin"></i> ${(user.points !== undefined ? user.points : 1000).toLocaleString()}`;
                 }
+
+                // Make the dashboard visible only after session user and points are populated
+                document.body.style.visibility = 'visible';
             } else {
-                window.location.href = 'login.html';
+                // Redirect immediately to login if no authenticated user is found
+                window.location.replace('login.html');
                 return;
             }
+        } else {
+            window.location.replace('login.html');
+            return;
         }
     } catch (err) {
         console.error("Failed to load user session info:", err);
+        window.location.replace('login.html');
+        return;
+    }
+
+    // ------------------------------------------------------------------------
+    // 1b. Load Earned Badges (Top) & All Achievement Progress Bars (Bottom)
+    // ------------------------------------------------------------------------
+    if (activeUsername) {
+        await loadDashboardAchievements(activeUsername);
     }
 
     // ------------------------------------------------------------------------
@@ -218,6 +252,7 @@ async function loadFriendsData() {
         const response = await fetch('/api/friends/data');
         if (!response.ok) return;
         const data = await response.json();
+        const unreadCounts = data.unreadCounts || {};
 
         if (pendingContainer) {
             pendingContainer.innerHTML = "";
@@ -252,14 +287,49 @@ async function loadFriendsData() {
                 friendsContainer.innerHTML = `<div class="p-2 small text-white opacity-75 fst-italic">No friends added yet.</div>`;
             } else {
                 data.friends.forEach(friend => {
-                    friendsContainer.innerHTML += `
-                        <div class="list-group-item d-flex justify-content-between align-items-center border-secondary mb-1 rounded py-2 px-3" style="background-color: #165da3 !important;">
-                            <span class="fw-semibold text-white">
-                                <i class="bi bi-circle-fill text-success small me-2"></i>${friend}
-                            </span>
-                            <span class="badge bg-success text-white">Online</span>
-                        </div>
-                    `;
+                    const friendName = typeof friend === "string"
+                        ? friend
+                        : (friend.username || friend.name || String(friend));
+                    const unreadCount = Number(unreadCounts[friendName] || 0);
+
+                    const row = document.createElement("div");
+                    row.className = "list-group-item d-flex justify-content-between align-items-center border-secondary mb-1 rounded py-2 px-3";
+                    row.style.cssText = "background-color: #165da3 !important;";
+
+                    const nameSpan = document.createElement("span");
+                    nameSpan.className = "fw-semibold text-white";
+                    nameSpan.innerHTML = `<i class="bi bi-circle-fill text-success small me-2"></i>`;
+                    nameSpan.appendChild(document.createTextNode(friendName));
+
+                    const rightGroup = document.createElement("div");
+                    rightGroup.className = "d-flex align-items-center gap-2";
+
+                    const badge = document.createElement("span");
+                    badge.className = "badge bg-success text-white";
+                    badge.textContent = "Online";
+
+                    const chatBtn = document.createElement("button");
+                    chatBtn.type = "button";
+                    chatBtn.className = "btn btn-sm btn-outline-light py-0 px-2 shadow-none position-relative";
+                    chatBtn.title = unreadCount > 0
+                        ? `Chat with ${friendName} (${unreadCount} unread)`
+                        : `Chat with ${friendName}`;
+                    chatBtn.setAttribute("aria-label", chatBtn.title);
+                    chatBtn.innerHTML = `<i class="bi bi-chat-dots-fill"></i>`;
+
+                    if (unreadCount > 0) {
+                        const unreadBadge = document.createElement("span");
+                        unreadBadge.className = "position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger";
+                        unreadBadge.style.fontSize = "0.65rem";
+                        unreadBadge.textContent = unreadCount > 99 ? "99+" : String(unreadCount);
+                        chatBtn.appendChild(unreadBadge);
+                    }
+
+                    chatBtn.addEventListener("click", () => openFriendChatModal(friendName));
+
+                    rightGroup.append(badge, chatBtn);
+                    row.append(nameSpan, rightGroup);
+                    friendsContainer.appendChild(row);
                 });
             }
         }
@@ -426,9 +496,19 @@ async function deleteMessage(msgId) {
     }
 }
 
+
+// ============================================================================
+// Create Custom Poker Table
+// ============================================================================
+
+document.addEventListener("DOMContentLoaded", function() {
+    const createTableForm = document.getElementById("createTableForm");
 document.addEventListener("DOMContentLoaded", function() {
     const createTableForm = document.getElementById("createTableForm");
 
+    if (createTableForm) {
+        createTableForm.addEventListener("submit", async function(e) {
+            e.preventDefault();
     if (createTableForm) {
         createTableForm.addEventListener("submit", async function(e) {
             e.preventDefault();
@@ -450,7 +530,22 @@ document.addEventListener("DOMContentLoaded", function() {
                 alert("Please enter blinds in the format $2 / $4.");
                 return;
             }
+            if (
+                blindValues.length !== 2 ||
+                blindValues.some(value => !Number.isFinite(value) || value <= 0)
+            ) {
+                alert("Please enter blinds in the format $2 / $4.");
+                return;
+            }
 
+            const tableData = {
+                tableName,
+                maxPlayers,
+                buyIn,
+                smallBlind: blindValues[0],
+                bigBlind: blindValues[1],
+                visibility
+            };
             const tableData = {
                 tableName,
                 maxPlayers,

@@ -105,6 +105,9 @@
                                 <form class="was-validated" method="post" action="register" id="signupForm">
                                     <!--Email Input -->
                                     <div class="mb-4">
+                                        <!-- Hidden input carrying over guest points when converting from a guest session -->
+                                        <input type="hidden" name="txt_points" id="txt_points" value="1000" />
+                                        
                                         <label for="txt_email" class="form-label text-muted small mb-1">Email</label>
                                         <input class="form-control input-line" type="email" name="txt_email" id="txt_email" placeholder="Enter Email" required />
                                     </div>

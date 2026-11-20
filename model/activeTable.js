@@ -10,6 +10,7 @@
 const Deck = require("../util/pokerLogic");
 const PlayerManager = require("./playerManager");
 const GameDao = require("./GameDao");
+const UserDao = require("./UserDao");
 
 class PotManager {
     constructor() {
@@ -224,8 +225,9 @@ class ActiveTable {
     getPlayerCount() { return this.playerManager.getPlayerCount(); }
     getSpectatorCount() { return this.playerManager.getSpectatorCount(); }
     
-    addPlayer(playerId) { 
-        const added = this.playerManager.addPlayer(playerId);
+    // Pass optional startingChips through to PlayerManager so account players keep their saved points at the table
+    addPlayer(playerId, startingChips = 1000) { 
+        const added = this.playerManager.addPlayer(playerId, startingChips);
         this.playerManager.updateQueueDistribution(this.gameInProgress);
         return added;
     }
@@ -751,8 +753,30 @@ class ActiveTable {
             console.error("Failed to persist game history record:", err);
         });
 
+        this.syncAccountPoints().catch(err => {
+            console.error("Failed to sync player account points:", err);
+        });
+
         this.playerManager.processPendingRemovals(this.gameInProgress);
         return { winners, maxScore, pot: resultPot, showdownHands };
+    }
+    
+    async syncAccountPoints() {
+        for (const playerId of this.initialPlayersSnapshot) {
+            if (!playerId || playerId.startsWith("Guest_")) continue;
+
+            const player = this.playerManager.getPlayer(playerId);
+            if (!player || typeof player.chips !== "number") continue;
+
+            try {
+                await UserDao.update(
+                    { username: playerId },
+                    { points: Math.max(0, Math.floor(player.chips)) }
+                );
+            } catch (err) {
+                console.error(`Failed to sync points for user ${playerId}:`, err);
+            }
+        }
     }
 }
 

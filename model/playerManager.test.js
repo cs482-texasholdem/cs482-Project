@@ -68,6 +68,15 @@ describe('Player & PlayerManager Classes', () => {
       expect(manager.addPlayer('  P1  ')).toBe(true);
       expect(manager.hasPlayer('P1')).toBe(true);
     });
+
+    // Verify addPlayer initializes custom starting chips for account players and defaults to 1000
+    test('assigns custom startingChips when provided and defaults to 1000', () => {
+      expect(manager.addPlayer('Guest_100')).toBe(true);
+      expect(manager.getPlayer('Guest_100').chips).toBe(1000);
+
+      expect(manager.addPlayer('AccountUser', 2250)).toBe(true);
+      expect(manager.getPlayer('AccountUser').chips).toBe(2250);
+    });
   });
 
   describe('updateQueueDistribution Logic', () => {
