@@ -5,12 +5,15 @@
  * Purpose: Backend controller for user management in the Texas Hold'em web 
  *          application. Handles authentication, session tracking, password 
  *          hashing delegation, user CRUD operations, role-based access 
- *          control (RBAC) security checks, and social friend management.
+ *          control (RBAC) security checks, social friend management, and 
+ *          persistent friend direct messaging.
  * ============================================================================
  */
 
+const mongoose = require('mongoose');
 const dao = require('../model/UserDao');
 const passUtil = require('../util/PasswordUtil');
+const FriendMessage = require('../model/FriendMessage');
 
 
 /**
@@ -366,6 +369,126 @@ exports.declineFriendRequest = async function(req, res) {
     }
 };
 
+/**
+ * Fetches persistent 1-on-1 chat history between the logged-in user and a friend.
+ */
+exports.getFriendChat = async function(req, res) {
+    try {
+        const currentUser = getCurrentUserHandle(req);
+        const friendUsername = req.params.friendUsername?.trim();
+
+        if (!currentUser) {
+            return res.status(401).json({ error: "Not logged in." });
+        }
+        if (!friendUsername) {
+            return res.status(400).json({ error: "Friend username is required." });
+        }
+
+        const messages = await FriendMessage.find({
+            $or: [
+                { sender: currentUser, recipient: friendUsername },
+                { sender: friendUsername, recipient: currentUser }
+            ]
+        }).sort({ createdAt: 1 });
+
+        return res.status(200).json({ messages });
+    } catch (err) {
+        console.error("Error loading friend chat:", err);
+        return res.status(500).json({ error: "Failed to load messages." });
+    }
+};
+
+/**
+ * Saves a new persistent 1-on-1 message to a friend in MongoDB.
+ */
+exports.sendFriendChatMessage = async function(req, res) {
+    try {
+        const currentUser = getCurrentUserHandle(req);
+        const friendUsername = req.params.friendUsername?.trim();
+        const text = typeof req.body?.text === "string" ? req.body.text.trim() : "";
+
+        if (!currentUser) {
+            return res.status(401).json({ error: "Not logged in." });
+        }
+        if (!friendUsername || !text) {
+            return res.status(400).json({ error: "Friend and message text are required." });
+        }
+
+        const created = await FriendMessage.create({
+            sender: currentUser,
+            recipient: friendUsername,
+            text: text.slice(0, 500)
+        });
+
+        return res.status(201).json({ message: created });
+    } catch (err) {
+        console.error("Error saving friend chat message:", err);
+        return res.status(500).json({ error: "Failed to send message." });
+    }
+};
+
+/**
+ * Edits an existing message if and only if the logged-in user is the sender.
+ */
+exports.editFriendChatMessage = async function(req, res) {
+    try {
+        const currentUser = getCurrentUserHandle(req);
+        const { messageId } = req.params;
+        const text = typeof req.body?.text === "string" ? req.body.text.trim() : "";
+
+        if (!currentUser) {
+            return res.status(401).json({ error: "Not logged in." });
+        }
+        if (!text) {
+            return res.status(400).json({ error: "Updated message text cannot be empty." });
+        }
+
+        const updated = await FriendMessage.findOneAndUpdate(
+            { _id: messageId, sender: currentUser, deleted: { $ne: true } },
+            { text: text.slice(0, 500), edited: true },
+            { new: true }
+        );
+
+        if (!updated) {
+            return res.status(404).json({ error: "Message not found, deleted, or not owned by user." });
+        }
+
+        return res.status(200).json({ message: updated });
+    } catch (err) {
+        console.error("Error editing friend chat message:", err);
+        return res.status(500).json({ error: "Failed to edit message." });
+    }
+};
+
+/**
+ * Deletes an existing message if and only if the logged-in user is the sender.
+ */
+exports.deleteFriendChatMessage = async function(req, res) {
+    try {
+        const currentUser = getCurrentUserHandle(req);
+        const { messageId } = req.params;
+
+        if (!currentUser) {
+            return res.status(401).json({ error: "Not logged in." });
+        }
+
+        const deletedMsg = await FriendMessage.findOneAndUpdate(
+            { _id: messageId, sender: currentUser },
+            { deleted: true, text: "" },
+            { new: true }
+        );
+
+        if (!deletedMsg) {
+            return res.status(404).json({ error: "Message not found or not owned by user." });
+        }
+
+        return res.status(200).json({ message: deletedMsg });
+    } catch (err) {
+        console.error("Error deleting friend chat message:", err);
+        return res.status(500).json({ error: "Failed to delete message." });
+    }
+};
+
 
 // ============================================================================
 // Messages Controller
@@ -393,8 +516,6 @@ exports.getUserMessages = async function(req, res) {
         res.status(500).json({ error: "Server error" });
     }
 };
-
-const mongoose = require('mongoose'); // Ensure mongoose is required at the top of your controller
 
 /**
  * Deletes a specific message from the logged-in user's messages array.
@@ -471,5 +592,3 @@ exports.logout = function(req, res){
 exports.adminCheck = function(req){ 
     return (req.session.user && req.session.user.permission == 1);
 };
-
-

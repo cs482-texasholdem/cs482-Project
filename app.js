@@ -44,6 +44,10 @@ app.post('/friends/request', UserCont.sendFriendRequest);
 app.post('/friends/accept', UserCont.acceptFriendRequest);
 app.post('/friends/decline', UserCont.declineFriendRequest);
 app.get('/api/friends/data', UserCont.getFriendsData);
+app.get('/api/friends/chat/:friendUsername', UserCont.getFriendChat);
+app.post('/api/friends/chat/:friendUsername', UserCont.sendFriendChatMessage);
+app.patch('/api/friends/chat/:friendUsername/:messageId', UserCont.editFriendChatMessage);
+app.delete('/api/friends/chat/:friendUsername/:messageId', UserCont.deleteFriendChatMessage);
 
 // Report Player Routes
 const reportCont = require('./controller/ReportController');

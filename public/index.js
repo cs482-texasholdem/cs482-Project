@@ -3,8 +3,8 @@
  * File Name: index.js
  * Author: Bonita Rodrigues, Gigi Li
  * Purpose: Frontend controller script for the User Dashboard homepage. Manages 
- *          dynamic user profile/points loading, user search capabilities, and 
- *          asynchronous friend list/request rendering directly on the dashboard.
+ *          dynamic user profile/points loading, user search capabilities, 
+ *          asynchronous friend list/request rendering, and persistent friend chat.
  * ============================================================================
  */
 
@@ -13,7 +13,14 @@
 // ============================================================================
 document.addEventListener("DOMContentLoaded", async function() {
 
-    //Clear local storage and disconnect socket on logout to prevent session persistence
+    const modalEl = document.getElementById("friendChatModal");
+    if (modalEl) {
+        modalEl.addEventListener("hidden.bs.modal", () => {
+            activeChatFriend = null;
+        });
+    }
+    
+    // Clear local storage and disconnect socket on logout to prevent session persistence
     const logoutLink = document.getElementById("logout-link");
     if (logoutLink) {
         logoutLink.addEventListener("click", () => {
@@ -33,11 +40,14 @@ document.addEventListener("DOMContentLoaded", async function() {
         if (response.ok) {
             const user = await response.json();
             if (user) {
+                const resolvedName = user.username || (user.email ? user.email.split('@')[0] : '');
+                currentLoggedInUser = resolvedName || null;
+
                 const usernameDisplay = document.getElementById('dashboardUsername');
                 const pointsDisplay = document.getElementById('dashboardPoints');
 
                 if (usernameDisplay) {
-                    usernameDisplay.textContent = user.username || user.email.split('@')[0];
+                    usernameDisplay.textContent = resolvedName || 'Player';
                 }
                 if (pointsDisplay) {
                     pointsDisplay.innerHTML = `<i class="bi bi-coin"></i> ${(user.points !== undefined ? user.points : 1000).toLocaleString()}`;
@@ -151,21 +161,44 @@ async function loadFriendsData() {
             }
         }
 
-        // 2. Render Active Friends List
+        // 2. Render Active Friends List with Chat Icon Button
         if (friendsContainer) {
             friendsContainer.innerHTML = "";
             if (!data.friends || data.friends.length === 0) {
                 friendsContainer.innerHTML = `<div class="p-2 small text-white opacity-75 fst-italic">No friends added yet.</div>`;
             } else {
                 data.friends.forEach(friend => {
-                    friendsContainer.innerHTML += `
-                        <div class="list-group-item d-flex justify-content-between align-items-center border-secondary mb-1 rounded py-2 px-3" style="background-color: #165da3 !important;">
-                            <span class="fw-semibold text-white">
-                                <i class="bi bi-circle-fill text-success small me-2"></i>${friend}
-                            </span>
-                            <span class="badge bg-success text-white">Online</span>
-                        </div>
-                    `;
+                    const friendName = typeof friend === "string"
+                        ? friend
+                        : (friend.username || friend.name || String(friend));
+
+                    const row = document.createElement("div");
+                    row.className = "list-group-item d-flex justify-content-between align-items-center border-secondary mb-1 rounded py-2 px-3";
+                    row.style.cssText = "background-color: #165da3 !important;";
+
+                    const nameSpan = document.createElement("span");
+                    nameSpan.className = "fw-semibold text-white";
+                    nameSpan.innerHTML = `<i class="bi bi-circle-fill text-success small me-2"></i>`;
+                    nameSpan.appendChild(document.createTextNode(friendName));
+
+                    const rightGroup = document.createElement("div");
+                    rightGroup.className = "d-flex align-items-center gap-2";
+
+                    const badge = document.createElement("span");
+                    badge.className = "badge bg-success text-white";
+                    badge.textContent = "Online";
+
+                    const chatBtn = document.createElement("button");
+                    chatBtn.type = "button";
+                    chatBtn.className = "btn btn-sm btn-outline-light py-0 px-2 shadow-none";
+                    chatBtn.title = `Chat with ${friendName}`;
+                    chatBtn.setAttribute("aria-label", `Chat with ${friendName}`);
+                    chatBtn.innerHTML = `<i class="bi bi-chat-dots-fill"></i>`;
+                    chatBtn.addEventListener("click", () => openFriendChatModal(friendName));
+
+                    rightGroup.append(badge, chatBtn);
+                    row.append(nameSpan, rightGroup);
+                    friendsContainer.appendChild(row);
                 });
             }
         }
@@ -357,76 +390,310 @@ async function deleteMessage(msgId) {
 }
 
 
- // ============================================================================
- // Create Custom Poker Table
- // ============================================================================
+// ============================================================================
+// Create Custom Poker Table
+// ============================================================================
 
- document.addEventListener("DOMContentLoaded", function() {
-     const createTableForm = document.getElementById("createTableForm");
+document.addEventListener("DOMContentLoaded", function() {
+    const createTableForm = document.getElementById("createTableForm");
 
-     if (createTableForm) {
-         createTableForm.addEventListener("submit", async function(e) {
-             e.preventDefault();
+    if (createTableForm) {
+        createTableForm.addEventListener("submit", async function(e) {
+            e.preventDefault();
 
-             // Retrieve form values
-             const tableName = document.getElementById("newTableName").value.trim();
-             const blinds = document.getElementById("newTableBlinds").value.trim();
-             const buyIn = document.getElementById("newTableMinBuyin").value;
-             const maxPlayers = document.getElementById("newTableMaxPlayers").value;
-             const visibility = document.getElementById("newTableVisibility").value;
+            // Retrieve form values
+            const tableName = document.getElementById("newTableName").value.trim();
+            const blinds = document.getElementById("newTableBlinds").value.trim();
+            const buyIn = document.getElementById("newTableMinBuyin").value;
+            const maxPlayers = document.getElementById("newTableMaxPlayers").value;
+            const visibility = document.getElementById("newTableVisibility").value;
 
-             // Split blinds into small and big blind values
-             const blindValues = blinds.split("/").map(value =>
-                 Number(value.trim().replace("$", ""))
-             );
+            // Split blinds into small and big blind values
+            const blindValues = blinds.split("/").map(value =>
+                Number(value.trim().replace("$", ""))
+            );
 
-             if (
-                 blindValues.length !== 2 ||
-                 blindValues.some(value => !Number.isFinite(value) || value <= 0)
-             ) {
-                 alert("Please enter blinds in the format $2 / $4.");
-                 return;
-             }
+            if (
+                blindValues.length !== 2 ||
+                blindValues.some(value => !Number.isFinite(value) || value <= 0)
+            ) {
+                alert("Please enter blinds in the format $2 / $4.");
+                return;
+            }
 
-             const tableData = {
-                 tableName,
-                 maxPlayers,
-                 buyIn,
-                 smallBlind: blindValues[0],
-                 bigBlind: blindValues[1],
-                 visibility
-             };
+            const tableData = {
+                tableName,
+                maxPlayers,
+                buyIn,
+                smallBlind: blindValues[0],
+                bigBlind: blindValues[1],
+                visibility
+            };
 
-             try {
-                 // Send request to backend
-                 const response = await fetch("/api/tables/create", {
-                     method: "POST",
-                     headers: {
-                         "Content-Type": "application/json"
-                     },
-                     body: JSON.stringify(tableData)
-                 });
+            try {
+                // Send request to backend
+                const response = await fetch("/api/tables/create", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json"
+                    },
+                    body: JSON.stringify(tableData)
+                });
 
-                 const result = await response.json();
+                const result = await response.json();
 
-                 if (response.ok) {
-                     alert("Table created successfully!");
-                     createTableForm.reset();
-                     // Redirect to newly created table
+                if (response.ok) {
+                    alert("Table created successfully!");
+                    createTableForm.reset();
+                    // Redirect to newly created table
                     window.location.href =
                         `tableDisplay.html?tableId=${encodeURIComponent(result.tableId)}`;
+                } else {
+                    alert(result.error || "Failed to create table.");
                 }
 
-                     // Table is now stored in TableManager.
-                     // We will connect My Created Tables next.
-                else {
-                     alert(result.error || "Failed to create table.");
-                 }
+            } catch (err) {
+                console.error("Error creating table:", err);
+                alert("Network error. Please try again.");
+            }
+        });
+    }
+});
 
-             } catch (err) {
-                 console.error("Error creating table:", err);
-                 alert("Network error. Please try again.");
-             }
-         });
-     }
- });
+
+// ============================================================================
+// FRIEND DIRECT CHAT (PERSISTENT MONGODB: SEND, EDIT OWN, DELETE OWN)
+// ============================================================================
+let activeChatFriend = null;
+let currentLoggedInUser = null;
+let friendChatModalInstance = null;
+
+function getCurrentUsername() {
+    if (currentLoggedInUser) return currentLoggedInUser;
+    const domName = document.getElementById("dashboardUsername")?.textContent?.trim();
+    return domName && domName !== "Player" ? domName : "";
+}
+
+async function fetchFriendMessages(friendUsername) {
+    try {
+        const res = await fetch(`/api/friends/chat/${encodeURIComponent(friendUsername)}`);
+        if (!res.ok) return [];
+        const data = await res.json();
+        return Array.isArray(data.messages) ? data.messages : [];
+    } catch (err) {
+        console.error("Failed to fetch friend chat:", err);
+        return [];
+    }
+}
+
+function renderFriendChatMessages(messages) {
+    const container = document.getElementById("friendChatMessages");
+    if (!container) return;
+
+    const me = getCurrentUsername();
+    container.innerHTML = "";
+
+    if (!messages.length) {
+        container.innerHTML = `<p class="text-white opacity-75 text-center small fst-italic my-auto">No messages yet. Say hello!</p>`;
+        return;
+    }
+
+    messages.forEach((msg) => {
+        const messageId = msg._id || msg.id;
+        const isMine = msg.sender === me;
+        const isDeleted = Boolean(msg.deleted);
+
+        const bubble = document.createElement("div");
+        bubble.className = `p-2 rounded border border-secondary ${isMine ? "ms-auto" : "me-auto"}`;
+        bubble.style.maxWidth = "85%";
+        bubble.style.backgroundColor = isMine ? "#1d3557" : "#0b132b";
+
+        const header = document.createElement("div");
+        header.className = "d-flex justify-content-between align-items-center gap-2 mb-1";
+
+        const senderLabel = document.createElement("strong");
+        senderLabel.className = "small text-info";
+        senderLabel.textContent = isMine ? `${msg.sender} (You)` : msg.sender;
+        header.appendChild(senderLabel);
+
+        const textEl = document.createElement("div");
+        textEl.style.wordBreak = "break-word";
+
+        if (isDeleted) {
+            textEl.className = "small text-light opacity-50 fst-italic";
+            textEl.textContent = "This message was deleted";
+            bubble.append(header, textEl);
+        } else {
+            textEl.className = "small text-white";
+            textEl.textContent = msg.text;
+
+            // Only the message sender can edit or delete non-deleted messages
+            if (isMine && messageId) {
+                const controls = document.createElement("div");
+                controls.className = "d-flex gap-1";
+
+                const editBtn = document.createElement("button");
+                editBtn.type = "button";
+                editBtn.className = "btn btn-link btn-sm text-warning p-0 text-decoration-none";
+                editBtn.title = "Edit message";
+                editBtn.innerHTML = `<i class="bi bi-pencil-square small"></i>`;
+                editBtn.addEventListener("click", () => startEditingMessage(messageId, msg.text, bubble, textEl));
+
+                const deleteBtn = document.createElement("button");
+                deleteBtn.type = "button";
+                deleteBtn.className = "btn btn-link btn-sm text-danger p-0 text-decoration-none";
+                deleteBtn.title = "Delete message";
+                deleteBtn.innerHTML = `<i class="bi bi-trash small"></i>`;
+                deleteBtn.addEventListener("click", () => handleDeleteFriendMessage(messageId));
+
+                controls.append(editBtn, deleteBtn);
+                header.appendChild(controls);
+            }
+
+            bubble.append(header, textEl);
+
+            if (msg.edited) {
+                const editedTag = document.createElement("span");
+                editedTag.className = "d-block text-light opacity-50 fst-italic";
+                editedTag.style.fontSize = "0.7rem";
+                editedTag.textContent = "(edited)";
+                bubble.appendChild(editedTag);
+            }
+        }
+
+        container.appendChild(bubble);
+    });
+
+    container.scrollTop = container.scrollHeight;
+}
+
+function startEditingMessage(messageId, currentText, bubble, textEl) {
+    if (bubble.querySelector(".edit-message-box")) return;
+
+    const editBox = document.createElement("div");
+    editBox.className = "edit-message-box mt-1 d-flex flex-column gap-1";
+
+    const input = document.createElement("input");
+    input.type = "text";
+    input.className = "form-control form-control-sm midnight-input text-grey border-secondary shadow-none";
+    input.value = currentText;
+    input.maxLength = 500;
+
+    const actions = document.createElement("div");
+    actions.className = "d-flex justify-content-end gap-1";
+
+    const cancelBtn = document.createElement("button");
+    cancelBtn.type = "button";
+    cancelBtn.className = "btn btn-outline-light btn-sm py-0 px-2";
+    cancelBtn.textContent = "Cancel";
+    cancelBtn.addEventListener("click", () => {
+        editBox.remove();
+        textEl.style.display = "";
+    });
+
+    const saveBtn = document.createElement("button");
+    saveBtn.type = "button";
+    saveBtn.className = "btn btn-success btn-sm py-0 px-2";
+    saveBtn.textContent = "Save";
+    saveBtn.addEventListener("click", async () => {
+        const updatedText = input.value.trim();
+        if (!updatedText || updatedText === currentText) {
+            editBox.remove();
+            textEl.style.display = "";
+            return;
+        }
+        await handleEditFriendMessage(messageId, updatedText);
+    });
+
+    actions.append(cancelBtn, saveBtn);
+    editBox.append(input, actions);
+    textEl.style.display = "none";
+    bubble.appendChild(editBox);
+    input.focus();
+}
+
+async function handleEditFriendMessage(messageId, newText) {
+    if (!activeChatFriend) return;
+    try {
+        const res = await fetch(
+            `/api/friends/chat/${encodeURIComponent(activeChatFriend)}/${encodeURIComponent(messageId)}`,
+            {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ text: newText })
+            }
+        );
+        if (res.ok) {
+            const fresh = await fetchFriendMessages(activeChatFriend);
+            renderFriendChatMessages(fresh);
+        }
+    } catch (err) {
+        console.error("Failed to edit message:", err);
+    }
+}
+
+async function handleDeleteFriendMessage(messageId) {
+    if (!activeChatFriend) return;
+    try {
+        const res = await fetch(
+            `/api/friends/chat/${encodeURIComponent(activeChatFriend)}/${encodeURIComponent(messageId)}`,
+            { method: "DELETE" }
+        );
+        if (res.ok) {
+            const fresh = await fetchFriendMessages(activeChatFriend);
+            renderFriendChatMessages(fresh);
+        }
+    } catch (err) {
+        console.error("Failed to delete message:", err);
+    }
+}
+
+async function openFriendChatModal(friendUsername) {
+    activeChatFriend = friendUsername;
+
+    const nameEl = document.getElementById("chatFriendName");
+    if (nameEl) nameEl.textContent = friendUsername;
+
+    const modalEl = document.getElementById("friendChatModal");
+    if (modalEl && typeof bootstrap !== "undefined") {
+        if (!friendChatModalInstance) {
+            friendChatModalInstance = new bootstrap.Modal(modalEl);
+        }
+        friendChatModalInstance.show();
+    }
+
+    const messages = await fetchFriendMessages(friendUsername);
+    renderFriendChatMessages(messages);
+
+    setTimeout(() => document.getElementById("friendChatInput")?.focus(), 150);
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+    const chatForm = document.getElementById("friendChatForm");
+    if (chatForm) {
+        chatForm.addEventListener("submit", async (event) => {
+            event.preventDefault();
+            if (!activeChatFriend) return;
+
+            const input = document.getElementById("friendChatInput");
+            const text = input?.value.trim();
+            if (!text) return;
+
+            input.value = "";
+
+            try {
+                const res = await fetch(`/api/friends/chat/${encodeURIComponent(activeChatFriend)}`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ text })
+                });
+                if (res.ok) {
+                    const fresh = await fetchFriendMessages(activeChatFriend);
+                    renderFriendChatMessages(fresh);
+                }
+            } catch (err) {
+                console.error("Failed to send message:", err);
+            }
+        });
+    }
+});
