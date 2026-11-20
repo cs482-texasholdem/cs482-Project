@@ -9,17 +9,23 @@
 const { evaluatePlayerAchievements } = require("../util/achievementEvaluator");
 
 function resolvePlayerId(req) {
-    if (req.params?.playerId && req.params.playerId.trim()) {
-        return req.params.playerId.trim();
+    if (req.params?.playerId && String(req.params.playerId).trim()) {
+        return String(req.params.playerId).trim();
     }
-    if (req.query?.playerId && req.query.playerId.trim()) {
-        return req.query.playerId.trim();
+    if (req.query?.playerId && String(req.query.playerId).trim()) {
+        return String(req.query.playerId).trim();
     }
     const sessionUser = req.session?.user;
     if (sessionUser) {
-        return typeof sessionUser === "object"
-            ? (sessionUser.username || sessionUser.email || "")
-            : String(sessionUser);
+        if (typeof sessionUser === "object") {
+            return String(
+                sessionUser.username ||
+                (sessionUser.email ? sessionUser.email.split("@")[0] : "") ||
+                sessionUser.email ||
+                ""
+            ).trim();
+        }
+        return String(sessionUser).trim();
     }
     return "";
 }

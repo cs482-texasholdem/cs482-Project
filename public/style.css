@@ -858,7 +858,15 @@ body.table-page {
 }
 
 .achievement-card.achievement-locked {
-    opacity: 0.78;
+    opacity: 0.85;
+}
+
+.achievement-progress-bar {
+    height: 10px;
+    background-color: #0b132b;
+    border: 1px solid #2b3c5e;
+    border-radius: 999px;
+    overflow: hidden;
 }
 
 .earned-badge-pill {

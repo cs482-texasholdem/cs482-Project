@@ -3,9 +3,9 @@
   File Name: index.html
   Author: Bonita Rodrigues, Gigi Li
   Purpose: Main user dashboard interface for the Texas Hold'em web application.
-             Displays user welcome profile with earned achievement badges at the
-             top, friends circle, table creation alongside created tables, game
-             history at the bottom, and modal report controls.
+             Displays earned achievement badges at the top, user welcome
+             profile, friends circle, table creation, game history, and a full
+             achievements progress bar showcase at the bottom.
   ============================================================================
 -->
  
@@ -265,8 +265,8 @@
 
             </div>
 
-            <!-- ROW 3: Recent Game History (Bottom Full Width) -->
-            <div class="row">
+            <!-- ROW 3: Recent Game History -->
+            <div class="row mb-4">
                 <div class="col-12">
                     <div class="card border-secondary midnight-card shadow-sm" style="background-color: #0b132b; color: #ffffff;">
                         <div class="card-header border-secondary bg-transparent py-3 d-flex justify-content-between align-items-center">
@@ -317,6 +317,34 @@
                 </div>
             </div>
 
+            <!-- BOTTOM ROW: All Achievements & Progress Bars -->
+            <div class="row">
+                <div class="col-12">
+                    <div class="card border-secondary midnight-card shadow-sm" style="background-color: #0b132b; color: #ffffff;">
+                        <div class="card-header border-secondary bg-transparent py-3 d-flex flex-wrap justify-content-between align-items-center gap-2">
+                            <div>
+                                <h5 class="fw-bold mb-1 text-white">
+                                    <i class="bi bi-bar-chart-steps text-warning me-2"></i> Achievement Progress Tracker
+                                </h5>
+                                <p class="small text-white opacity-75 mb-0">
+                                    Live completion progress bars for all 20 achievements.
+                                </p>
+                            </div>
+                            <span class="badge bg-primary px-3 py-2" id="dashboardAchievementOverall">
+                                0 / 20 Completed
+                            </span>
+                        </div>
+                        <div class="card-body p-4">
+                            <div class="row g-3" id="dashboardAchievementsProgressGrid">
+                                <div class="col-12">
+                                    <p class="text-white opacity-75 small fst-italic mb-0">Loading achievement progress...</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
         </div> 
 
        <!-- POP-UP MODAL: Report Player -->
@@ -337,7 +365,6 @@
                             <div class="mb-3 position-relative">
                                 <label for="reportedUsername" class="form-label small fw-semibold text-white">Offending Username</label>
                                 <input type="text" class="form-control text-white border-secondary shadow-none" id="reportedUsername" name="reportedUsername" placeholder="Type username to search..." autocomplete="off" style="background-color: #131b2e;" required>
-                                <!-- Autocomplete Suggestions Dropdown -->
                                 <div id="reportUserSuggestions" class="list-group position-absolute w-100 shadow-lg mt-1" style="z-index: 1050; max-height: 150px; overflow-y: auto;"></div>
                             </div>
                             
@@ -380,7 +407,6 @@
                     <button type="button" class="btn-close btn-close-white shadow-none" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <div class="modal-body p-4" id="messagesModalBody" style="max-height: 400px; overflow-y: auto;">
-                    <!-- Dynamic messages load here -->
                     <p class="text-white opacity-75 text-center fst-italic my-3">Loading messages...</p>
                 </div>
                 <div class="modal-footer border-secondary">

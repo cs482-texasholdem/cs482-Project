@@ -54,6 +54,11 @@ app.post('/api/reports/warn', reportCont.warnUser);
 app.get('/api/user/messages', UserCont.getUserMessages);
 app.delete('/api/user/messages/:msgId', UserCont.deleteUserMessage);
 
+// Achievements Routes
+const achievementCont = require('./controller/achievementController');
+app.get('/api/achievements', achievementCont.getAchievements);
+app.get('/api/achievements/:playerId', achievementCont.getAchievements);
+
 // Table Actions (Query/Body Table ID)
 const {createTable, joinTable, leaveTable, playerAction, startGame, nextRound, getTableStatus} = require("./controller/tableController");
 app.get("/api/table/status", getTableStatus);
@@ -136,5 +141,12 @@ app.get('/api/games/:id/reconstruct', async (req, res) => {
         res.status(500).json({ error: "Server error during game reconstruction" });
     }
 });
+
+if (require.main === module) {
+    const port = process.env.PORT || 3000;
+    app.listen(port, () => {
+        console.log(`Server listening on port ${port}`);
+    });
+}
 
 exports.app = app;

@@ -3,8 +3,9 @@
  * File Name: index.js
  * Author: Bonita Rodrigues, Gigi Li
  * Purpose: Frontend controller script for the User Dashboard homepage. Manages 
- *          dynamic user profile/points loading, earned achievement badges, user
- *          search capabilities, and asynchronous friend list/request rendering.
+ *          dynamic user profile/points loading, earned achievement badges at
+ *          the top, progress bars for all achievements at the bottom, user
+ *          search, and asynchronous friend list/request rendering.
  * ============================================================================
  */
 
@@ -27,7 +28,7 @@ document.addEventListener("DOMContentLoaded", async function() {
     // 1. Fetch & Populate Logged-In User Profile & Points
     // ------------------------------------------------------------------------
     try {
-        const response = await fetch('/loggedUser');
+        const response = await fetch('/loggeduser');
         if (response.ok) {
             const user = await response.json();
             if (user) {
@@ -51,10 +52,10 @@ document.addEventListener("DOMContentLoaded", async function() {
     }
 
     // ------------------------------------------------------------------------
-    // 1b. Load Completed Achievement Badges at Top of Dashboard
+    // 1b. Load Earned Badges (Top) & All Achievement Progress Bars (Bottom)
     // ------------------------------------------------------------------------
     if (activeUsername) {
-        loadDashboardBadges(activeUsername);
+        await loadDashboardAchievements(activeUsername);
     }
 
     // ------------------------------------------------------------------------
@@ -106,49 +107,106 @@ document.addEventListener("DOMContentLoaded", async function() {
     }
 });
 
-async function loadDashboardBadges(playerId) {
+async function loadDashboardAchievements(playerId) {
     const badgesContainer = document.getElementById("dashboardEarnedBadges");
     const countBadge = document.getElementById("dashboardBadgeCount");
-    if (!badgesContainer) return;
+    const progressGrid = document.getElementById("dashboardAchievementsProgressGrid");
+    const overallBadge = document.getElementById("dashboardAchievementOverall");
 
     try {
         const res = await fetch(`/api/achievements/${encodeURIComponent(playerId)}`);
         if (!res.ok) throw new Error("Failed to load achievements.");
         const data = await res.json();
+
+        const allAchievements = data.achievements || [];
         const earned = data.completedAchievements || [];
 
         if (countBadge) {
             countBadge.textContent = `${earned.length} Badge${earned.length === 1 ? "" : "s"} Earned`;
         }
-
-        if (earned.length === 0) {
-            badgesContainer.innerHTML = `
-                <span class="small text-white opacity-75 fst-italic">
-                    No badges earned yet. Play hands in the Poker Lobby to unlock achievements!
-                </span>
-            `;
-            return;
+        if (overallBadge) {
+            overallBadge.textContent = `${data.completedCount || earned.length} / ${data.totalCount || allAchievements.length} Completed`;
         }
 
-        badgesContainer.innerHTML = "";
-        earned.forEach(ach => {
-            const pill = document.createElement("div");
-            pill.className = "earned-badge-pill";
-            pill.title = `${ach.name}: ${ach.shortDesc}`;
-            pill.innerHTML = `
-                <div class="achievement-badge-graphic ${ach.theme || "badge-gold"}">
-                    <i class="bi ${ach.icon || "bi-award-fill"}"></i>
-                </div>
-                <div>
-                    <div class="fw-bold small text-white">${ach.name}</div>
-                    <div class="text-warning" style="font-size: 0.72rem;">${ach.shortDesc}</div>
-                </div>
-            `;
-            badgesContainer.appendChild(pill);
-        });
+        // Top Earned Badges Showcase
+        if (badgesContainer) {
+            if (earned.length === 0) {
+                badgesContainer.innerHTML = `
+                    <span class="small text-white opacity-75 fst-italic">
+                        No badges earned yet. Play hands in the Poker Lobby to unlock achievements!
+                    </span>
+                `;
+            } else {
+                badgesContainer.innerHTML = "";
+                earned.forEach(ach => {
+                    const pill = document.createElement("div");
+                    pill.className = "earned-badge-pill";
+                    pill.title = `${ach.name}: ${ach.shortDesc}`;
+                    pill.innerHTML = `
+                        <div class="achievement-badge-graphic ${ach.theme || "badge-gold"}">
+                            <i class="bi ${ach.icon || "bi-award-fill"}"></i>
+                        </div>
+                        <div>
+                            <div class="fw-bold small text-white">${ach.name}</div>
+                            <div class="text-warning" style="font-size: 0.72rem;">${ach.shortDesc}</div>
+                        </div>
+                    `;
+                    badgesContainer.appendChild(pill);
+                });
+            }
+        }
+
+        // Bottom All-Achievements Progress Bars Grid
+        if (progressGrid) {
+            progressGrid.innerHTML = "";
+            allAchievements.forEach(ach => {
+                const pct = Math.max(0, Math.min(100, Number(ach.percent) || (ach.completed ? 100 : 0)));
+                const barClass = ach.completed ? "bg-success" : "bg-info";
+                const cardClass = ach.completed ? "achievement-completed" : "achievement-locked";
+                const badgeLockClass = ach.completed ? "" : "locked-badge";
+                const statusPill = ach.completed
+                    ? `<span class="badge bg-success"><i class="bi bi-check-circle-fill me-1"></i>Completed</span>`
+                    : `<span class="badge bg-secondary">${pct}%</span>`;
+
+                const col = document.createElement("div");
+                col.className = "col-md-6 col-lg-4";
+                col.innerHTML = `
+                    <div class="achievement-card ${cardClass} d-flex flex-column justify-content-between">
+                        <div class="d-flex align-items-start gap-3 mb-2">
+                            <div class="achievement-badge-graphic ${ach.theme || "badge-gold"} ${badgeLockClass}">
+                                <i class="bi ${ach.icon || "bi-award-fill"}"></i>
+                            </div>
+                            <div class="flex-grow-1">
+                                <div class="d-flex justify-content-between align-items-center gap-2 mb-1">
+                                    <h6 class="fw-bold text-white mb-0">${ach.name}</h6>
+                                    ${statusPill}
+                                </div>
+                                <p class="small text-white opacity-75 mb-1">${ach.shortDesc}</p>
+                                <div class="small text-secondary">${ach.criteria || ""}</div>
+                            </div>
+                        </div>
+                        <div class="pt-2">
+                            <div class="d-flex justify-content-between align-items-center small mb-1">
+                                <span class="text-warning fw-semibold">${ach.progressText || ""}</span>
+                                <span class="text-info fw-semibold">${pct}%</span>
+                            </div>
+                            <div class="progress achievement-progress-bar" role="progressbar" aria-valuenow="${pct}" aria-valuemin="0" aria-valuemax="100">
+                                <div class="progress-bar ${barClass}" style="width: ${pct}%;"></div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                progressGrid.appendChild(col);
+            });
+        }
     } catch (err) {
-        console.error("Error loading dashboard badges:", err);
-        badgesContainer.innerHTML = `<span class="small text-danger">Unable to load badges right now.</span>`;
+        console.error("Error loading dashboard achievements:", err);
+        if (badgesContainer) {
+            badgesContainer.innerHTML = `<span class="small text-danger">Unable to load badges right now.</span>`;
+        }
+        if (progressGrid) {
+            progressGrid.innerHTML = `<div class="col-12"><p class="text-danger small mb-0">Unable to load achievement progress bars.</p></div>`;
+        }
     }
 }
 
