@@ -134,6 +134,60 @@ test('register should catch database errors and redirect to signup.html', async 
     expect(res.redirect).toHaveBeenCalledWith('/signup.html');
 });
 
+// Verify guest-to-account conversion preserves transferred points instead of resetting to 1,000
+test('register should preserve transferred txt_points for converting guest users', async function(){
+    let req = {
+        body: {
+            txt_username: 'guestconvert',
+            txt_email: 'guestconvert@mail.com',
+            txt_pass: 'secure123',
+            txt_points: '1850'
+        },
+        session: {
+            // Mock session.save so async registration completes immediately in tests
+            save: jest.fn((cb) => cb && cb())
+        }
+    };
+    let res = { redirect: jest.fn() };
+    passUtil.hashPassword.mockReturnValue('hashedPassword');
+    dao.create.mockResolvedValue({ _id: '2', points: 1850 });
+
+    await controller.register(req, res);
+
+    expect(dao.create).toHaveBeenCalledWith(expect.objectContaining({
+        username: 'guestconvert',
+        points: 1850
+    }));
+    expect(req.session.user.points).toBe(1850);
+    expect(res.redirect).toHaveBeenCalledWith('/index.html');
+});
+
+// Verify register falls back to session pendingGuestPoints when txt_points is omitted
+test('register should fall back to req.session.pendingGuestPoints and clear it', async function(){
+    let req = {
+        body: {
+            txt_username: 'sessionguest',
+            txt_email: 'sessionguest@mail.com',
+            txt_pass: 'secure123'
+        },
+        session: {
+            pendingGuestPoints: 2400,
+            save: jest.fn((cb) => cb && cb())
+        }
+    };
+    let res = { redirect: jest.fn() };
+    passUtil.hashPassword.mockReturnValue('hashedPassword');
+    dao.create.mockResolvedValue({ _id: '3', points: 2400 });
+
+    await controller.register(req, res);
+
+    expect(dao.create).toHaveBeenCalledWith(expect.objectContaining({
+        points: 2400
+    }));
+    expect(req.session.pendingGuestPoints).toBeUndefined();
+    expect(res.redirect).toHaveBeenCalledWith('/index.html');
+});
+
 // ==========================================
 // 5. login Tests
 // ==========================================
@@ -189,18 +243,47 @@ test('login should fail and redirect with error=1 when password check fails', as
 // ==========================================
 // 6. loggedUser & logout Tests
 // ==========================================
-test('loggedUser should send active session user with status 200', function(){
+test('loggedUser should send active session user with status 200', async function(){
     let req = { session: { user: { username: 'activeUser', email: 'active@mail.com' } } };
     let res = {
         status: jest.fn(),
         send: jest.fn(),
         end: jest.fn()
     };
+    // Mock dao.findOne so async loggedUser resolves without waiting on a real DB query
+    dao.findOne.mockResolvedValue({ username: 'activeUser', email: 'active@mail.com', points: 1000 });
 
-    controller.loggedUser(req, res);
+    await controller.loggedUser(req, res);
 
     expect(res.status).toHaveBeenCalledWith(200);
-    expect(res.send).toHaveBeenCalledWith(req.session.user);
+    expect(res.send).toHaveBeenCalledWith(expect.objectContaining({ username: 'activeUser', email: 'active@mail.com' }));
+    expect(res.end).toHaveBeenCalled();
+});
+
+// Verify loggedUser pulls the latest points from UserDao so post-game updates appear on the dashboard
+test('loggedUser should refresh points from UserDao when available', async function(){
+    let req = {
+        session: {
+            user: { username: 'activeUser', email: 'active@mail.com', points: 1000 }
+        }
+    };
+    let res = {
+        status: jest.fn(),
+        send: jest.fn(),
+        end: jest.fn()
+    };
+    dao.findOne.mockResolvedValue({
+        username: 'activeUser',
+        email: 'active@mail.com',
+        points: 1625
+    });
+
+    await controller.loggedUser(req, res);
+
+    expect(dao.findOne).toHaveBeenCalled();
+    expect(req.session.user.points).toBe(1625);
+    expect(res.status).toHaveBeenCalledWith(200);
+    expect(res.send).toHaveBeenCalledWith(expect.objectContaining({ points: 1625 }));
     expect(res.end).toHaveBeenCalled();
 });
 
