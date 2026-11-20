@@ -36,12 +36,12 @@ document.addEventListener("DOMContentLoaded", async function() {
     // 1. Fetch & Populate Logged-In User Profile & Points
     // ------------------------------------------------------------------------
     try {
-        // Use lowercase '/loggeduser' to match app.js route and bypass stale browser cache
+        // Request the active session user from '/loggeduser' without stale browser caching
         const response = await fetch('/loggeduser', { cache: 'no-store' });
         if (response.ok) {
             const user = await response.json();
             if (user) {
-                // Clear any leftover guest mode flags now that a real account is authenticated
+                // Clear leftover guest identifiers once a real account session is active
                 sessionStorage.removeItem('identityMode');
                 sessionStorage.removeItem('guestPlayerId');
                 localStorage.removeItem('guestPlayerId');
@@ -53,17 +53,18 @@ document.addEventListener("DOMContentLoaded", async function() {
                 const pointsDisplay = document.getElementById('dashboardPoints');
 
                 if (usernameDisplay) {
+                    // Show the logged-in user's username on the dashboard banner
                     usernameDisplay.textContent = resolvedName || 'Player';
                 }
                 if (pointsDisplay) {
-                    // Display the user's saved points from MongoDB/session
+                    // Render the user's latest saved points balance
                     pointsDisplay.innerHTML = `<i class="bi bi-coin"></i> ${(user.points !== undefined ? user.points : 1000).toLocaleString()}`;
                 }
 
-                // Reveal the dashboard only after the user session and points are populated
+                // Make the dashboard visible only after session user and points are populated
                 document.body.style.visibility = 'visible';
             } else {
-                // Redirect immediately without ever showing the dashboard markup
+                // Redirect immediately to login if no authenticated user is found
                 window.location.replace('login.html');
                 return;
             }

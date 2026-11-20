@@ -138,14 +138,23 @@ exports.register = async function(req, res){
         userData.permission = 2;                     // Standard player
         userData.points = 1000;                      // Starting points
 
-        // Prefer explicit form points if provided, otherwise fall back to guest points saved in session on table leave
-        const rawPoints = req.body.txt_points !== undefined && req.body.txt_points !== ""
-            ? Number(req.body.txt_points)
-            : Number(req.session.pendingGuestPoints);
+        // Read points submitted from the sign-up form, falling back to guest points stored in session
+        const formPoints = Number(req.body.txt_points);
+        const sessionPoints = Number(req.session.pendingGuestPoints);
 
-        if (Number.isFinite(rawPoints) && rawPoints >= 0) {
-            userData.points = Math.floor(rawPoints);
+        if (req.body.txt_points !== undefined && req.body.txt_points !== "" && Number.isFinite(formPoints) && formPoints >= 0) {
+            userData.points = Math.floor(formPoints);
+        } else if (Number.isFinite(sessionPoints) && sessionPoints >= 0) {
+            userData.points = Math.floor(sessionPoints);
         }
+
+        // Log registration points so we can confirm the exact balance persisted to MongoDB
+        console.log("Registering user with points:", {
+            username: userData.username,
+            txt_points: req.body.txt_points,
+            sessionPoints: req.session.pendingGuestPoints,
+            finalPoints: userData.points
+        });
 
         // Clear the temporary guest points from session once claimed
         delete req.session.pendingGuestPoints;

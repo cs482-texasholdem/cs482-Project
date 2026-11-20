@@ -225,8 +225,9 @@ class ActiveTable {
     getPlayerCount() { return this.playerManager.getPlayerCount(); }
     getSpectatorCount() { return this.playerManager.getSpectatorCount(); }
     
-    addPlayer(playerId) { 
-        const added = this.playerManager.addPlayer(playerId);
+    // Pass optional startingChips through to PlayerManager so account players keep their saved points at the table
+    addPlayer(playerId, startingChips = 1000) { 
+        const added = this.playerManager.addPlayer(playerId, startingChips);
         this.playerManager.updateQueueDistribution(this.gameInProgress);
         return added;
     }
