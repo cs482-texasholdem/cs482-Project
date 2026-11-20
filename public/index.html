@@ -3,8 +3,9 @@
   File Name: index.html
   Author: Bonita Rodrigues, Gigi Li
   Purpose: Main user dashboard interface for the Texas Hold'em web application.
-             Displays user welcome profile alongside friends circle, table creation 
-             alongside created tables, game history at the bottom, and modal report controls.
+             Displays user welcome profile with earned achievement badges at the
+             top, friends circle, table creation alongside created tables, game
+             history at the bottom, and modal report controls.
   ============================================================================
 -->
  
@@ -70,6 +71,30 @@
 
         <!-- Main Dashboard Container -->
         <div class="container my-5">
+
+            <!-- TOP ROW: Completed Achievement Badges Showcase -->
+            <div class="row mb-4">
+                <div class="col-12">
+                    <div class="card p-4 border-secondary midnight-card shadow-sm" style="background-color: #0b132b; color: #ffffff;">
+                        <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+                            <div>
+                                <h5 class="fw-bold text-white mb-1">
+                                    <i class="bi bi-award-fill text-warning me-2"></i> Earned Achievement Badges
+                                </h5>
+                                <p class="small text-white opacity-75 mb-0">
+                                    Badges unlocked from your recorded hands and account milestones.
+                                </p>
+                            </div>
+                            <span class="badge bg-warning text-dark fw-semibold px-3 py-2" id="dashboardBadgeCount">
+                                0 Badges Earned
+                            </span>
+                        </div>
+                        <div id="dashboardEarnedBadges" class="d-flex flex-wrap gap-3">
+                            <span class="small text-white opacity-75 fst-italic">Loading earned badges...</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
             
             <!-- ROW 1: Welcome Banner & Friends Circle Side-by-Side -->
             <div class="row g-4 mb-4">

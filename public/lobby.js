@@ -3,39 +3,35 @@
   File Name: lobby.js
   Author: Gigi Li
   Purpose: Lobby interface for the Texas Hold'em web application. 
-           Allows users to view public tables and join games.
+           Allows users to view public tables, join games, and view all
+           achievements with completion status and info modals when logged in.
   ============================================================================
 */
 let joinSidebar;
+let lobbyAchievementsCache = [];
 
 document.addEventListener("DOMContentLoaded", async function() {
-    // Initialize Sidebar for Joining Tables
     const sidebarElement = document.getElementById('joinGameSidebar');
     if (sidebarElement) {
         joinSidebar = new bootstrap.Offcanvas(sidebarElement);
     }
 
-    // Guest Session Checks & Navigation Restrictions
     const urlParams = new URLSearchParams(window.location.search);
     let playerId = urlParams.get("playerId");
 
-    // If ID is in URL, save it to localStorage
     if (playerId && playerId.startsWith("Guest_")) {
         sessionStorage.setItem("guestPlayerId", playerId);
         sessionStorage.setItem("identityMode", "guest");
     } else { 
-        // Otherwise, check localStorage/sessionStorage
         playerId = sessionStorage.getItem("guestPlayerId");
     }
 
-    // If the URL explicitly has a Guest ID, lock this tab into Guest mode 
     if (playerId && playerId.startsWith("Guest_")) {
         setupGuestLobbyView(playerId);
         setupCommonLobbyListeners(playerId);
         return;
     }
 
-    // Check with the backend server to see if a real user account is logged in
     if (sessionStorage.getItem("identityMode") !== "guest") {
         try {
             const res = await fetch('/loggeduser');
@@ -46,6 +42,10 @@ document.addEventListener("DOMContentLoaded", async function() {
                 localStorage.removeItem("guestPlayerId");
                 sessionStorage.removeItem("guestPlayerId");
                 setupGuestLobbyView(playerId);
+            } else {
+                const resolvedUserId = user.username || (user.email ? user.email.split('@')[0] : user.id);
+                setUpLoggedInLobbyView(user);
+                await loadLobbyAchievements(resolvedUserId);
             }
         } catch (e) {
             console.error("Session verification failed:", e);
@@ -55,13 +55,107 @@ document.addEventListener("DOMContentLoaded", async function() {
     setupCommonLobbyListeners(playerId);
 });
 
-//helper function for guest view
+async function loadLobbyAchievements(playerId) {
+    const section = document.getElementById("lobbyAchievementsSection");
+    const grid = document.getElementById("lobbyAchievementsGrid");
+    const summaryBadge = document.getElementById("lobbyAchievementSummary");
+    if (!section || !grid) return;
+
+    section.classList.remove("d-none");
+
+    try {
+        const res = await fetch(`/api/achievements/${encodeURIComponent(playerId)}`);
+        if (!res.ok) throw new Error("Failed to fetch achievements.");
+        const data = await res.json();
+
+        lobbyAchievementsCache = data.achievements || [];
+        if (summaryBadge) {
+            summaryBadge.textContent = `${data.completedCount || 0} / ${data.totalCount || lobbyAchievementsCache.length} Completed`;
+        }
+
+        grid.innerHTML = "";
+        lobbyAchievementsCache.forEach(ach => {
+            const col = document.createElement("div");
+            col.className = "col-md-6 col-lg-4";
+
+            const statusClass = ach.completed ? "achievement-completed" : "achievement-locked";
+            const badgeLockClass = ach.completed ? "" : "locked-badge";
+            const statusBadge = ach.completed
+                ? `<span class="badge bg-success"><i class="bi bi-check-circle-fill me-1"></i>Completed</span>`
+                : `<span class="badge bg-secondary">In Progress</span>`;
+
+            col.innerHTML = `
+                <div class="achievement-card ${statusClass} d-flex flex-column justify-content-between">
+                    <div class="d-flex align-items-start gap-3">
+                        <div class="achievement-badge-graphic ${ach.theme || "badge-gold"} ${badgeLockClass}">
+                            <i class="bi ${ach.icon || "bi-award-fill"}"></i>
+                        </div>
+                        <div class="flex-grow-1">
+                            <div class="d-flex justify-content-between align-items-center gap-2 mb-1">
+                                <h6 class="fw-bold text-white mb-0">${ach.name}</h6>
+                                ${statusBadge}
+                            </div>
+                            <p class="small text-white opacity-75 mb-2">${ach.shortDesc}</p>
+                        </div>
+                    </div>
+                    <div class="d-flex justify-content-between align-items-center pt-2 mt-2 border-top border-secondary">
+                        <span class="small text-info">${ach.progressText || ""}</span>
+                        <button type="button" class="btn btn-sm btn-outline-warning fw-semibold" onclick="openAchievementInfo('${ach.id}')">
+                            <i class="bi bi-info-circle me-1"></i>More Info
+                        </button>
+                    </div>
+                </div>
+            `;
+            grid.appendChild(col);
+        });
+    } catch (err) {
+        console.error("Error loading lobby achievements:", err);
+        grid.innerHTML = `<div class="col-12"><p class="text-danger small mb-0">Unable to load achievements.</p></div>`;
+    }
+}
+
+function openAchievementInfo(achievementId) {
+    const ach = lobbyAchievementsCache.find(item => item.id === achievementId);
+    if (!ach) return;
+
+    const badgeEl = document.getElementById("modalAchievementBadge");
+    const iconEl = document.getElementById("modalAchievementIcon");
+    const nameEl = document.getElementById("modalAchievementName");
+    const statusEl = document.getElementById("modalAchievementStatus");
+    const descEl = document.getElementById("modalAchievementDesc");
+    const criteriaEl = document.getElementById("modalAchievementCriteria");
+    const progressEl = document.getElementById("modalAchievementProgress");
+
+    if (badgeEl) {
+        badgeEl.className = `achievement-badge-graphic ${ach.theme || "badge-gold"} ${ach.completed ? "" : "locked-badge"}`;
+    }
+    if (iconEl) {
+        iconEl.className = `bi ${ach.icon || "bi-award-fill"}`;
+    }
+    if (nameEl) nameEl.textContent = ach.name;
+    if (statusEl) {
+        statusEl.className = ach.completed ? "badge bg-success" : "badge bg-secondary";
+        statusEl.textContent = ach.completed ? "Completed" : "Not Yet Completed";
+    }
+    if (descEl) descEl.textContent = ach.shortDesc;
+    if (criteriaEl) criteriaEl.textContent = ach.criteria;
+    if (progressEl) progressEl.textContent = `Current Progress: ${ach.progressText || "N/A"}`;
+
+    const modalEl = document.getElementById("achievementInfoModal");
+    if (modalEl && typeof bootstrap !== "undefined") {
+        const modal = bootstrap.Modal.getOrCreateInstance(modalEl);
+        modal.show();
+    }
+}
+
 function setupGuestLobbyView(playerId) {
     const dashboardNavItem = document.getElementById('dashboard-nav-item');
     const saveContainer = document.getElementById('lobby-save-container');
     const lobbyContainer = document.querySelector('.container.my-5');
+    const achievementsSection = document.getElementById('lobbyAchievementsSection');
 
-    //disable dashboard link and show a banner
+    if (achievementsSection) achievementsSection.classList.add("d-none");
+
     if (dashboardNavItem) {
         dashboardNavItem.innerHTML = `
             <span class="nav-link text-muted" style="cursor: not-allowed;" title="Create an account to unlock your dashboard">
@@ -71,7 +165,6 @@ function setupGuestLobbyView(playerId) {
     }
     if (saveContainer) saveContainer.style.display = "none";
 
-    // Show guest banner encouraging them to sign up and save points
     if (lobbyContainer) {
         const pokerBanner = document.createElement('div');
         pokerBanner.className = 'alert alert-dismissible fade show mb-4 text-white shadow-lg border-0';
@@ -99,7 +192,6 @@ function setupGuestLobbyView(playerId) {
     }
 }
 
-//helper function for logged in user view
 function setUpLoggedInLobbyView(user) {
     const dashboardNavItem = document.getElementById('dashboard-nav-item');
     const saveContainer = document.getElementById('lobby-save-container');
@@ -114,7 +206,6 @@ function setUpLoggedInLobbyView(user) {
 }
 
 function setupCommonLobbyListeners(playerId) {
-    //handle Save Points button click in the lobby header
     const lobbySaveBtn = document.getElementById("lobby-save-btn");
     if (lobbySaveBtn) {
         lobbySaveBtn.addEventListener("click", () => {
@@ -123,7 +214,6 @@ function setupCommonLobbyListeners(playerId) {
         });
     }
 
-    //clear guest player storage immediately when user clicks logout
     const logoutLink = document.getElementById("logout-link");
     if (logoutLink) {
         logoutLink.addEventListener("click", (e) => {
@@ -135,10 +225,7 @@ function setupCommonLobbyListeners(playerId) {
     }
 }
 
-
-// helper function to open the table seating sidebar and populate values
 function openJoinSidebar(tableId, tableName, blinds, minBuyin) {
-    // Only allow the three ranked table selections
     const rankedTables = [
         "ranked-beginner",
         "ranked-intermediate",
@@ -154,15 +241,13 @@ function openJoinSidebar(tableId, tableName, blinds, minBuyin) {
     document.getElementById('sidebarTableBlinds').textContent = blinds;
     document.getElementById('sidebarTableMinBuyin').textContent = minBuyin;
     
-    let numericBuyin = parseInt(minBuyin.replace(/[^0-9]/g, '')) || 1000; //parse numeric min buy-in, default is 1000
+    let numericBuyin = parseInt(minBuyin.replace(/[^0-9]/g, '')) || 1000;
     
-    const buyInInput = document.getElementById('buyInAmount')
+    const buyInInput = document.getElementById('buyInAmount');
     buyInInput.value = numericBuyin;
     buyInInput.min = numericBuyin;
 
     const form = document.getElementById("joinTableForm");
-
-    // Ensure the correct table ID is submitted
     let hiddenInput = form.querySelector('input[name="tableId"]');
 
     if (!hiddenInput) {
@@ -177,7 +262,6 @@ function openJoinSidebar(tableId, tableName, blinds, minBuyin) {
     if (joinSidebar) joinSidebar.show();
 }
 
-// Toggle public lobbies section visibility
 function togglePublicLobbies() {
     const section = document.getElementById('publicLobbiesSection');
     section.classList.toggle('d-none');
@@ -189,7 +273,6 @@ function togglePublicLobbies() {
     }
 }
 
-// Ensure table seating form appends the correct playerId when submitting
 const joinTableForm = document.getElementById("joinTableForm");
 
 if (joinTableForm) {
@@ -198,12 +281,9 @@ if (joinTableForm) {
 
         let resolvedPlayerId = "";
 
-        // Check whether this tab is in Guest mode
         if (sessionStorage.getItem("identityMode") === "guest") {
             resolvedPlayerId = sessionStorage.getItem("guestPlayerId");
-
         } else {
-            // Check if there is a logged-in user
             try {
                 const res = await fetch('/loggeduser');
                 const user = await res.json();
@@ -217,7 +297,6 @@ if (joinTableForm) {
             }
         }
 
-        // If no identity was found, check the URL for an existing guest ID
         if (!resolvedPlayerId) {
             const urlParams = new URLSearchParams(window.location.search);
             const urlPlayerId = urlParams.get("playerId");
@@ -233,20 +312,17 @@ if (joinTableForm) {
             }
         }
 
-        // Remove any old hidden input to prevent duplicate parameters
         const existingInput = this.querySelector('input[name="playerId"]');
         if (existingInput) {
             existingInput.remove();
         }
 
-        // Append resolved player ID as a hidden input
         const input = document.createElement("input");
         input.type = "hidden";
         input.name = "playerId";
         input.value = resolvedPlayerId;
         this.appendChild(input);
 
-        // Manually submit form
         HTMLFormElement.prototype.submit.call(this);
     });
 }

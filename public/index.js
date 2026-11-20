@@ -3,17 +3,13 @@
  * File Name: index.js
  * Author: Bonita Rodrigues, Gigi Li
  * Purpose: Frontend controller script for the User Dashboard homepage. Manages 
- *          dynamic user profile/points loading, user search capabilities, and 
- *          asynchronous friend list/request rendering directly on the dashboard.
+ *          dynamic user profile/points loading, earned achievement badges, user
+ *          search capabilities, and asynchronous friend list/request rendering.
  * ============================================================================
  */
 
-// ============================================================================
-// DOM Content Loaded Initialization
-// ============================================================================
 document.addEventListener("DOMContentLoaded", async function() {
 
-    //Clear local storage and disconnect socket on logout to prevent session persistence
     const logoutLink = document.getElementById("logout-link");
     if (logoutLink) {
         logoutLink.addEventListener("click", () => {
@@ -25,6 +21,8 @@ document.addEventListener("DOMContentLoaded", async function() {
         });
     }
     
+    let activeUsername = "";
+
     // ------------------------------------------------------------------------
     // 1. Fetch & Populate Logged-In User Profile & Points
     // ------------------------------------------------------------------------
@@ -33,22 +31,30 @@ document.addEventListener("DOMContentLoaded", async function() {
         if (response.ok) {
             const user = await response.json();
             if (user) {
+                activeUsername = user.username || (user.email ? user.email.split('@')[0] : "Player");
                 const usernameDisplay = document.getElementById('dashboardUsername');
                 const pointsDisplay = document.getElementById('dashboardPoints');
 
                 if (usernameDisplay) {
-                    usernameDisplay.textContent = user.username || user.email.split('@')[0];
+                    usernameDisplay.textContent = activeUsername;
                 }
                 if (pointsDisplay) {
                     pointsDisplay.innerHTML = `<i class="bi bi-coin"></i> ${(user.points !== undefined ? user.points : 1000).toLocaleString()}`;
                 }
             } else {
-                // If no active session, redirect to login
                 window.location.href = 'login.html';
+                return;
             }
         }
     } catch (err) {
         console.error("Failed to load user session info:", err);
+    }
+
+    // ------------------------------------------------------------------------
+    // 1b. Load Completed Achievement Badges at Top of Dashboard
+    // ------------------------------------------------------------------------
+    if (activeUsername) {
+        loadDashboardBadges(activeUsername);
     }
 
     // ------------------------------------------------------------------------
@@ -69,11 +75,9 @@ document.addEventListener("DOMContentLoaded", async function() {
             if (!query) return;
 
             try {
-                // Fetch matching users asynchronously from the backend API
                 const response = await fetch(`/api/users/search?q=${encodeURIComponent(query)}`);
                 const users = await response.json();
 
-                // Clear out any old search results before rendering new ones
                 searchResults.innerHTML = "";
                 
                 if (!users || users.length === 0) {
@@ -81,7 +85,6 @@ document.addEventListener("DOMContentLoaded", async function() {
                     return;
                 }
 
-                // Dynamically build and render list items for each matching user
                 users.forEach(user => {
                     const displayIdentifier = user.username || (user.email ? user.email.split('@')[0] : user.login);
                     searchResults.innerHTML += `
@@ -103,15 +106,52 @@ document.addEventListener("DOMContentLoaded", async function() {
     }
 });
 
+async function loadDashboardBadges(playerId) {
+    const badgesContainer = document.getElementById("dashboardEarnedBadges");
+    const countBadge = document.getElementById("dashboardBadgeCount");
+    if (!badgesContainer) return;
 
-// ============================================================================
-// Social & Friends List Data Loader
-// ============================================================================
+    try {
+        const res = await fetch(`/api/achievements/${encodeURIComponent(playerId)}`);
+        if (!res.ok) throw new Error("Failed to load achievements.");
+        const data = await res.json();
+        const earned = data.completedAchievements || [];
 
-/**
- * Asynchronously fetches and renders the user's current friends list and 
- * pending incoming friend requests directly inside the dashboard panels.
- */
+        if (countBadge) {
+            countBadge.textContent = `${earned.length} Badge${earned.length === 1 ? "" : "s"} Earned`;
+        }
+
+        if (earned.length === 0) {
+            badgesContainer.innerHTML = `
+                <span class="small text-white opacity-75 fst-italic">
+                    No badges earned yet. Play hands in the Poker Lobby to unlock achievements!
+                </span>
+            `;
+            return;
+        }
+
+        badgesContainer.innerHTML = "";
+        earned.forEach(ach => {
+            const pill = document.createElement("div");
+            pill.className = "earned-badge-pill";
+            pill.title = `${ach.name}: ${ach.shortDesc}`;
+            pill.innerHTML = `
+                <div class="achievement-badge-graphic ${ach.theme || "badge-gold"}">
+                    <i class="bi ${ach.icon || "bi-award-fill"}"></i>
+                </div>
+                <div>
+                    <div class="fw-bold small text-white">${ach.name}</div>
+                    <div class="text-warning" style="font-size: 0.72rem;">${ach.shortDesc}</div>
+                </div>
+            `;
+            badgesContainer.appendChild(pill);
+        });
+    } catch (err) {
+        console.error("Error loading dashboard badges:", err);
+        badgesContainer.innerHTML = `<span class="small text-danger">Unable to load badges right now.</span>`;
+    }
+}
+
 async function loadFriendsData() {
     const pendingContainer = document.getElementById("pendingRequestsList");
     const friendsContainer = document.getElementById("friendListContainer");
@@ -121,7 +161,6 @@ async function loadFriendsData() {
         if (!response.ok) return;
         const data = await response.json();
 
-        // 1. Render Pending Friend Requests
         if (pendingContainer) {
             pendingContainer.innerHTML = "";
             if (!data.friendRequests || data.friendRequests.length === 0) {
@@ -134,12 +173,10 @@ async function loadFriendsData() {
                                 <i class="bi bi-person-fill text-white me-2"></i>${requester}
                             </span>
                             <div class="btn-group">
-                                <!-- Accept Request Form -->
                                 <form action="/friends/accept" method="POST" class="m-0 me-1">
                                     <input type="hidden" name="requester" value="${requester}">
                                     <button type="submit" class="btn btn-sm btn-outline-success shadow-none" title="Accept"><i class="bi bi-check-lg"></i></button>
                                 </form>
-                                <!-- Decline Request Form -->
                                 <form action="/friends/decline" method="POST" class="m-0">
                                     <input type="hidden" name="requester" value="${requester}">
                                     <button type="submit" class="btn btn-sm btn-outline-danger shadow-none" title="Decline"><i class="bi bi-x-lg"></i></button>
@@ -151,7 +188,6 @@ async function loadFriendsData() {
             }
         }
 
-        // 2. Render Active Friends List
         if (friendsContainer) {
             friendsContainer.innerHTML = "";
             if (!data.friends || data.friends.length === 0) {
@@ -174,16 +210,11 @@ async function loadFriendsData() {
     }
 }
 
-
-// ============================================================================
-// Report Player Modal & Autocomplete Logic
-// ============================================================================
 document.addEventListener("DOMContentLoaded", function() {
     const reportInput = document.getElementById("reportedUsername");
     const suggestionsBox = document.getElementById("reportUserSuggestions");
     const reportForm = document.getElementById("reportUserForm");
 
-    // 1. Live Username Autocomplete Lookup
     if (reportInput && suggestionsBox) {
         reportInput.addEventListener("input", async function() {
             const query = this.value.trim();
@@ -219,7 +250,6 @@ document.addEventListener("DOMContentLoaded", function() {
             }
         });
 
-        // Hide suggestions when clicking outside
         document.addEventListener("click", function(e) {
             if (!reportInput.contains(e.target) && !suggestionsBox.contains(e.target)) {
                 suggestionsBox.innerHTML = "";
@@ -227,7 +257,6 @@ document.addEventListener("DOMContentLoaded", function() {
         });
     }
 
-    // 2. Asynchronous Form Submission
     if (reportForm) {
         reportForm.addEventListener("submit", async function(e) {
             e.preventDefault();
@@ -262,22 +291,10 @@ document.addEventListener("DOMContentLoaded", function() {
     }
 });
 
-
-// ============================================================================
-// User Dashboard - Administrative Messages & Warning Notifications
-// ============================================================================
-
-/**
- * Initializes message fetching when the DOM loads.
- */
 document.addEventListener("DOMContentLoaded", async function() {
     await loadUserMessages();
 });
 
-/**
- * Asynchronously fetches user messages/warnings from the server API 
- * and populates the notification badge and expandable message items.
- */
 async function loadUserMessages() {
     try {
         const response = await fetch('/api/user/messages');
@@ -292,7 +309,6 @@ async function loadUserMessages() {
             badge.textContent = messages.length;
 
             modalBody.innerHTML = "";
-            // Use Bootstrap Accordion for collapsible behavior
             let accordionHtml = `<div class="accordion accordion-flush" id="messagesAccordion">`;
             
             messages.reverse().forEach((msg, index) => {
@@ -336,10 +352,6 @@ async function loadUserMessages() {
     }
 }
 
-/**
- * Sends a request to delete a specific message by ID and refreshes the inbox.
- * @param {string} msgId The unique ID of the message
- */
 async function deleteMessage(msgId) {
     try {
         const response = await fetch(`/api/user/messages/${msgId}`, {
@@ -347,7 +359,7 @@ async function deleteMessage(msgId) {
         });
 
         if (response.ok) {
-            await loadUserMessages(); // Refresh list & badge count
+            await loadUserMessages();
         } else {
             console.error("Failed to delete message");
         }
@@ -356,77 +368,64 @@ async function deleteMessage(msgId) {
     }
 }
 
+document.addEventListener("DOMContentLoaded", function() {
+    const createTableForm = document.getElementById("createTableForm");
 
- // ============================================================================
- // Create Custom Poker Table
- // ============================================================================
+    if (createTableForm) {
+        createTableForm.addEventListener("submit", async function(e) {
+            e.preventDefault();
 
- document.addEventListener("DOMContentLoaded", function() {
-     const createTableForm = document.getElementById("createTableForm");
+            const tableName = document.getElementById("newTableName").value.trim();
+            const blinds = document.getElementById("newTableBlinds").value.trim();
+            const buyIn = document.getElementById("newTableMinBuyin").value;
+            const maxPlayers = document.getElementById("newTableMaxPlayers").value;
+            const visibility = document.getElementById("newTableVisibility").value;
 
-     if (createTableForm) {
-         createTableForm.addEventListener("submit", async function(e) {
-             e.preventDefault();
+            const blindValues = blinds.split("/").map(value =>
+                Number(value.trim().replace("$", ""))
+            );
 
-             // Retrieve form values
-             const tableName = document.getElementById("newTableName").value.trim();
-             const blinds = document.getElementById("newTableBlinds").value.trim();
-             const buyIn = document.getElementById("newTableMinBuyin").value;
-             const maxPlayers = document.getElementById("newTableMaxPlayers").value;
-             const visibility = document.getElementById("newTableVisibility").value;
+            if (
+                blindValues.length !== 2 ||
+                blindValues.some(value => !Number.isFinite(value) || value <= 0)
+            ) {
+                alert("Please enter blinds in the format $2 / $4.");
+                return;
+            }
 
-             // Split blinds into small and big blind values
-             const blindValues = blinds.split("/").map(value =>
-                 Number(value.trim().replace("$", ""))
-             );
+            const tableData = {
+                tableName,
+                maxPlayers,
+                buyIn,
+                smallBlind: blindValues[0],
+                bigBlind: blindValues[1],
+                visibility
+            };
 
-             if (
-                 blindValues.length !== 2 ||
-                 blindValues.some(value => !Number.isFinite(value) || value <= 0)
-             ) {
-                 alert("Please enter blinds in the format $2 / $4.");
-                 return;
-             }
+            try {
+                const response = await fetch("/api/tables/create", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json"
+                    },
+                    body: JSON.stringify(tableData)
+                });
 
-             const tableData = {
-                 tableName,
-                 maxPlayers,
-                 buyIn,
-                 smallBlind: blindValues[0],
-                 bigBlind: blindValues[1],
-                 visibility
-             };
+                const result = await response.json();
 
-             try {
-                 // Send request to backend
-                 const response = await fetch("/api/tables/create", {
-                     method: "POST",
-                     headers: {
-                         "Content-Type": "application/json"
-                     },
-                     body: JSON.stringify(tableData)
-                 });
-
-                 const result = await response.json();
-
-                 if (response.ok) {
-                     alert("Table created successfully!");
-                     createTableForm.reset();
-                     // Redirect to newly created table
+                if (response.ok) {
+                    alert("Table created successfully!");
+                    createTableForm.reset();
                     window.location.href =
                         `tableDisplay.html?tableId=${encodeURIComponent(result.tableId)}`;
+                } else {
+                    alert(result.error || "Failed to create table.");
                 }
 
-                     // Table is now stored in TableManager.
-                     // We will connect My Created Tables next.
-                else {
-                     alert(result.error || "Failed to create table.");
-                 }
-
-             } catch (err) {
-                 console.error("Error creating table:", err);
-                 alert("Network error. Please try again.");
-             }
-         });
-     }
- });
+            } catch (err) {
+                console.error("Error creating table:", err);
+                alert("Network error. Please try again.");
+            }
+        });
+    }
+});
