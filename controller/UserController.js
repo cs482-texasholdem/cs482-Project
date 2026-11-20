@@ -138,6 +138,18 @@ exports.register = async function(req, res){
         userData.permission = 2;                     // Standard player
         userData.points = 1000;                      // Starting points
 
+        // Prefer explicit form points if provided, otherwise fall back to guest points saved in session on table leave
+        const rawPoints = req.body.txt_points !== undefined && req.body.txt_points !== ""
+            ? Number(req.body.txt_points)
+            : Number(req.session.pendingGuestPoints);
+
+        if (Number.isFinite(rawPoints) && rawPoints >= 0) {
+            userData.points = Math.floor(rawPoints);
+        }
+
+        // Clear the temporary guest points from session once claimed
+        delete req.session.pendingGuestPoints;
+
         if(req.body.txt_pass) {
             userData.password = passUtil.hashPassword(req.body.txt_pass);
         }
@@ -153,7 +165,13 @@ exports.register = async function(req, res){
             points: userData.points
         };
 
-        res.redirect('/index.html');
+        // Explicitly save the session before redirecting so /loggeduser immediately sees the new account and points
+        req.session.save((err) => {
+            if (err) {
+                console.error("Session save error after registration:", err);
+            }
+            res.redirect('/index.html');
+        });   
     } catch (error) {
         console.error("Error during user registration:", error);
         res.redirect('/signup.html');
@@ -552,15 +570,40 @@ exports.deleteUserMessage = async function(req, res) {
  * @param {Object} req request object containing session state
  * @param {Object} res response object
  */
-exports.loggedUser = function(req, res){
-    res.status(200); 
-    if(req.session.user) 
-        res.send(req.session.user); 
-    else 
-        res.json(null); 
-    res.end(); 
-};
+exports.loggedUser = async function(req, res){
+    res.status(200);
+    if (!req.session.user) { 
+        res.json(null);
+        res.end();
+        return;
+    }
 
+    try {
+        const handle = typeof req.session.user === "object"
+            ? req.session.user.username
+            : req.session.user;
+
+        const freshUser = await dao.findOne({
+            $or: [{ username: handle }, { email: handle }]
+        });
+
+        if (freshUser) {
+            const updatedSessionUser = typeof req.session.user === "object"
+                ? { ...req.session.user, points: freshUser.points }
+                : freshUser;
+
+            req.session.user = updatedSessionUser;
+            res.send(updatedSessionUser);
+            res.end();
+            return;
+        }
+    } catch (err) {
+        console.error("Error refreshing user points in session:", err);
+    }
+
+    res.send(req.session.user);
+    res.end();
+};
 
 /**
  * Destroys the active user session and redirects to lobby.

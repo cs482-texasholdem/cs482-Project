@@ -7,6 +7,7 @@
 let currentPlayerId = "";
 let socket = null;
 let lastRenderedChatCount = 0;
+let allowNavigation = false;
 
 // Get the selected table from the URL
 const urlParams = new URLSearchParams(window.location.search);
@@ -86,6 +87,33 @@ async function initializePlayerIdentity() {
     const displayName = document.getElementById("display-player-id");
     if (headerName) headerName.textContent = currentPlayerId;
     if (displayName) displayName.textContent = currentPlayerId;
+
+    // Check whether the current player is in Guest mode
+    const isGuestPlayer = currentPlayerId.startsWith("Guest_") || sessionStorage.getItem("identityMode") === "guest";
+    const savePointsContainer = document.getElementById("save-points-container");
+    const savePointsBtn = document.getElementById("save-points-btn");
+
+    // Display the "Save Points (Sign Up)" button in the top navbar only for guests
+    if (savePointsContainer) {
+        savePointsContainer.style.display = isGuestPlayer ? "inline-flex" : "none";
+    }
+
+    // Redirect guest to the sign-up page with their current tableId, playerId, and chip total
+    // Remove the guest from the table first, then redirect to the sign-up page with their current points
+    if (savePointsBtn) {
+        savePointsBtn.addEventListener("click", async () => {
+            await exitTableAndRedirect(null, true);
+        });
+    }
+
+    // Warn guests before closing or refreshing the browser tab unless they are intentionally navigating via our buttons
+    if (isGuestPlayer) {
+        window.addEventListener("beforeunload", (event) => {
+            if (!allowNavigation) {
+                event.preventDefault();
+            }
+        });
+    }
 
     // Initialize the table interface without automatically joining
     initializeSocketAndUI();
@@ -223,46 +251,78 @@ const timerText = document.getElementById("turn-timer-text");
 const timerCircle = document.getElementById("turn-timer-circle");
 const actionButtons = document.querySelectorAll("[data-action]");
 
-async function leaveTable(destination) {
+// Helper that removes the player from the active table on the server and navigates cleanly
+async function removeFromServerTable() {
+    try {
+        await fetch("/api/table/leave", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                tableId: currentTableId,
+                playerId: currentPlayerId
+            })
+        });
+    } catch (error) {
+        console.error("Error notifying server of table leave:", error);
+    }
+}
+
+// Unified exit handler for Leave Table, Home, Lobby, and Save Points (Sign Up)
+async function exitTableAndRedirect(destination, forceSignup = false) {
+    const isGuestPlayer = currentPlayerId.startsWith("Guest_") || sessionStorage.getItem("identityMode") === "guest";
+    const parsedChips = Number(yourChipsElem?.textContent?.replace(/[^0-9.-]+/g, ""));
+    const currentChips = Number.isFinite(parsedChips) ? parsedChips : 1000;
+
+    if (isGuestPlayer) {
+        // If triggered directly by the "Save Points (Sign Up)" button, skip the confirm dialog and go straight to sign-up
+        let goToSignup = forceSignup;
+
+        if (!forceSignup) {
+            goToSignup = confirm(
+                `You have ${currentChips.toLocaleString()} temporary guest points.\n\n` +
+                `Click OK to create an account and save your points, or Cancel to leave the table without saving.`
+            );
+        }
+
+        // Always remove the guest from the table first so they don't remain seated in-game
+        await removeFromServerTable();
+        allowNavigation = true;
+
+        if (goToSignup) {
+            // Transfer to sign-up page with guest ID, table ID, and chip balance
+            window.location.href = `signup.html?playerId=${encodeURIComponent(currentPlayerId)}&tableId=${encodeURIComponent(currentTableId)}&points=${encodeURIComponent(currentChips)}`;
+            return;
+        }
+
+        // Guest declined saving points: go straight to the lobby (never index.html or login.html)
+        window.location.href = "lobby.html";
+        return;
+    }
+
+    // Registered user flow
     if (!confirm("Are you sure you want to leave the table?")) {
         return;
     }
 
-    try {
-        const response = await fetch("/api/table/leave", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ 
-                tableId: currentTableId,
-                playerId: currentPlayerId 
-            })
-        });
-
-        if (!response.ok) {
-            throw new Error("Failed to leave table.");
-        }
-
-        window.location.href = destination;
-    } 
-    catch (error) {
-        console.error("Failed to leave table:", error);
-        alert("Unable to leave the table. Please try again.");
-    }
+    await removeFromServerTable();
+    allowNavigation = true;
+    window.location.href = destination || "lobby.html";
 }
 
 const leaveBtn = document.getElementById("leave-table-btn");
-if (leaveBtn) leaveBtn.addEventListener("click", () => leaveTable("lobby.html"));
+if (leaveBtn) leaveBtn.addEventListener("click", () => exitTableAndRedirect("lobby.html"));
 
 const homeLink = document.getElementById("home-link");
 if (homeLink) homeLink.addEventListener("click", (event) => {
     event.preventDefault();
-    leaveTable("index.html");
+    // Guests don't have an unlocked dashboard yet, so Home routes them to lobby.html after leaving
+    exitTableAndRedirect("index.html");
 });
 
 const lobbyLink = document.getElementById("lobby-link");
 if (lobbyLink) lobbyLink.addEventListener("click", (event) => {
     event.preventDefault();
-    leaveTable("lobby.html");
+    exitTableAndRedirect("lobby.html");
 });
 
 // Table link -> Add a test player to the current table
@@ -440,6 +500,12 @@ function renderActivePlayers(status) {
     if (availableChipsElem) availableChipsElem.textContent = (status.playerChips || 0).toLocaleString();
     if (yourBetElem) yourBetElem.textContent = status.playerBet || 0;
     if (currentBetElem) currentBetElem.textContent = status.currentHighestBet || 0;
+
+    // Keep the top navigation bar's "Account Chips" display synchronized with the player's live table chips
+    const accountChipsElem = document.getElementById("account-chips");
+    if (accountChipsElem && status.playerChips !== undefined) {
+        accountChipsElem.textContent = Number(status.playerChips).toLocaleString();
+    }
 
     if (currentTurnPlayerElem) {
         currentTurnPlayerElem.textContent = status.currentTurnPlayer || "None";

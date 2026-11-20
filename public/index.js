@@ -36,10 +36,16 @@ document.addEventListener("DOMContentLoaded", async function() {
     // 1. Fetch & Populate Logged-In User Profile & Points
     // ------------------------------------------------------------------------
     try {
-        const response = await fetch('/loggedUser');
+        // Use lowercase '/loggeduser' to match app.js route and bypass stale browser cache
+        const response = await fetch('/loggeduser', { cache: 'no-store' });
         if (response.ok) {
             const user = await response.json();
             if (user) {
+                // Clear any leftover guest mode flags now that a real account is authenticated
+                sessionStorage.removeItem('identityMode');
+                sessionStorage.removeItem('guestPlayerId');
+                localStorage.removeItem('guestPlayerId');
+
                 const resolvedName = user.username || (user.email ? user.email.split('@')[0] : '');
                 currentLoggedInUser = resolvedName || null;
 
@@ -50,15 +56,25 @@ document.addEventListener("DOMContentLoaded", async function() {
                     usernameDisplay.textContent = resolvedName || 'Player';
                 }
                 if (pointsDisplay) {
+                    // Display the user's saved points from MongoDB/session
                     pointsDisplay.innerHTML = `<i class="bi bi-coin"></i> ${(user.points !== undefined ? user.points : 1000).toLocaleString()}`;
                 }
+
+                // Reveal the dashboard only after the user session and points are populated
+                document.body.style.visibility = 'visible';
             } else {
-                // If no active session, redirect to login
-                window.location.href = 'login.html';
+                // Redirect immediately without ever showing the dashboard markup
+                window.location.replace('login.html');
+                return;
             }
+        } else {
+            window.location.replace('login.html');
+            return;
         }
     } catch (err) {
         console.error("Failed to load user session info:", err);
+        window.location.replace('login.html');
+        return;
     }
 
     // ------------------------------------------------------------------------
