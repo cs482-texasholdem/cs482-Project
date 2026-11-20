@@ -8,6 +8,7 @@ const ActiveTable = require("../model/activeTable");
 const Deck = require("../util/pokerLogic");
 const TableManager = require("../model/tableManager");
 const tableManager = new TableManager();
+const UserDao = require("../model/UserDao");
 
 const DEFAULT_CHAT_MESSAGES = [
     { sender: "Dealer", text: "Welcome to the table!", timestamp: Date.now() }
@@ -373,7 +374,7 @@ function postChatMessage(req, res) {
     });
 }
 
-function joinTable(req, res) {
+async function joinTable(req, res) {
     const table = getRequestedTable(req);
 
     if (!table) {
@@ -395,7 +396,22 @@ function joinTable(req, res) {
         });
     }
 
-    if (!table.addPlayer(id)) {
+    // Start guests at 1000 chips; for account users, load their saved points from UserDao[cite: 5, 7]
+    let startingChips = 1000;
+    if (!id.startsWith("Guest_")) {
+        try {
+            const dbUser = await UserDao.findOne({
+                $or: [{ username: id }, { email: id }]
+            });
+            if (dbUser && typeof dbUser.points === "number") {
+                startingChips = Math.max(0, Math.floor(dbUser.points));
+            }
+        } catch (err) {
+            console.error("Failed to fetch user points on table join:", err);
+        }
+    }
+
+    if (!table.addPlayer(id, startingChips)) {
         return res.status(409).json({ error: "Could not add player to table." });
     }
 

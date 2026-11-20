@@ -51,7 +51,8 @@ class PlayerManager {
         return this.spectators.length;
     }
 
-    addPlayer(playerId) {
+    // Allow passing a starting chip stack (such as a registered user's saved points), defaulting to 1000
+    addPlayer(playerId, startingChips = 1000) {
         if (typeof playerId !== "string" || !playerId.trim()) {
             return false;
         }
@@ -61,7 +62,12 @@ class PlayerManager {
             return false;
         }
 
-        const player = new Player(trimmedId);
+        const validChips = (typeof startingChips === "number" && Number.isFinite(startingChips) && startingChips >= 0)
+            ? Math.floor(startingChips)
+            : 1000;
+
+        // Create the table player with their account points (or default 1000 chips)
+        const player = new Player(trimmedId, validChips);
         this.playerObjects.set(trimmedId, player);
         this.queue.push(trimmedId);
         this.updateQueueDistribution(false);
