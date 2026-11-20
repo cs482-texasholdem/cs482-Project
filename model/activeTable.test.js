@@ -1,5 +1,7 @@
 jest.mock('./GameDao');
+jest.mock('./UserDao');
 const GameDao = require('./GameDao');
+const UserDao = require('./UserDao');
 const ActiveTable = require('./activeTable.js');
 const Deck = require('../util/pokerLogic');
 
@@ -182,6 +184,36 @@ describe('ActiveTable Class (Delegated PlayerManager & Game Engine with Side-Pot
         table.playerObjects.get('P2').folded = true;
         const winnerData = table.handleWinner();
         expect(winnerData.winners).toEqual(['P1']);
+    });
+
+    // Verify post-game point sync updates registered users and skips Guest_ accounts
+    test('handleWinner syncs updated chips to UserDao for registered players but not guests', async () => {
+        const updateSpy = jest.spyOn(UserDao, 'update').mockResolvedValue({});
+
+        table.addPlayer('RegisteredAlice', 1000);
+        table.addPlayer('Guest_8888', 1000);
+        table.startGame();
+
+        // Force guest to fold and set registered player's chip stack prior to pot payout (1420 + 20 pot = 1440)
+        table.playerObjects.get('Guest_8888').folded = true;
+        table.playerObjects.get('RegisteredAlice').chips = 1420;
+
+        table.handleWinner();
+
+        // Wait a microtask tick for async syncAccountPoints to complete
+        await new Promise(resolve => setImmediate(resolve));
+
+        expect(updateSpy).toHaveBeenCalledWith(
+            { username: 'RegisteredAlice' },
+            { points: 1440 }
+        );
+        
+        expect(updateSpy).not.toHaveBeenCalledWith(
+            { username: 'Guest_8888' },
+            expect.anything()
+        );
+
+        updateSpy.mockRestore();
     });
 
     // ==========================================

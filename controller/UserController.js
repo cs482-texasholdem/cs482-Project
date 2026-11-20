@@ -174,13 +174,17 @@ exports.register = async function(req, res){
             points: userData.points
         };
 
-        // Explicitly save the session before redirecting so /loggeduser immediately sees the new account and points
-        req.session.save((err) => {
-            if (err) {
-                console.error("Session save error after registration:", err);
-            }
+        // Save session if available (Express session provides .save; some unit test mocks omit it)
+        if (req.session && typeof req.session.save === "function") {
+            req.session.save((err) => {
+                if (err) {
+                    console.error("Session save error after registration:", err);
+                }
+                res.redirect('/index.html');
+            });
+        } else {
             res.redirect('/index.html');
-        });   
+        } 
     } catch (error) {
         console.error("Error during user registration:", error);
         res.redirect('/signup.html');
@@ -566,6 +570,34 @@ exports.deleteUserMessage = async function(req, res) {
         console.error("Error deleting user message:", error);
         res.status(500).json({ error: "Server error while deleting message." });
     }
+};
+
+// Retrieve a guest's active table chip balance (or session fallback) for the sign-up point transfer flow
+exports.getGuestPoints = function(req, res) {
+    const { tableManager } = require("./tableController"); // Access active tables from TableManager
+    const tableId = req.query.tableId || "main"; // Target table ID or default "main" table
+    const playerId = (req.query.playerId || "").trim(); // Guest player ID
+    const table = tableManager && typeof tableManager.getTable === "function"
+        ? tableManager.getTable(tableId)
+        : null;
+
+    if (table && playerId) {
+        const player = table.playerManager && typeof table.playerManager.getPlayer === "function"
+            ? table.playerManager.getPlayer(playerId)
+            : null;
+
+        if (player && typeof player.chips === "number") {
+            // Clamp chip stack to a non-negative integer
+            return res.status(200).json({ points: Math.max(0, Math.floor(player.chips)) });
+        }
+    }
+
+    // Fall back to pendingGuestPoints in session or default 1000 starting points
+    const fallbackPoints = req.session && typeof req.session.pendingGuestPoints === "number"
+        ? Math.max(0, Math.floor(req.session.pendingGuestPoints))
+        : 1000;
+
+    return res.status(200).json({ points: fallbackPoints });
 };
 
 
