@@ -503,12 +503,7 @@ async function deleteMessage(msgId) {
 
 document.addEventListener("DOMContentLoaded", function() {
     const createTableForm = document.getElementById("createTableForm");
-document.addEventListener("DOMContentLoaded", function() {
-    const createTableForm = document.getElementById("createTableForm");
 
-    if (createTableForm) {
-        createTableForm.addEventListener("submit", async function(e) {
-            e.preventDefault();
     if (createTableForm) {
         createTableForm.addEventListener("submit", async function(e) {
             e.preventDefault();
@@ -538,14 +533,6 @@ document.addEventListener("DOMContentLoaded", function() {
                 return;
             }
 
-            const tableData = {
-                tableName,
-                maxPlayers,
-                buyIn,
-                smallBlind: blindValues[0],
-                bigBlind: blindValues[1],
-                visibility
-            };
             const tableData = {
                 tableName,
                 maxPlayers,
