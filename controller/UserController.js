@@ -319,7 +319,7 @@ exports.sendFriendRequest = async function(req, res) {
 };
 
 /**
- * Fetches the active user's friends list and pending requests.
+ * Fetches the active user's friends list, pending requests, and unread chat counts.
  */
 exports.getFriendsData = async function(req, res) {
     try {
@@ -333,6 +333,8 @@ exports.getFriendsData = async function(req, res) {
         });
         if (!user) return res.status(404).json({ error: "User not found" });
 
+        const canonicalUsername = user.username || (user.email ? user.email.split('@')[0] : currentHandle);
+
         const resolvedFriends = [];
         for (const f of (user.friends || [])) {
             resolvedFriends.push(await resolveToUsername(f));
@@ -343,9 +345,32 @@ exports.getFriendsData = async function(req, res) {
             resolvedRequests.push(await resolveToUsername(r));
         }
 
+        const unreadAgg = await FriendMessage.aggregate([
+            {
+                $match: {
+                    recipient: { $in: [currentHandle, canonicalUsername].filter(Boolean) },
+                    read: false,
+                    deleted: { $ne: true }
+                }
+            },
+            {
+                $group: {
+                    _id: "$sender",
+                    count: { $sum: 1 }
+                }
+            }
+        ]);
+
+        const unreadCounts = {};
+        for (const entry of unreadAgg) {
+            const senderName = await resolveToUsername(entry._id);
+            unreadCounts[senderName] = (unreadCounts[senderName] || 0) + entry.count;
+        }
+
         res.json({
             friends: resolvedFriends,
-            friendRequests: resolvedRequests
+            friendRequests: resolvedRequests,
+            unreadCounts
         });
     } catch (error) {
         console.error("Error fetching friends data:", error);
@@ -401,7 +426,8 @@ exports.declineFriendRequest = async function(req, res) {
 };
 
 /**
- * Fetches persistent 1-on-1 chat history between the logged-in user and a friend.
+ * Fetches persistent 1-on-1 chat history between the logged-in user and a friend,
+ * and marks incoming unread messages from that friend as read.
  */
 exports.getFriendChat = async function(req, res) {
     try {
@@ -414,6 +440,11 @@ exports.getFriendChat = async function(req, res) {
         if (!friendUsername) {
             return res.status(400).json({ error: "Friend username is required." });
         }
+
+        await FriendMessage.updateMany(
+            { sender: friendUsername, recipient: currentUser, read: false },
+            { $set: { read: true } }
+        );
 
         const messages = await FriendMessage.find({
             $or: [

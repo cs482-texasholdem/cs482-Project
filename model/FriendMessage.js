@@ -6,7 +6,8 @@ const friendMessageSchema = new mongoose.Schema(
         recipient: {type: String, required: true, trim: true, index: true},
         text: {type: String, required: true, trim: true, maxlength: 500},
         edited: {type: Boolean, default: false},
-        deleted: {type: Boolean, default: false}
+        deleted: {type: Boolean, default: false},
+        read: {type: Boolean, default: false}
     },
     { timestamps: true }
 );

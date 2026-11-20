@@ -136,8 +136,9 @@ document.addEventListener("DOMContentLoaded", async function() {
 // ============================================================================
 
 /**
- * Asynchronously fetches and renders the user's current friends list and 
- * pending incoming friend requests directly inside the dashboard panels.
+ * Asynchronously fetches and renders the user's current friends list, 
+ * pending incoming friend requests, and unread chat badges directly inside 
+ * the dashboard panels.
  */
 async function loadFriendsData() {
     const pendingContainer = document.getElementById("pendingRequestsList");
@@ -147,6 +148,7 @@ async function loadFriendsData() {
         const response = await fetch('/api/friends/data');
         if (!response.ok) return;
         const data = await response.json();
+        const unreadCounts = data.unreadCounts || {};
 
         // 1. Render Pending Friend Requests
         if (pendingContainer) {
@@ -178,7 +180,7 @@ async function loadFriendsData() {
             }
         }
 
-        // 2. Render Active Friends List with Chat Icon Button
+        // 2. Render Active Friends List with Chat Icon Button & Unread Badge
         if (friendsContainer) {
             friendsContainer.innerHTML = "";
             if (!data.friends || data.friends.length === 0) {
@@ -188,6 +190,7 @@ async function loadFriendsData() {
                     const friendName = typeof friend === "string"
                         ? friend
                         : (friend.username || friend.name || String(friend));
+                    const unreadCount = Number(unreadCounts[friendName] || 0);
 
                     const row = document.createElement("div");
                     row.className = "list-group-item d-flex justify-content-between align-items-center border-secondary mb-1 rounded py-2 px-3";
@@ -207,10 +210,21 @@ async function loadFriendsData() {
 
                     const chatBtn = document.createElement("button");
                     chatBtn.type = "button";
-                    chatBtn.className = "btn btn-sm btn-outline-light py-0 px-2 shadow-none";
-                    chatBtn.title = `Chat with ${friendName}`;
-                    chatBtn.setAttribute("aria-label", `Chat with ${friendName}`);
+                    chatBtn.className = "btn btn-sm btn-outline-light py-0 px-2 shadow-none position-relative";
+                    chatBtn.title = unreadCount > 0
+                        ? `Chat with ${friendName} (${unreadCount} unread)`
+                        : `Chat with ${friendName}`;
+                    chatBtn.setAttribute("aria-label", chatBtn.title);
                     chatBtn.innerHTML = `<i class="bi bi-chat-dots-fill"></i>`;
+
+                    if (unreadCount > 0) {
+                        const unreadBadge = document.createElement("span");
+                        unreadBadge.className = "position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger";
+                        unreadBadge.style.fontSize = "0.65rem";
+                        unreadBadge.textContent = unreadCount > 99 ? "99+" : String(unreadCount);
+                        chatBtn.appendChild(unreadBadge);
+                    }
+
                     chatBtn.addEventListener("click", () => openFriendChatModal(friendName));
 
                     rightGroup.append(badge, chatBtn);
@@ -681,8 +695,15 @@ async function openFriendChatModal(friendUsername) {
 
     const messages = await fetchFriendMessages(friendUsername);
     renderFriendChatMessages(messages);
+    await loadFriendsData();
 
-    setTimeout(() => document.getElementById("friendChatInput")?.focus(), 150);
+    setTimeout(() => {
+        const container = document.getElementById("friendChatMessages");
+        if (container) {
+            container.scrollTop = container.scrollHeight;
+        }
+        document.getElementById("friendChatInput")?.focus();
+    }, 150);
 }
 
 document.addEventListener("DOMContentLoaded", () => {
@@ -713,4 +734,20 @@ document.addEventListener("DOMContentLoaded", () => {
             }
         });
     }
+
+    // Poll periodically so new messages, edits, deletions, and unread badges appear without manual reloads
+    setInterval(async () => {
+        // Pause active thread refresh while an inline edit box is open so typing isn't interrupted
+        const isEditing = Boolean(document.querySelector("#friendChatMessages .edit-message-box"));
+
+        if (activeChatFriend && !isEditing) {
+            const messages = await fetchFriendMessages(activeChatFriend);
+            renderFriendChatMessages(messages);
+        }
+
+        // Refresh friend list & unread badges while viewing the dashboard outside the modal
+        if (!activeChatFriend) {
+            await loadFriendsData();
+        }
+    }, 3000);
 });
