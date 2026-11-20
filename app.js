@@ -60,6 +60,25 @@ app.delete('/api/user/messages/:msgId', UserCont.deleteUserMessage);
 
 // Table Actions (Query/Body Table ID)
 const {createTable, joinTable, leaveTable, playerAction, startGame, nextRound, getTableStatus, postChatMessage} = require("./controller/tableController");
+
+// Retrieve a guest player's live chip stack from an active table (defaults to 1000 starting points)
+const { tableManager } = require("./controller/tableController"); // Access active tables from TableManager
+app.get("/api/guest/points", (req, res) => {
+    const tableId = req.query.tableId || "main";
+    const playerId = (req.query.playerId || "").trim(); 
+    const table = tableManager.getTable(tableId);
+
+    if (table && playerId) {
+        const player = table.playerManager.getPlayer(playerId); // Look up seated/queued player
+        if (player && typeof player.chips === "number") {
+            // Non negative integers only
+            return res.status(200).json({ points: Math.max(0, Math.floor(player.chips)) });
+        }
+    }
+
+    // Default to 1000 starting points if no active chip stack is found
+    return res.status(200).json({ points: 1000 });
+});
 app.get("/api/table/status", getTableStatus);
 app.post("/api/table/join", joinTable);
 app.post("/api/table/leave", leaveTable);

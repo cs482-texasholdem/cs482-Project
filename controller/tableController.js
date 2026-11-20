@@ -425,9 +425,18 @@ function leaveTable(req, res) {
         return res.status(400).json({ error: "Player ID is required." });
     }
 
-    if (!table.removePlayer(playerId.trim())) {
-        return res.status(404).json({ error: "Player is not in this table." });
+    const trimmedId = playerId.trim();
+
+    // Capture the guest's current table chips into the session before removing them from the table
+    if (trimmedId.startsWith("Guest_") && req.session) {
+        const departingPlayer = table.playerManager.getPlayer(trimmedId);
+        if (departingPlayer && typeof departingPlayer.chips === "number") {
+            req.session.pendingGuestPoints = Math.max(0, Math.floor(departingPlayer.chips));
+        }
     }
+
+    // Remove the player if they are seated/queued (do not fail if they already left)
+    table.removePlayer(trimmedId);
 
     broadcastTableUpdate(req, table.tableId); // Notify all clients of the table update
 
