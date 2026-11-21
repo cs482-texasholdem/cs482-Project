@@ -1,9 +1,11 @@
 const controller = require('./UserController');
 const dao = require('../model/UserDao');
 const passUtil = require('../util/PasswordUtil');
+const FriendMessage = require('../model/FriendMessage');
 
 jest.mock('../model/UserDao');
 jest.mock('../util/PasswordUtil');
+jest.mock('../model/FriendMessage');
 
 beforeEach(function(){
     jest.clearAllMocks();
@@ -134,6 +136,57 @@ test('register should catch database errors and redirect to signup.html', async 
     expect(res.redirect).toHaveBeenCalledWith('/signup.html');
 });
 
+test('register should enforce 1000 starting points even if txt_points is submitted', async function(){
+    let req = {
+        body: {
+            txt_username: 'guestconvert',
+            txt_email: 'guestconvert@mail.com',
+            txt_pass: 'secure123',
+            txt_points: '1850'
+        },
+        session: {
+            save: jest.fn((cb) => cb && cb())
+        }
+    };
+    let res = { redirect: jest.fn() };
+    passUtil.hashPassword.mockReturnValue('hashedPassword');
+    dao.create.mockResolvedValue({ _id: '2', points: 1000 });
+
+    await controller.register(req, res);
+
+    expect(dao.create).toHaveBeenCalledWith(expect.objectContaining({
+        username: 'guestconvert',
+        points: 1000
+    }));
+    expect(req.session.user.points).toBe(1000);
+    expect(res.redirect).toHaveBeenCalledWith('/index.html');
+});
+
+test('register should enforce 1000 starting points and clear stale req.session.pendingGuestPoints', async function(){
+    let req = {
+        body: {
+            txt_username: 'sessionguest',
+            txt_email: 'sessionguest@mail.com',
+            txt_pass: 'secure123'
+        },
+        session: {
+            pendingGuestPoints: 2400,
+            save: jest.fn((cb) => cb && cb())
+        }
+    };
+    let res = { redirect: jest.fn() };
+    passUtil.hashPassword.mockReturnValue('hashedPassword');
+    dao.create.mockResolvedValue({ _id: '3', points: 1000 });
+
+    await controller.register(req, res);
+
+    expect(dao.create).toHaveBeenCalledWith(expect.objectContaining({
+        points: 1000
+    }));
+    expect(req.session.pendingGuestPoints).toBeUndefined();
+    expect(res.redirect).toHaveBeenCalledWith('/index.html');
+});
+
 // ==========================================
 // 5. login Tests
 // ==========================================
@@ -189,18 +242,45 @@ test('login should fail and redirect with error=1 when password check fails', as
 // ==========================================
 // 6. loggedUser & logout Tests
 // ==========================================
-test('loggedUser should send active session user with status 200', function(){
+test('loggedUser should send active session user with status 200', async function(){
     let req = { session: { user: { username: 'activeUser', email: 'active@mail.com' } } };
     let res = {
         status: jest.fn(),
         send: jest.fn(),
         end: jest.fn()
     };
+    dao.findOne.mockResolvedValue({ username: 'activeUser', email: 'active@mail.com', points: 1000 });
 
-    controller.loggedUser(req, res);
+    await controller.loggedUser(req, res);
 
     expect(res.status).toHaveBeenCalledWith(200);
-    expect(res.send).toHaveBeenCalledWith(req.session.user);
+    expect(res.send).toHaveBeenCalledWith(expect.objectContaining({ username: 'activeUser', email: 'active@mail.com' }));
+    expect(res.end).toHaveBeenCalled();
+});
+
+test('loggedUser should refresh points from UserDao when available', async function(){
+    let req = {
+        session: {
+            user: { username: 'activeUser', email: 'active@mail.com', points: 1000 }
+        }
+    };
+    let res = {
+        status: jest.fn(),
+        send: jest.fn(),
+        end: jest.fn()
+    };
+    dao.findOne.mockResolvedValue({
+        username: 'activeUser',
+        email: 'active@mail.com',
+        points: 1625
+    });
+
+    await controller.loggedUser(req, res);
+
+    expect(dao.findOne).toHaveBeenCalled();
+    expect(req.session.user.points).toBe(1625);
+    expect(res.status).toHaveBeenCalledWith(200);
+    expect(res.send).toHaveBeenCalledWith(expect.objectContaining({ points: 1625 }));
     expect(res.end).toHaveBeenCalled();
 });
 
@@ -219,7 +299,7 @@ test('loggedUser should send null JSON when no user session is active', function
     expect(res.end).toHaveBeenCalled();
 });
 
-test('logout should clear session user and redirect to index.html', function(){
+test('logout should clear session user and redirect to login.html', function(){
     const req = { session: { user: { username: 'activeUser'}, destroy: jest.fn((callback) => callback(null)) } };
     const res = { redirect: jest.fn(), clearCookie: jest.fn(), setHeader: jest.fn() };
 
@@ -269,11 +349,12 @@ test('sendFriendRequest should push sender username into recipient friendRequest
     expect(res.redirect).toHaveBeenCalledWith('/index.html');
 });
 
-test('getFriendsData should return resolved friends and requests JSON', async function(){
+test('getFriendsData should return resolved friends, requests, and unreadCounts JSON', async function(){
     let req = {
         session: { user: { email: 'alice@mail.com', username: 'alice' } }
     };
     let res = {
+        status: jest.fn().mockReturnThis(),
         json: jest.fn()
     };
 
@@ -284,13 +365,19 @@ test('getFriendsData should return resolved friends and requests JSON', async fu
             friendRequests: ['charlie']
         })
         .mockResolvedValueOnce({ username: 'bob' })
-        .mockResolvedValueOnce({ username: 'charlie' });
+        .mockResolvedValueOnce({ username: 'charlie' })
+        .mockResolvedValueOnce({ username: 'bob' });
+
+    FriendMessage.aggregate.mockResolvedValue([
+        { _id: 'bob', count: 2 }
+    ]);
 
     await controller.getFriendsData(req, res);
 
     expect(res.json).toHaveBeenCalledWith({
         friends: ['bob'],
-        friendRequests: ['charlie']
+        friendRequests: ['charlie'],
+        unreadCounts: { bob: 2 }
     });
 });
 
@@ -597,4 +684,502 @@ test('deleteUserMessage should handle errors and return 500', async function(){
 
     expect(res.status).toHaveBeenCalledWith(500);
     expect(res.json).toHaveBeenCalledWith({ error: "Server error while deleting message." });
+});
+
+// ==========================================
+// 12. Friend Chat Tests
+// ==========================================
+test('getFriendChat should return 401 if unauthenticated', async function(){
+    let req = { params: { friendUsername: 'bob' }, session: {} };
+    let res = { status: jest.fn().mockReturnThis(), json: jest.fn() };
+
+    await controller.getFriendChat(req, res);
+
+    expect(res.status).toHaveBeenCalledWith(401);
+    expect(res.json).toHaveBeenCalledWith({ error: "Not logged in." });
+});
+
+test('getFriendChat should return 400 if friendUsername is missing or blank', async function(){
+    let req = {
+        params: { friendUsername: '   ' },
+        session: { user: { username: 'alice' } }
+    };
+    let res = { status: jest.fn().mockReturnThis(), json: jest.fn() };
+
+    await controller.getFriendChat(req, res);
+
+    expect(res.status).toHaveBeenCalledWith(400);
+    expect(res.json).toHaveBeenCalledWith({ error: "Friend username is required." });
+});
+
+test('getFriendChat should mark incoming messages read and return sorted messages', async function(){
+    let req = {
+        params: { friendUsername: 'bob' },
+        session: { user: { username: 'alice' } }
+    };
+    let res = { status: jest.fn().mockReturnThis(), json: jest.fn() };
+
+    const mockMessages = [
+        { _id: 'm1', sender: 'alice', recipient: 'bob', text: 'Hey!', edited: false, deleted: false, read: true },
+        { _id: 'm2', sender: 'bob', recipient: 'alice', text: 'Ready to play?', edited: false, deleted: false, read: true }
+    ];
+
+    FriendMessage.updateMany.mockResolvedValue({ modifiedCount: 1 });
+    FriendMessage.find.mockReturnValue({
+        sort: jest.fn().mockResolvedValue(mockMessages)
+    });
+
+    await controller.getFriendChat(req, res);
+
+    expect(FriendMessage.updateMany).toHaveBeenCalledWith(
+        { sender: 'bob', recipient: 'alice', read: false },
+        { $set: { read: true } }
+    );
+    expect(FriendMessage.find).toHaveBeenCalled();
+    expect(res.status).toHaveBeenCalledWith(200);
+    expect(res.json).toHaveBeenCalledWith({ messages: mockMessages });
+});
+
+test('getFriendChat should return 500 when database query fails', async function(){
+    let req = {
+        params: { friendUsername: 'bob' },
+        session: { user: { username: 'alice' } }
+    };
+    let res = { status: jest.fn().mockReturnThis(), json: jest.fn() };
+
+    FriendMessage.updateMany.mockRejectedValue(new Error('DB error'));
+
+    await controller.getFriendChat(req, res);
+
+    expect(res.status).toHaveBeenCalledWith(500);
+    expect(res.json).toHaveBeenCalledWith({ error: "Failed to load messages." });
+});
+
+test('sendFriendChatMessage should return 401 if unauthenticated', async function(){
+    let req = {
+        params: { friendUsername: 'bob' },
+        body: { text: 'Hello!' },
+        session: {}
+    };
+    let res = { status: jest.fn().mockReturnThis(), json: jest.fn() };
+
+    await controller.sendFriendChatMessage(req, res);
+
+    expect(res.status).toHaveBeenCalledWith(401);
+    expect(res.json).toHaveBeenCalledWith({ error: "Not logged in." });
+});
+
+test('sendFriendChatMessage should reject empty or whitespace-only messages with 400', async function(){
+    let req = {
+        params: { friendUsername: 'bob' },
+        body: { text: '   ' },
+        session: { user: { username: 'alice' } }
+    };
+    let res = { status: jest.fn().mockReturnThis(), json: jest.fn() };
+
+    await controller.sendFriendChatMessage(req, res);
+
+    expect(FriendMessage.create).not.toHaveBeenCalled();
+    expect(res.status).toHaveBeenCalledWith(400);
+    expect(res.json).toHaveBeenCalledWith({ error: "Friend and message text are required." });
+});
+
+test('sendFriendChatMessage should truncate messages over 500 characters and save', async function(){
+    let req = {
+        params: { friendUsername: 'bob' },
+        body: { text: 'a'.repeat(550) },
+        session: { user: { username: 'alice' } }
+    };
+    let res = { status: jest.fn().mockReturnThis(), json: jest.fn() };
+
+    const createdMsg = {
+        _id: 'msg500',
+        sender: 'alice',
+        recipient: 'bob',
+        text: 'a'.repeat(500)
+    };
+    FriendMessage.create.mockResolvedValue(createdMsg);
+
+    await controller.sendFriendChatMessage(req, res);
+
+    expect(FriendMessage.create).toHaveBeenCalledWith({
+        sender: 'alice',
+        recipient: 'bob',
+        text: 'a'.repeat(500)
+    });
+    expect(res.status).toHaveBeenCalledWith(201);
+    expect(res.json).toHaveBeenCalledWith({ message: createdMsg });
+});
+
+test('sendFriendChatMessage should create and return the new message for valid input', async function(){
+    let req = {
+        params: { friendUsername: 'bob' },
+        body: { text: 'GG at the river!' },
+        session: { user: { username: 'alice' } }
+    };
+    let res = { status: jest.fn().mockReturnThis(), json: jest.fn() };
+
+    const createdMsg = {
+        _id: 'msg123',
+        sender: 'alice',
+        recipient: 'bob',
+        text: 'GG at the river!',
+        edited: false,
+        deleted: false,
+        read: false
+    };
+    FriendMessage.create.mockResolvedValue(createdMsg);
+
+    await controller.sendFriendChatMessage(req, res);
+
+    expect(FriendMessage.create).toHaveBeenCalledWith({
+        sender: 'alice',
+        recipient: 'bob',
+        text: 'GG at the river!'
+    });
+    expect(res.status).toHaveBeenCalledWith(201);
+    expect(res.json).toHaveBeenCalledWith({ message: createdMsg });
+});
+
+test('sendFriendChatMessage should return 500 when FriendMessage.create throws', async function(){
+    let req = {
+        params: { friendUsername: 'bob' },
+        body: { text: 'Hello!' },
+        session: { user: { username: 'alice' } }
+    };
+    let res = { status: jest.fn().mockReturnThis(), json: jest.fn() };
+
+    FriendMessage.create.mockRejectedValue(new Error('DB write error'));
+
+    await controller.sendFriendChatMessage(req, res);
+
+    expect(res.status).toHaveBeenCalledWith(500);
+    expect(res.json).toHaveBeenCalledWith({ error: "Failed to send message." });
+});
+
+test('editFriendChatMessage should return 401 if unauthenticated', async function(){
+    let req = {
+        params: { messageId: 'msg123' },
+        body: { text: 'Updated text' },
+        session: {}
+    };
+    let res = { status: jest.fn().mockReturnThis(), json: jest.fn() };
+
+    await controller.editFriendChatMessage(req, res);
+
+    expect(res.status).toHaveBeenCalledWith(401);
+    expect(res.json).toHaveBeenCalledWith({ error: "Not logged in." });
+});
+
+test('editFriendChatMessage should return 400 if updated text is empty', async function(){
+    let req = {
+        params: { messageId: 'msg123' },
+        body: { text: '   ' },
+        session: { user: { username: 'alice' } }
+    };
+    let res = { status: jest.fn().mockReturnThis(), json: jest.fn() };
+
+    await controller.editFriendChatMessage(req, res);
+
+    expect(FriendMessage.findOneAndUpdate).not.toHaveBeenCalled();
+    expect(res.status).toHaveBeenCalledWith(400);
+});
+
+test('editFriendChatMessage should return 404 when message does not exist or user is not sender', async function(){
+    let req = {
+        params: { messageId: 'msg123' },
+        body: { text: 'Updated text' },
+        session: { user: { username: 'alice' } }
+    };
+    let res = { status: jest.fn().mockReturnThis(), json: jest.fn() };
+
+    FriendMessage.findOneAndUpdate.mockResolvedValue(null);
+
+    await controller.editFriendChatMessage(req, res);
+
+    expect(FriendMessage.findOneAndUpdate).toHaveBeenCalledWith(
+        { _id: 'msg123', sender: 'alice', deleted: { $ne: true } },
+        { text: 'Updated text', edited: true },
+        { new: true }
+    );
+    expect(res.status).toHaveBeenCalledWith(404);
+});
+
+test('editFriendChatMessage should update text and mark edited=true for sender', async function(){
+    let req = {
+        params: { messageId: 'msg123' },
+        body: { text: 'Fixed typo' },
+        session: { user: { username: 'alice' } }
+    };
+    let res = { status: jest.fn().mockReturnThis(), json: jest.fn() };
+
+    const updatedDoc = {
+        _id: 'msg123',
+        sender: 'alice',
+        recipient: 'bob',
+        text: 'Fixed typo',
+        edited: true
+    };
+    FriendMessage.findOneAndUpdate.mockResolvedValue(updatedDoc);
+
+    await controller.editFriendChatMessage(req, res);
+
+    expect(res.status).toHaveBeenCalledWith(200);
+    expect(res.json).toHaveBeenCalledWith({ message: updatedDoc });
+});
+
+test('editFriendChatMessage should return 500 when database update fails', async function(){
+    let req = {
+        params: { messageId: 'msg123' },
+        body: { text: 'Fixed typo' },
+        session: { user: { username: 'alice' } }
+    };
+    let res = { status: jest.fn().mockReturnThis(), json: jest.fn() };
+
+    FriendMessage.findOneAndUpdate.mockRejectedValue(new Error('DB update error'));
+
+    await controller.editFriendChatMessage(req, res);
+
+    expect(res.status).toHaveBeenCalledWith(500);
+    expect(res.json).toHaveBeenCalledWith({ error: "Failed to edit message." });
+});
+
+test('deleteFriendChatMessage should return 401 if unauthenticated', async function(){
+    let req = { params: { messageId: 'msg123' }, session: {} };
+    let res = { status: jest.fn().mockReturnThis(), json: jest.fn() };
+
+    await controller.deleteFriendChatMessage(req, res);
+
+    expect(res.status).toHaveBeenCalledWith(401);
+    expect(res.json).toHaveBeenCalledWith({ error: "Not logged in." });
+});
+
+test('deleteFriendChatMessage should return 404 when message is missing or not owned by user', async function(){
+    let req = {
+        params: { messageId: 'msg123' },
+        session: { user: { username: 'mallory' } }
+    };
+    let res = { status: jest.fn().mockReturnThis(), json: jest.fn() };
+
+    FriendMessage.findOneAndUpdate.mockResolvedValue(null);
+
+    await controller.deleteFriendChatMessage(req, res);
+
+    expect(FriendMessage.findOneAndUpdate).toHaveBeenCalledWith(
+        { _id: 'msg123', sender: 'mallory' },
+        { deleted: true, text: "" },
+        { new: true }
+    );
+    expect(res.status).toHaveBeenCalledWith(404);
+});
+
+test('deleteFriendChatMessage should soft-delete message and clear text for sender', async function(){
+    let req = {
+        params: { messageId: 'msg123' },
+        session: { user: { username: 'alice' } }
+    };
+    let res = { status: jest.fn().mockReturnThis(), json: jest.fn() };
+
+    const softDeletedDoc = {
+        _id: 'msg123',
+        sender: 'alice',
+        recipient: 'bob',
+        deleted: true,
+        text: ""
+    };
+    FriendMessage.findOneAndUpdate.mockResolvedValue(softDeletedDoc);
+
+    await controller.deleteFriendChatMessage(req, res);
+
+    expect(res.status).toHaveBeenCalledWith(200);
+    expect(res.json).toHaveBeenCalledWith({ message: softDeletedDoc });
+});
+
+test('deleteFriendChatMessage should return 500 when database delete fails', async function(){
+    let req = {
+        params: { messageId: 'msg123' },
+        session: { user: { username: 'alice' } }
+    };
+    let res = { status: jest.fn().mockReturnThis(), json: jest.fn() };
+
+    FriendMessage.findOneAndUpdate.mockRejectedValue(new Error('DB delete error'));
+
+    await controller.deleteFriendChatMessage(req, res);
+
+    expect(res.status).toHaveBeenCalledWith(500);
+    expect(res.json).toHaveBeenCalledWith({ error: "Failed to delete message." });
+});
+
+// ==========================================
+// 13. Password Reset Tests
+// ==========================================
+test('requestPasswordReset should return 400 when email is missing or blank', async function(){
+    let req = { body: { email: '   ' } };
+    let res = { status: jest.fn().mockReturnThis(), json: jest.fn() };
+
+    await controller.requestPasswordReset(req, res);
+
+    expect(dao.findLogin).not.toHaveBeenCalled();
+    expect(res.status).toHaveBeenCalledWith(400);
+    expect(res.json).toHaveBeenCalledWith({ error: "Please enter a valid email address." });
+});
+
+test('requestPasswordReset should return 200 without updating when email does not exist', async function(){
+    let req = { body: { email: 'Unknown@Mail.com' } };
+    let res = { status: jest.fn().mockReturnThis(), json: jest.fn() };
+    dao.findLogin.mockResolvedValue(null);
+
+    await controller.requestPasswordReset(req, res);
+
+    expect(dao.findLogin).toHaveBeenCalledWith('unknown@mail.com');
+    expect(dao.update).not.toHaveBeenCalled();
+    expect(res.status).toHaveBeenCalledWith(200);
+    expect(res.json).toHaveBeenCalledWith({
+        message: "If an account exists for that email, a 6-digit reset code has been sent."
+    });
+});
+
+test('requestPasswordReset should generate a 6-digit code with 15-min expiry and update user', async function(){
+    const now = Date.now();
+    jest.spyOn(Date, 'now').mockReturnValue(now);
+
+    let req = { body: { email: 'Player@Mail.com' } };
+    let res = { status: jest.fn().mockReturnThis(), json: jest.fn() };
+    dao.findLogin.mockResolvedValue({ _id: 'u123', email: 'player@mail.com' });
+    dao.update.mockResolvedValue(true);
+
+    await controller.requestPasswordReset(req, res);
+
+    expect(dao.findLogin).toHaveBeenCalledWith('player@mail.com');
+    expect(dao.update).toHaveBeenCalledWith(
+        'u123',
+        expect.objectContaining({
+            resetCode: expect.stringMatching(/^\d{6}$/),
+            resetCodeExpires: new Date(now + 15 * 60 * 1000)
+        })
+    );
+    expect(res.status).toHaveBeenCalledWith(200);
+    expect(res.json).toHaveBeenCalledWith({
+        message: "If an account exists for that email, a 6-digit reset code has been sent."
+    });
+
+    Date.now.mockRestore();
+});
+
+test('requestPasswordReset should return 500 when an error occurs', async function(){
+    let req = { body: { email: 'player@mail.com' } };
+    let res = { status: jest.fn().mockReturnThis(), json: jest.fn() };
+    dao.findLogin.mockRejectedValue(new Error('DB lookup error'));
+
+    await controller.requestPasswordReset(req, res);
+
+    expect(res.status).toHaveBeenCalledWith(500);
+    expect(res.json).toHaveBeenCalledWith({ error: "Could not process password reset request." });
+});
+
+test('resetPasswordWithCode should return 400 when required fields are missing', async function(){
+    let req = { body: { email: 'player@mail.com', code: '', newPassword: 'secret123' } };
+    let res = { status: jest.fn().mockReturnThis(), json: jest.fn() };
+
+    await controller.resetPasswordWithCode(req, res);
+
+    expect(dao.findLogin).not.toHaveBeenCalled();
+    expect(res.status).toHaveBeenCalledWith(400);
+    expect(res.json).toHaveBeenCalledWith({ error: "Email, reset code, and new password are required." });
+});
+
+test('resetPasswordWithCode should return 400 when newPassword is shorter than 6 characters', async function(){
+    let req = { body: { email: 'player@mail.com', code: '123456', newPassword: '123' } };
+    let res = { status: jest.fn().mockReturnThis(), json: jest.fn() };
+
+    await controller.resetPasswordWithCode(req, res);
+
+    expect(dao.findLogin).not.toHaveBeenCalled();
+    expect(res.status).toHaveBeenCalledWith(400);
+    expect(res.json).toHaveBeenCalledWith({ error: "New password must be at least 6 characters long." });
+});
+
+test('resetPasswordWithCode should return 400 when user or reset code metadata is missing', async function(){
+    let req = { body: { email: 'player@mail.com', code: '123456', newPassword: 'newpassword123' } };
+    let res = { status: jest.fn().mockReturnThis(), json: jest.fn() };
+    dao.findLogin.mockResolvedValue({ _id: 'u123', email: 'player@mail.com' });
+
+    await controller.resetPasswordWithCode(req, res);
+
+    expect(dao.update).not.toHaveBeenCalled();
+    expect(res.status).toHaveBeenCalledWith(400);
+    expect(res.json).toHaveBeenCalledWith({ error: "Invalid or expired reset code." });
+});
+
+test('resetPasswordWithCode should return 400 when the reset code is expired', async function(){
+    let req = { body: { email: 'player@mail.com', code: '123456', newPassword: 'newpassword123' } };
+    let res = { status: jest.fn().mockReturnThis(), json: jest.fn() };
+    dao.findLogin.mockResolvedValue({
+        _id: 'u123',
+        email: 'player@mail.com',
+        resetCode: '123456',
+        resetCodeExpires: new Date(Date.now() - 60 * 1000)
+    });
+
+    await controller.resetPasswordWithCode(req, res);
+
+    expect(dao.update).not.toHaveBeenCalled();
+    expect(res.status).toHaveBeenCalledWith(400);
+    expect(res.json).toHaveBeenCalledWith({ error: "Invalid or expired reset code." });
+});
+
+test('resetPasswordWithCode should return 400 when the reset code does not match', async function(){
+    let req = { body: { email: 'player@mail.com', code: '654321', newPassword: 'newpassword123' } };
+    let res = { status: jest.fn().mockReturnThis(), json: jest.fn() };
+    dao.findLogin.mockResolvedValue({
+        _id: 'u123',
+        email: 'player@mail.com',
+        resetCode: '123456',
+        resetCodeExpires: new Date(Date.now() + 10 * 60 * 1000)
+    });
+
+    await controller.resetPasswordWithCode(req, res);
+
+    expect(dao.update).not.toHaveBeenCalled();
+    expect(res.status).toHaveBeenCalledWith(400);
+    expect(res.json).toHaveBeenCalledWith({ error: "Invalid or expired reset code." });
+});
+
+test('resetPasswordWithCode should hash new password, clear reset fields, and return 200 on valid code', async function(){
+    let req = { body: { email: ' Player@Mail.com ', code: ' 123456 ', newPassword: 'newpassword123' } };
+    let res = { status: jest.fn().mockReturnThis(), json: jest.fn() };
+
+    dao.findLogin.mockResolvedValue({
+        _id: 'u123',
+        email: 'player@mail.com',
+        resetCode: '123456',
+        resetCodeExpires: new Date(Date.now() + 10 * 60 * 1000)
+    });
+    passUtil.hashPassword.mockReturnValue('hashedNewPassword123');
+    dao.update.mockResolvedValue(true);
+
+    await controller.resetPasswordWithCode(req, res);
+
+    expect(dao.findLogin).toHaveBeenCalledWith('player@mail.com');
+    expect(passUtil.hashPassword).toHaveBeenCalledWith('newpassword123');
+    expect(dao.update).toHaveBeenCalledWith('u123', {
+        password: 'hashedNewPassword123',
+        resetCode: null,
+        resetCodeExpires: null
+    });
+    expect(res.status).toHaveBeenCalledWith(200);
+    expect(res.json).toHaveBeenCalledWith({
+        message: "Password updated successfully. You can now log in with your new password."
+    });
+});
+
+test('resetPasswordWithCode should return 500 when an unexpected error occurs', async function(){
+    let req = { body: { email: 'player@mail.com', code: '123456', newPassword: 'newpassword123' } };
+    let res = { status: jest.fn().mockReturnThis(), json: jest.fn() };
+    dao.findLogin.mockRejectedValue(new Error('DB update failure'));
+
+    await controller.resetPasswordWithCode(req, res);
+
+    expect(res.status).toHaveBeenCalledWith(500);
+    expect(res.json).toHaveBeenCalledWith({ error: "Failed to reset password." });
 });

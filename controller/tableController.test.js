@@ -1,6 +1,9 @@
 jest.mock('../model/GameDao');
+jest.mock('../model/UserDao', () => ({
+    findOne: jest.fn().mockResolvedValue(null)
+}));
 const GameDao = require('../model/GameDao');
-const { getTableStatus, tableManager, joinTable, leaveTable, startGame, finishGame, playerAction, nextRound, mainTable} = require('../controller/tableController.js');
+const { getTableStatus, tableManager, joinTable, leaveTable, startGame, finishGame, playerAction, nextRound, postChatMessage, mainTable} = require('../controller/tableController.js');
 const TableManager = require('../model/tableManager');
 
 describe('Table Controller Unit Tests', () => {
@@ -9,9 +12,9 @@ describe('Table Controller Unit Tests', () => {
     beforeEach(() => {
         jest.clearAllMocks();
         // Prevent tests from making real database writes
-        GameDao.create.mockResolvedValue({})
+        GameDao.create.mockResolvedValue({});
 
-        //set up mock io for testing broadcasts
+        // Set up mock io for testing broadcasts
         mockIo = {
             emit: jest.fn(),
             to: jest.fn().mockReturnThis(),
@@ -20,6 +23,7 @@ describe('Table Controller Unit Tests', () => {
         req = {
             query: {},
             body: {},
+            session: {},
             app: {
                 get: jest.fn((key) => {
                     if (key === 'io') return mockIo;
@@ -33,26 +37,26 @@ describe('Table Controller Unit Tests', () => {
         };
     });
 
-    test('joinTable validates missing player ID and successfully joins table', () => {
+    test('joinTable validates missing player ID and successfully joins table', async () => {
         // Missing ID
         req.body = { playerId: '' };
-        joinTable(req, res);
+        await joinTable(req, res);
         expect(res.status).toHaveBeenCalledWith(400);
 
         // Valid Join
         req.body = { playerId: 'ControllerPlayer1' };
-        joinTable(req, res);
+        await joinTable(req, res);
         expect(res.status).toHaveBeenCalledWith(200);
 
         // Duplicate Join
-        joinTable(req, res);
+        await joinTable(req, res);
         expect(res.status).toHaveBeenCalledWith(200);
     });
 
-    test('joinTable rejects a non-string player ID', () => {
+    test('joinTable rejects a non-string player ID', async () => {
         req.body = { playerId: 123 };
 
-        joinTable(req, res);
+        await joinTable(req, res);
 
         expect(res.status).toHaveBeenCalledWith(400);
         expect(res.json).toHaveBeenCalledWith({
@@ -60,24 +64,24 @@ describe('Table Controller Unit Tests', () => {
         });
     });
 
-    test('joinTable gets player ID from query parameters', () => {
+    test('joinTable gets player ID from query parameters', async () => {
         const addPlayerSpy = jest.spyOn(mainTable, 'addPlayer').mockReturnValue(true);
 
         req.query = { playerId: 'QueryPlayer1' };
 
-        joinTable(req, res);
+        await joinTable(req, res);
 
-        expect(addPlayerSpy).toHaveBeenCalledWith('QueryPlayer1');
+        expect(addPlayerSpy).toHaveBeenCalledWith('QueryPlayer1', 1000);
         expect(res.status).toHaveBeenCalledWith(200);
 
         addPlayerSpy.mockRestore();
     });
 
-    test('joinTable succeeds when Socket.io is unavailable', () => {
+    test('joinTable succeeds when Socket.io is unavailable', async () => {
         req.app.get.mockReturnValue(null);
         req.body = { playerId: 'NoSocketPlayer' };
 
-        joinTable(req, res);
+        await joinTable(req, res);
 
         expect(res.status).toHaveBeenCalledWith(200);
         expect(res.json).toHaveBeenCalledWith(
@@ -116,13 +120,13 @@ describe('Table Controller Unit Tests', () => {
         );
     });
 
-    test('getTableStatus returns player hand during an active game', () => {
+    test('getTableStatus returns player hand during an active game', async () => {
         // Add two players and start a game
         req.body = { playerId: 'StatusPlayer1' };
-        joinTable(req, res);
+        await joinTable(req, res);
 
         req.body = { playerId: 'StatusPlayer2' };
-        joinTable(req, res);
+        await joinTable(req, res);
 
         startGame(req, res);
 
@@ -146,14 +150,14 @@ describe('Table Controller Unit Tests', () => {
         mainTable.removePlayer('StatusPlayer2');
     });
 
-    test('startGame handles insufficient players and successful start', () => {
+    test('startGame handles insufficient players and successful start', async () => {
         // Try starting with only 1 player
         startGame(req, res);
         expect(res.status).toHaveBeenCalledWith(400);
 
         // Add second player to meet minimum requirement
         req.body = { playerId: 'ControllerPlayer2' };
-        joinTable(req, res);
+        await joinTable(req, res);
 
         startGame(req, res);
         expect(res.status).toHaveBeenCalledWith(200);
@@ -207,7 +211,7 @@ describe('Table Controller Unit Tests', () => {
         finishGameSpy.mockRestore();
     });
 
-    test('playerAction validates required fields and executes action', () => {
+    test('playerAction validates required fields and executes action', async () => {
         // Check missing required fields
         req.body = {};
         playerAction(req, res);
@@ -215,10 +219,10 @@ describe('Table Controller Unit Tests', () => {
 
         // Set up a game
         req.body = { playerId: 'ControllerPlayer1' };
-        joinTable(req, res);
+        await joinTable(req, res);
 
         req.body = { playerId: 'ControllerPlayer2' };
-        joinTable(req, res);
+        await joinTable(req, res);
 
         startGame(req, res);
 
@@ -249,7 +253,6 @@ describe('Table Controller Unit Tests', () => {
         };
 
         playerAction(req, res);
-        console.log(res.json.mock.calls);
 
         expect(recordActionSpy).toHaveBeenCalledWith(
             'ControllerPlayer1',
@@ -334,21 +337,22 @@ describe('Table Controller Unit Tests', () => {
         resetToLobbySpy.mockRestore();
     });
 
-    test('leaveTable validates and removes player', () => {
+    test('leaveTable validates and removes player', async () => {
         req.body = { playerId: 'ControllerPlayer1' };
-        leaveTable(req, res);
+        await leaveTable(req, res);
         expect(res.status).toHaveBeenCalledWith(200);
 
-        // Leave non-existent player
+        // Leave non-existent player safely succeeds with 200
         req.body = { playerId: 'Ghost' };
-        leaveTable(req, res);
-        expect(res.status).toHaveBeenCalledWith(404);
+        await leaveTable(req, res);
+        expect(res.status).toHaveBeenCalledWith(200);
     });
-    test('leaveTable rejects a missing player ID', () => {
+
+    test('leaveTable rejects a missing player ID', async () => {
         req.body = {};
         req.query = {};
 
-        leaveTable(req, res);
+        await leaveTable(req, res);
 
         expect(res.status).toHaveBeenCalledWith(400);
         expect(res.json).toHaveBeenCalledWith({
@@ -356,11 +360,11 @@ describe('Table Controller Unit Tests', () => {
         });
     });
 
-    test('playerAction executes action and broadcasts state update via Socket.io', () => {
+    test('playerAction executes action and broadcasts state update via Socket.io', async () => {
         req.body = { playerId: 'ControllerPlayer1' };
-        joinTable(req, res);
+        await joinTable(req, res);
         req.body = { playerId: 'ControllerPlayer2' };
-        joinTable(req, res);
+        await joinTable(req, res);
         startGame(req, res);
 
         req.body = { playerId: 'ControllerPlayer1', action: 'Call' };
@@ -371,14 +375,13 @@ describe('Table Controller Unit Tests', () => {
             "TABLE_UPDATED",
             { tableId: "main" }
         );
-
     });
 
-    test('playerAction broadcasts PLAYER_FOLDED when a player folds', () => {
+    test('playerAction broadcasts PLAYER_FOLDED when a player folds', async () => {
         req.body = { playerId: 'ControllerPlayer1' };
-        joinTable(req, res);
+        await joinTable(req, res);
         req.body = { playerId: 'ControllerPlayer2' };
-        joinTable(req, res);
+        await joinTable(req, res);
         startGame(req, res);
 
         req.body = { playerId: 'ControllerPlayer1', action: 'Fold' };
@@ -391,43 +394,43 @@ describe('Table Controller Unit Tests', () => {
         );
     });
 
-    test('joinTable returns 404 when tableId does not exist in tableManager', () => {
+    test('joinTable returns 404 when tableId does not exist in tableManager', async () => {
         req.params = { tableId: 'nonexistentTable' };
         req.body = { playerId: 'PlayerX' };
 
-        joinTable(req, res);
+        await joinTable(req, res);
 
         expect(res.status).toHaveBeenCalledWith(404);
         expect(res.json).toHaveBeenCalledWith({ error: "Table not found." });
     });
 
-    test('joinTable handles table full or registration failure gracefully', () => {
+    test('joinTable handles table full or registration failure gracefully', async () => {
         // Mock addPlayer to return false (table full / error)
         const addPlayerSpy = jest.spyOn(mainTable, 'addPlayer').mockReturnValue(false);
         req.body = { playerId: 'OverflowPlayer' };
 
-        joinTable(req, res);
+        await joinTable(req, res);
 
         expect(res.status).toHaveBeenCalledWith(409);
 
         addPlayerSpy.mockRestore();
     });
 
-    test('leaveTable returns 400 when playerId is missing', () => {
+    test('leaveTable returns 400 when playerId is missing', async () => {
         req.body = {};
         req.query = {};
 
-        leaveTable(req, res);
+        await leaveTable(req, res);
 
         expect(res.status).toHaveBeenCalledWith(400);
         expect(res.json).toHaveBeenCalledWith({ error: "Player ID is required." });
     });
 
-    test('leaveTable handles table not found when params.tableId is invalid', () => {
+    test('leaveTable handles table not found when params.tableId is invalid', async () => {
         req.params = { tableId: 'badTable' };
         req.body = { playerId: 'Player1' };
 
-        leaveTable(req, res);
+        await leaveTable(req, res);
 
         expect(res.status).toHaveBeenCalledWith(404);
         expect(res.json).toHaveBeenCalledWith({ error: "Table not found." });
@@ -453,11 +456,11 @@ describe('Table Controller Unit Tests', () => {
         expect(res.json).toHaveBeenCalledWith({ error: "Table not found." });
     });
 
-    test('playerAction handles action failure returned by table engine', () => {
+    test('playerAction handles action failure returned by table engine', async () => {
         req.body = { playerId: 'Player1' };
-        joinTable(req, res);
+        await joinTable(req, res);
         req.body = { playerId: 'Player2' };
-        joinTable(req, res);
+        await joinTable(req, res);
         startGame(req, res);
 
         const recordActionSpy = jest.spyOn(mainTable, 'recordAction').mockReturnValue({
@@ -490,6 +493,23 @@ describe('Table Controller Unit Tests', () => {
 
         nextRoundSpy.mockRestore();
     });
+
+    // Verify leaving as a Guest_ player saves their current chip stack into req.session.pendingGuestPoints
+    test('leaveTable stores departing guest chips in req.session.pendingGuestPoints', async () => {
+        mainTable.resetToLobby();
+        const guestId = 'Guest_4321';
+        mainTable.addPlayer(guestId);
+        mainTable.playerManager.getPlayer(guestId).chips = 1550;
+
+        req.body = { tableId: 'main', playerId: guestId };
+        req.session = {};
+
+        await leaveTable(req, res);
+
+        expect(req.session.pendingGuestPoints).toBe(1550);
+        expect(mainTable.hasPlayer(guestId)).toBe(false);
+        expect(res.status).toHaveBeenCalledWith(200);
+    });
 });
 
 
@@ -510,6 +530,7 @@ describe('Multi-Table Controller Tests', () => {
             params: {},
             query: {},
             body: {},
+            session: {},
             app: {
                 get: jest.fn((key) => {
                     if (key === 'io') return mockIo;
@@ -548,20 +569,20 @@ describe('Multi-Table Controller Tests', () => {
         expect(tableManager.getTable(table3.tableId)).toBe(table3);
     });
 
-    test('should allow players to join three separate tables', () => {
+    test('should allow players to join three separate tables', async () => {
         req.params = { tableId: table1.tableId };
         req.body = { playerId: 'Player1' };
-        joinTable(req, res);
+        await joinTable(req, res);
         expect(res.status).toHaveBeenLastCalledWith(200);
 
         req.params = { tableId: table2.tableId };
         req.body = { playerId: 'Player2' };
-        joinTable(req, res);
+        await joinTable(req, res);
         expect(res.status).toHaveBeenLastCalledWith(200);
 
         req.params = { tableId: table3.tableId };
         req.body = { playerId: 'Player3' };
-        joinTable(req, res);
+        await joinTable(req, res);
         expect(res.status).toHaveBeenLastCalledWith(200);
 
         expect(table1.players).toEqual(['Player1']);
@@ -590,7 +611,7 @@ describe('Multi-Table Controller Tests', () => {
         }
     });
 
-    test('should only remove players from the selected table', () => {
+    test('should only remove players from the selected table', async () => {
         table1.addPlayer('Player1');
         table2.addPlayer('Player2');
         table3.addPlayer('Player3');
@@ -598,7 +619,7 @@ describe('Multi-Table Controller Tests', () => {
         req.params = { tableId: table2.tableId };
         req.body = { playerId: 'Player2' };
 
-        leaveTable(req, res);
+        await leaveTable(req, res);
 
         expect(res.status).toHaveBeenCalledWith(200);
 
@@ -607,11 +628,11 @@ describe('Multi-Table Controller Tests', () => {
         expect(table3.players).toContain('Player3');
     });
 
-    test('should return 404 for a nonexistent table', () => {
+    test('should return 404 for a nonexistent table', async () => {
         req.params = { tableId: 'invalidTable' };
         req.body = { playerId: 'Player1' };
 
-        joinTable(req, res);
+        await joinTable(req, res);
 
         expect(res.status).toHaveBeenCalledWith(404);
 
@@ -619,7 +640,6 @@ describe('Multi-Table Controller Tests', () => {
         expect(tableManager.getTable(table1.tableId)).toBe(table1);
         expect(tableManager.getTable(table2.tableId)).toBe(table2);
         expect(tableManager.getTable(table3.tableId)).toBe(table3);
-
     });
 
     test('should start a game without affecting other tables', () => {
@@ -666,4 +686,94 @@ describe('Multi-Table Controller Tests', () => {
         expect(table2.gameInProgress).toBe(true);
         expect(table3.gameInProgress).toBe(true);
     });
+
+    test('getTableStatus initializes and returns chatMessages', () => {
+        req.query = { playerId: 'StatusChatPlayer' };
+
+        getTableStatus(req, res);
+
+        expect(res.status).toHaveBeenCalledWith(200);
+        expect(res.json).toHaveBeenCalledWith(
+            expect.objectContaining({
+                chatMessages: expect.any(Array)
+            })
+        );
+        expect(mainTable.chatMessages.length).toBeGreaterThan(0);
+    });
+
+    test('postChatMessage returns 404 when requested table does not exist', () => {
+        req.params = { tableId: 'missing-table' };
+        req.body = { playerId: 'Alice', message: 'Hello!' };
+
+        postChatMessage(req, res);
+
+        expect(res.status).toHaveBeenCalledWith(404);
+        expect(res.json).toHaveBeenCalledWith({ error: "Table not found." });
+    });
+
+    test('postChatMessage returns 401 when sender is missing', () => {
+        req.session = {};
+        req.body = { message: 'Hello!' };
+
+        postChatMessage(req, res);
+
+        expect(res.status).toHaveBeenCalledWith(401);
+        expect(res.json).toHaveBeenCalledWith({ error: "Player ID is required to chat." });
+    });
+
+    test('postChatMessage returns 400 when message is empty or whitespace', () => {
+        req.body = { playerId: 'Alice', message: '   ' };
+
+        postChatMessage(req, res);
+
+        expect(res.status).toHaveBeenCalledWith(400);
+        expect(res.json).toHaveBeenCalledWith({ error: "Message cannot be empty." });
+        expect(mockIo.emit).not.toHaveBeenCalledWith('table-chat', expect.anything());
+    });
+
+    test('postChatMessage stores trimmed message up to 200 chars, emits table-chat, and returns 200', () => {
+        const initialCount = mainTable.chatMessages.length;
+        const longText = '  ' + 'x'.repeat(230) + '  ';
+
+        req.session = { user: { username: 'SessionAlice' } };
+        req.body = { message: longText };
+
+        postChatMessage(req, res);
+
+        expect(res.status).toHaveBeenCalledWith(200);
+        expect(res.json).toHaveBeenCalledWith({
+            success: true,
+            chatMessages: expect.any(Array)
+        });
+
+        const latest = mainTable.chatMessages[mainTable.chatMessages.length - 1];
+        expect(mainTable.chatMessages.length).toBe(initialCount + 1);
+        expect(latest.sender).toBe('SessionAlice');
+        expect(latest.text).toBe('x'.repeat(200));
+        expect(typeof latest.timestamp).toBe('number');
+
+        expect(mockIo.emit).toHaveBeenCalledWith('table-chat', {
+            tableId: 'main',
+            sender: 'SessionAlice',
+            message: 'x'.repeat(200)
+        });
+    });
+
+    test('postChatMessage caps chat history at 50 messages', () => {
+        mainTable.chatMessages = Array.from({ length: 50 }, (_, i) => ({
+            sender: 'Dealer',
+            text: `Msg ${i}`,
+            timestamp: Date.now()
+        }));
+
+        req.body = { playerId: 'Bob', message: 'Message 51' };
+
+        postChatMessage(req, res);
+
+        expect(mainTable.chatMessages.length).toBe(50);
+        expect(mainTable.chatMessages[0].text).toBe('Msg 1');
+        expect(mainTable.chatMessages[49].text).toBe('Message 51');
+        expect(res.status).toHaveBeenCalledWith(200);
+    });
+    
 });

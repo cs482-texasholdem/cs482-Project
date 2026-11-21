@@ -120,7 +120,7 @@
                                                 Remember me
                                             </label>
                                         </div>
-                                        <a href="#" class="text-muted small text-decoration-none">Forgot password?</a>
+                                        <a href="#" id="forgotPasswordLink" class="text-muted small text-decoration-none">Forgot password?</a>
                                     </div>
 
                                     <!-- Action Buttons -->
@@ -143,6 +143,105 @@
                             </div>
 
                         </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Forgot Password Modal -->
+        <div class="modal fade" id="forgotPasswordModal" tabindex="-1" aria-labelledby="forgotPasswordModalLabel" aria-hidden="true">
+            <div class="modal-dialog modal-dialog-centered">
+                <div class="modal-content border-secondary text-white shadow-lg" style="background-color: #0b132b;">
+                    <div class="modal-header border-secondary">
+                        <h5 class="modal-title fw-bold text-white" id="forgotPasswordModalLabel">
+                            <i class="bi bi-shield-lock-fill text-info me-2"></i>Reset Password
+                        </h5>
+                        <button type="button" class="btn-close btn-close-white shadow-none" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+
+                    <div class="modal-body p-4">
+                        <div id="resetFeedback" class="alert d-none small py-2 px-3" role="alert"></div>
+
+                        <!-- Step 1: Request Reset Code -->
+                        <div id="resetStepRequest">
+                            <p class="small text-light opacity-75 mb-3">
+                                Enter your account email and we will send a 6-digit verification code.
+                            </p>
+                            <div class="mb-3">
+                                <label for="resetEmailInput" class="form-label small text-light">Email Address</label>
+                                <input
+                                    type="email"
+                                    id="resetEmailInput"
+                                    class="form-control border-secondary shadow-none"
+                                    style="background-color: #131b2e; color: #ffffff;"
+                                    data-bs-theme="dark"
+                                    placeholder="you@example.com"
+                                    required
+                                >
+                            </div>
+                            <button type="button" id="sendResetCodeBtn" class="btn btn-primary w-100 fw-semibold shadow-none">
+                                Send Reset Code
+                            </button>
+                        </div>
+
+                        <!-- Step 2: Enter Code & New Password -->
+                        <form id="resetPasswordForm" class="d-none">
+                            <p class="small text-light opacity-75 mb-3">
+                                Enter the 6-digit code sent to <strong id="resetTargetEmail" class="text-info"></strong> and choose a new password.
+                            </p>
+
+                            <div class="mb-3">
+                                <label for="resetCodeInput" class="form-label small text-light">6-Digit Code</label>
+                                <input
+                                    type="text"
+                                    id="resetCodeInput"
+                                    class="form-control border-secondary shadow-none"
+                                    style="background-color: #131b2e; color: #ffffff;"
+                                    data-bs-theme="dark"
+                                    placeholder="123456"
+                                    maxlength="6"
+                                    pattern="\d{6}"
+                                    required
+                                >
+                            </div>
+
+                            <div class="mb-3">
+                                <label for="newPasswordInput" class="form-label small text-light">New Password</label>
+                                <input
+                                    type="password"
+                                    id="newPasswordInput"
+                                    class="form-control border-secondary shadow-none"
+                                    style="background-color: #131b2e; color: #ffffff;"
+                                    data-bs-theme="dark"
+                                    placeholder="At least 6 characters"
+                                    minlength="6"
+                                    required
+                                >
+                            </div>
+
+                            <div class="mb-3">
+                                <label for="confirmPasswordInput" class="form-label small text-light">Confirm New Password</label>
+                                <input
+                                    type="password"
+                                    id="confirmPasswordInput"
+                                    class="form-control border-secondary shadow-none"
+                                    style="background-color: #131b2e; color: #ffffff;"
+                                    data-bs-theme="dark"
+                                    placeholder="Re-enter new password"
+                                    minlength="6"
+                                    required
+                                >
+                            </div>
+
+                            <div class="d-flex justify-content-between gap-2">
+                                <button type="button" id="backToEmailBtn" class="btn btn-outline-light btn-sm shadow-none">
+                                    Change Email
+                                </button>
+                                <button type="submit" id="submitNewPasswordBtn" class="btn btn-success fw-semibold shadow-none">
+                                    Save New Password
+                                </button>
+                            </div>
+                        </form>
                     </div>
                 </div>
             </div>
