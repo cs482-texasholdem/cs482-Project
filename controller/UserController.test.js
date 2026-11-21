@@ -1009,3 +1009,177 @@ test('deleteFriendChatMessage should return 500 when database delete fails', asy
     expect(res.status).toHaveBeenCalledWith(500);
     expect(res.json).toHaveBeenCalledWith({ error: "Failed to delete message." });
 });
+
+// ==========================================
+// 13. Password Reset Tests
+// ==========================================
+test('requestPasswordReset should return 400 when email is missing or blank', async function(){
+    let req = { body: { email: '   ' } };
+    let res = { status: jest.fn().mockReturnThis(), json: jest.fn() };
+
+    await controller.requestPasswordReset(req, res);
+
+    expect(dao.findLogin).not.toHaveBeenCalled();
+    expect(res.status).toHaveBeenCalledWith(400);
+    expect(res.json).toHaveBeenCalledWith({ error: "Please enter a valid email address." });
+});
+
+test('requestPasswordReset should return 200 without updating when email does not exist', async function(){
+    let req = { body: { email: 'Unknown@Mail.com' } };
+    let res = { status: jest.fn().mockReturnThis(), json: jest.fn() };
+    dao.findLogin.mockResolvedValue(null);
+
+    await controller.requestPasswordReset(req, res);
+
+    expect(dao.findLogin).toHaveBeenCalledWith('unknown@mail.com');
+    expect(dao.update).not.toHaveBeenCalled();
+    expect(res.status).toHaveBeenCalledWith(200);
+    expect(res.json).toHaveBeenCalledWith({
+        message: "If an account exists for that email, a 6-digit reset code has been sent."
+    });
+});
+
+test('requestPasswordReset should generate a 6-digit code with 15-min expiry and update user', async function(){
+    const now = Date.now();
+    jest.spyOn(Date, 'now').mockReturnValue(now);
+
+    let req = { body: { email: 'Player@Mail.com' } };
+    let res = { status: jest.fn().mockReturnThis(), json: jest.fn() };
+    dao.findLogin.mockResolvedValue({ _id: 'u123', email: 'player@mail.com' });
+    dao.update.mockResolvedValue(true);
+
+    await controller.requestPasswordReset(req, res);
+
+    expect(dao.findLogin).toHaveBeenCalledWith('player@mail.com');
+    expect(dao.update).toHaveBeenCalledWith(
+        'u123',
+        expect.objectContaining({
+            resetCode: expect.stringMatching(/^\d{6}$/),
+            resetCodeExpires: new Date(now + 15 * 60 * 1000)
+        })
+    );
+    expect(res.status).toHaveBeenCalledWith(200);
+    expect(res.json).toHaveBeenCalledWith({
+        message: "If an account exists for that email, a 6-digit reset code has been sent."
+    });
+
+    Date.now.mockRestore();
+});
+
+test('requestPasswordReset should return 500 when an error occurs', async function(){
+    let req = { body: { email: 'player@mail.com' } };
+    let res = { status: jest.fn().mockReturnThis(), json: jest.fn() };
+    dao.findLogin.mockRejectedValue(new Error('DB lookup error'));
+
+    await controller.requestPasswordReset(req, res);
+
+    expect(res.status).toHaveBeenCalledWith(500);
+    expect(res.json).toHaveBeenCalledWith({ error: "Could not process password reset request." });
+});
+
+test('resetPasswordWithCode should return 400 when required fields are missing', async function(){
+    let req = { body: { email: 'player@mail.com', code: '', newPassword: 'secret123' } };
+    let res = { status: jest.fn().mockReturnThis(), json: jest.fn() };
+
+    await controller.resetPasswordWithCode(req, res);
+
+    expect(dao.findLogin).not.toHaveBeenCalled();
+    expect(res.status).toHaveBeenCalledWith(400);
+    expect(res.json).toHaveBeenCalledWith({ error: "Email, reset code, and new password are required." });
+});
+
+test('resetPasswordWithCode should return 400 when newPassword is shorter than 6 characters', async function(){
+    let req = { body: { email: 'player@mail.com', code: '123456', newPassword: '123' } };
+    let res = { status: jest.fn().mockReturnThis(), json: jest.fn() };
+
+    await controller.resetPasswordWithCode(req, res);
+
+    expect(dao.findLogin).not.toHaveBeenCalled();
+    expect(res.status).toHaveBeenCalledWith(400);
+    expect(res.json).toHaveBeenCalledWith({ error: "New password must be at least 6 characters long." });
+});
+
+test('resetPasswordWithCode should return 400 when user or reset code metadata is missing', async function(){
+    let req = { body: { email: 'player@mail.com', code: '123456', newPassword: 'newpassword123' } };
+    let res = { status: jest.fn().mockReturnThis(), json: jest.fn() };
+    dao.findLogin.mockResolvedValue({ _id: 'u123', email: 'player@mail.com' });
+
+    await controller.resetPasswordWithCode(req, res);
+
+    expect(dao.update).not.toHaveBeenCalled();
+    expect(res.status).toHaveBeenCalledWith(400);
+    expect(res.json).toHaveBeenCalledWith({ error: "Invalid or expired reset code." });
+});
+
+test('resetPasswordWithCode should return 400 when the reset code is expired', async function(){
+    let req = { body: { email: 'player@mail.com', code: '123456', newPassword: 'newpassword123' } };
+    let res = { status: jest.fn().mockReturnThis(), json: jest.fn() };
+    dao.findLogin.mockResolvedValue({
+        _id: 'u123',
+        email: 'player@mail.com',
+        resetCode: '123456',
+        resetCodeExpires: new Date(Date.now() - 60 * 1000)
+    });
+
+    await controller.resetPasswordWithCode(req, res);
+
+    expect(dao.update).not.toHaveBeenCalled();
+    expect(res.status).toHaveBeenCalledWith(400);
+    expect(res.json).toHaveBeenCalledWith({ error: "Invalid or expired reset code." });
+});
+
+test('resetPasswordWithCode should return 400 when the reset code does not match', async function(){
+    let req = { body: { email: 'player@mail.com', code: '654321', newPassword: 'newpassword123' } };
+    let res = { status: jest.fn().mockReturnThis(), json: jest.fn() };
+    dao.findLogin.mockResolvedValue({
+        _id: 'u123',
+        email: 'player@mail.com',
+        resetCode: '123456',
+        resetCodeExpires: new Date(Date.now() + 10 * 60 * 1000)
+    });
+
+    await controller.resetPasswordWithCode(req, res);
+
+    expect(dao.update).not.toHaveBeenCalled();
+    expect(res.status).toHaveBeenCalledWith(400);
+    expect(res.json).toHaveBeenCalledWith({ error: "Invalid or expired reset code." });
+});
+
+test('resetPasswordWithCode should hash new password, clear reset fields, and return 200 on valid code', async function(){
+    let req = { body: { email: ' Player@Mail.com ', code: ' 123456 ', newPassword: 'newpassword123' } };
+    let res = { status: jest.fn().mockReturnThis(), json: jest.fn() };
+
+    dao.findLogin.mockResolvedValue({
+        _id: 'u123',
+        email: 'player@mail.com',
+        resetCode: '123456',
+        resetCodeExpires: new Date(Date.now() + 10 * 60 * 1000)
+    });
+    passUtil.hashPassword.mockReturnValue('hashedNewPassword123');
+    dao.update.mockResolvedValue(true);
+
+    await controller.resetPasswordWithCode(req, res);
+
+    expect(dao.findLogin).toHaveBeenCalledWith('player@mail.com');
+    expect(passUtil.hashPassword).toHaveBeenCalledWith('newpassword123');
+    expect(dao.update).toHaveBeenCalledWith('u123', {
+        password: 'hashedNewPassword123',
+        resetCode: null,
+        resetCodeExpires: null
+    });
+    expect(res.status).toHaveBeenCalledWith(200);
+    expect(res.json).toHaveBeenCalledWith({
+        message: "Password updated successfully. You can now log in with your new password."
+    });
+});
+
+test('resetPasswordWithCode should return 500 when an unexpected error occurs', async function(){
+    let req = { body: { email: 'player@mail.com', code: '123456', newPassword: 'newpassword123' } };
+    let res = { status: jest.fn().mockReturnThis(), json: jest.fn() };
+    dao.findLogin.mockRejectedValue(new Error('DB update failure'));
+
+    await controller.resetPasswordWithCode(req, res);
+
+    expect(res.status).toHaveBeenCalledWith(500);
+    expect(res.json).toHaveBeenCalledWith({ error: "Failed to reset password." });
+});
