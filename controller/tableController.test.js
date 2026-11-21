@@ -3,7 +3,7 @@ jest.mock('../model/UserDao', () => ({
     findOne: jest.fn().mockResolvedValue(null)
 }));
 const GameDao = require('../model/GameDao');
-const { getTableStatus, tableManager, joinTable, leaveTable, startGame, finishGame, playerAction, nextRound, mainTable} = require('../controller/tableController.js');
+const { getTableStatus, tableManager, joinTable, leaveTable, startGame, finishGame, playerAction, nextRound, postChatMessage, mainTable} = require('../controller/tableController.js');
 const TableManager = require('../model/tableManager');
 
 describe('Table Controller Unit Tests', () => {
@@ -686,4 +686,94 @@ describe('Multi-Table Controller Tests', () => {
         expect(table2.gameInProgress).toBe(true);
         expect(table3.gameInProgress).toBe(true);
     });
+
+    test('getTableStatus initializes and returns chatMessages', () => {
+        req.query = { playerId: 'StatusChatPlayer' };
+
+        getTableStatus(req, res);
+
+        expect(res.status).toHaveBeenCalledWith(200);
+        expect(res.json).toHaveBeenCalledWith(
+            expect.objectContaining({
+                chatMessages: expect.any(Array)
+            })
+        );
+        expect(mainTable.chatMessages.length).toBeGreaterThan(0);
+    });
+
+    test('postChatMessage returns 404 when requested table does not exist', () => {
+        req.params = { tableId: 'missing-table' };
+        req.body = { playerId: 'Alice', message: 'Hello!' };
+
+        postChatMessage(req, res);
+
+        expect(res.status).toHaveBeenCalledWith(404);
+        expect(res.json).toHaveBeenCalledWith({ error: "Table not found." });
+    });
+
+    test('postChatMessage returns 401 when sender is missing', () => {
+        req.session = {};
+        req.body = { message: 'Hello!' };
+
+        postChatMessage(req, res);
+
+        expect(res.status).toHaveBeenCalledWith(401);
+        expect(res.json).toHaveBeenCalledWith({ error: "Player ID is required to chat." });
+    });
+
+    test('postChatMessage returns 400 when message is empty or whitespace', () => {
+        req.body = { playerId: 'Alice', message: '   ' };
+
+        postChatMessage(req, res);
+
+        expect(res.status).toHaveBeenCalledWith(400);
+        expect(res.json).toHaveBeenCalledWith({ error: "Message cannot be empty." });
+        expect(mockIo.emit).not.toHaveBeenCalledWith('table-chat', expect.anything());
+    });
+
+    test('postChatMessage stores trimmed message up to 200 chars, emits table-chat, and returns 200', () => {
+        const initialCount = mainTable.chatMessages.length;
+        const longText = '  ' + 'x'.repeat(230) + '  ';
+
+        req.session = { user: { username: 'SessionAlice' } };
+        req.body = { message: longText };
+
+        postChatMessage(req, res);
+
+        expect(res.status).toHaveBeenCalledWith(200);
+        expect(res.json).toHaveBeenCalledWith({
+            success: true,
+            chatMessages: expect.any(Array)
+        });
+
+        const latest = mainTable.chatMessages[mainTable.chatMessages.length - 1];
+        expect(mainTable.chatMessages.length).toBe(initialCount + 1);
+        expect(latest.sender).toBe('SessionAlice');
+        expect(latest.text).toBe('x'.repeat(200));
+        expect(typeof latest.timestamp).toBe('number');
+
+        expect(mockIo.emit).toHaveBeenCalledWith('table-chat', {
+            tableId: 'main',
+            sender: 'SessionAlice',
+            message: 'x'.repeat(200)
+        });
+    });
+
+    test('postChatMessage caps chat history at 50 messages', () => {
+        mainTable.chatMessages = Array.from({ length: 50 }, (_, i) => ({
+            sender: 'Dealer',
+            text: `Msg ${i}`,
+            timestamp: Date.now()
+        }));
+
+        req.body = { playerId: 'Bob', message: 'Message 51' };
+
+        postChatMessage(req, res);
+
+        expect(mainTable.chatMessages.length).toBe(50);
+        expect(mainTable.chatMessages[0].text).toBe('Msg 1');
+        expect(mainTable.chatMessages[49].text).toBe('Message 51');
+        expect(res.status).toHaveBeenCalledWith(200);
+    });
+    
 });
