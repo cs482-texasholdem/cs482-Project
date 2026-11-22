@@ -20,6 +20,41 @@ document.addEventListener("DOMContentLoaded", function() {
     const guestPlayerId = params.get('playerId') || sessionStorage.getItem('guestPlayerId');
     const tableId = params.get('tableId') || 'main';
     const urlPoints = Number(params.get('points'));
+    const toggleSponsorBtn = document.getElementById('toggle-sponsor-fields-btn');
+    const sponsorFieldsBox = document.getElementById('sponsor-signup-fields');
+    const sponsorCodeInput = document.getElementById('txt_sponsor_code');
+    const sponsorNameInput = document.getElementById('txt_sponsor_name');
+
+    // ADDED: Show sponsor fields only when toggled on; clear values if hidden or form reset
+    const setSponsorSectionVisible = (visible) => {
+        if (!sponsorFieldsBox) return;
+        sponsorFieldsBox.style.display = visible ? 'block' : 'none';
+        if (visible) {
+            sponsorCodeInput?.focus();
+        } else {
+            if (sponsorCodeInput) sponsorCodeInput.value = '';
+            if (sponsorNameInput) sponsorNameInput.value = '';
+        }
+    };
+
+    if (toggleSponsorBtn) {
+        toggleSponsorBtn.addEventListener('click', () => {
+            const isCurrentlyHidden = !sponsorFieldsBox || sponsorFieldsBox.style.display === 'none';
+            setSponsorSectionVisible(isCurrentlyHidden);
+        });
+    }
+
+    if (params.get('error') === 'invalid_sponsor_code') {
+        setSponsorSectionVisible(true);
+        if (msgDisplay) {
+            msgDisplay.innerHTML = `
+                <div class="alert alert-danger alert-dismissible fade show mt-3 mb-0">
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                    <strong>Invalid Sponsor Code.</strong> Please enter a valid system-issued sponsor code or register as a standard player.
+                </div>
+            `;
+        }
+    }
 
     // Keep a fallback copy of the guest's points in sessionStorage in case the page refreshes
     if (params.has('points') && Number.isFinite(urlPoints) && urlPoints >= 0) {
@@ -80,6 +115,20 @@ document.addEventListener("DOMContentLoaded", function() {
                 sessionStorage.removeItem('guestPlayerId');
                 sessionStorage.removeItem('pendingGuestPoints');
                 localStorage.removeItem('guestPlayerId');
+            }
+        });
+
+        form.addEventListener('reset', () => {
+            setSponsorSectionVisible(false);
+            if (msgDisplay) {
+                msgDisplay.innerHTML = '';
+            }
+            if (guestPlayerId) {
+                if (Number.isFinite(urlPoints) && urlPoints >= 0 && params.has('points')) {
+                    applyGuestPoints(urlPoints);
+                } else if (Number.isFinite(storedPoints) && storedPoints >= 0) {
+                    applyGuestPoints(storedPoints);
+                }
             }
         });
     }

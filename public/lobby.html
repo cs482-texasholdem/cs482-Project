@@ -3,7 +3,8 @@
   File Name: lobby.html
   Author: Camila Cosme, Gigi Li
   Purpose: Standalone poker lobby page displaying active tables and stakes, 
-             with integrated offcanvas seating buy-in controls.
+             monthly public table leaderboards, integrated offcanvas seating
+             buy-in controls, and player achievements for logged-in users.
   ============================================================================
 -->
  
@@ -43,7 +44,6 @@
                     </li>
                 </ul>
                 <ul class="navbar-nav align-items-center">
-                    <!-- Guest Save Points Option (Hidden by default, shown for guests) -->
                     <li class="nav-item me-3" id="lobby-save-container" style="display: none;">
                         <button type="button" id="lobby-save-btn" class="btn btn-save-points shadow-none">
                             <i class="bi bi-person-plus-fill me-1"></i> Save Points (Sign Up)
@@ -120,7 +120,7 @@
                                 <li class="mb-2"><i class="bi bi-people-fill text-primary me-2"></i> Players: 7 / 9</li>
                                 <li><i class="bi bi-shield-check text-primary me-2"></i> Min Buy-in: $2,500</li>
                             </ul>
-                            <button class="mt-auto btn btn-outline-primary w-100 py-2 fw-semibold" onclick="openJoinSidebar('ranked-intermediate', 'Intermediate Lounge', '$25 / $50', '$2,500')"
+                            <button class="mt-auto btn btn-outline-primary w-100 py-2 fw-semibold" onclick="openJoinSidebar('ranked-intermediate', 'Intermediate Lounge', '$25 / $50', '$2,500')">
                                 <i class="bi bi-box-arrow-in-right me-1"></i> Join Table
                             </button>
                         </div>
@@ -146,7 +146,7 @@
                                 <li class="mb-2"><i class="bi bi-people-fill text-primary me-2"></i> Players: 8 / 9</li>
                                 <li><i class="bi bi-shield-check text-primary me-2"></i> Min Buy-in: $500</li>
                             </ul>
-                            <button class="mt-auto btn btn-outline-primary w-100 py-2 fw-semibold" onclick="openJoinSidebar('ranked-advanced', 'Advanced Lounge', '$5 / $10', '$500')"
+                            <button class="mt-auto btn btn-outline-primary w-100 py-2 fw-semibold" onclick="openJoinSidebar('ranked-advanced', 'Advanced Lounge', '$5 / $10', '$500')">
                                 <i class="bi bi-box-arrow-in-right me-1"></i> Join Table
                             </button>
                         </div>
@@ -201,7 +201,7 @@
                 </div>
                 
                 <!-- Public Lobby Section -->
-                <div id="publicLobbiesSection" class="mt-4 d-none">
+                <div id="publicLobbiesSection" class="col-12 mt-4 d-none">
 
                     <div class="card shadow-sm border-secondary midnight-card"
                         style="background-color: #0b132b; color: #ffffff;">
@@ -222,7 +222,6 @@
 
                             </div>
 
-                            <!-- Public tables will be displayed here -->
                             <div id="publicLobbyList">
                                 <p class="text-white opacity-90 mb-0">
                                     No public tables are displayed yet.
@@ -236,7 +235,88 @@
                 </div>
 
             </div>
+
+            <div id="publicTableLeaderboardsSection" class="mt-5">
+                <div class="card shadow-sm border-secondary midnight-card" style="background-color: #0b132b; color: #ffffff;">
+                    <div class="card-body p-4">
+                        <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+                            <div>
+                                <h3 class="fw-bold mb-1 text-white">
+                                    <i class="bi bi-trophy-fill text-warning me-2"></i> Monthly Public Table Leaderboards
+                                </h3>
+                                <p class="text-white opacity-75 small mb-0">
+                                    Ranked by net points gained at each public table. Resets automatically on the 1st of every month (UTC).
+                                </p>
+                            </div>
+                            <span class="badge bg-warning text-dark fw-semibold px-3 py-2" id="leaderboardMonthBadge">
+                                Current Month
+                            </span>
+                        </div>
+
+                        <div class="row g-3" id="publicTableLeaderboardsGrid">
+                            <div class="col-12">
+                                <p class="text-white opacity-75 small fst-italic mb-0">
+                                    Loading monthly public table leaderboards...
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="lobbyAchievementsSection" class="mt-5 d-none">
+                <div class="card shadow-sm border-secondary midnight-card" style="background-color: #0b132b; color: #ffffff;">
+                    <div class="card-body p-4">
+                        <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+                            <div>
+                                <h3 class="fw-bold mb-1 text-white">
+                                    <i class="bi bi-trophy-fill text-warning me-2"></i> Player Achievements
+                                </h3>
+                                <p class="text-white opacity-75 small mb-0">
+                                    Completed achievements are highlighted. Click "More Info" on any achievement for full details.
+                                </p>
+                            </div>
+                            <span class="badge bg-primary fs-6 px-3 py-2" id="lobbyAchievementSummary">
+                                0 / 20 Completed
+                            </span>
+                        </div>
+                        <div class="row g-3" id="lobbyAchievementsGrid"></div>
+                    </div>
+                </div>
+            </div>
         </div> 
+
+        <!-- Achievement Info Modal -->
+        <div class="modal fade" id="achievementInfoModal" tabindex="-1" aria-labelledby="achievementInfoModalLabel" aria-hidden="true">
+            <div class="modal-dialog modal-dialog-centered">
+                <div class="modal-content border-secondary text-white shadow-lg" style="background-color: #0b132b;">
+                    <div class="modal-header border-secondary">
+                        <h5 class="modal-title fw-bold text-white" id="achievementInfoModalLabel">Achievement Details</h5>
+                        <button type="button" class="btn-close btn-close-white shadow-none" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body p-4">
+                        <div class="d-flex align-items-center gap-3 mb-3">
+                            <div id="modalAchievementBadge" class="achievement-badge-graphic badge-gold">
+                                <i id="modalAchievementIcon" class="bi bi-award-fill"></i>
+                            </div>
+                            <div>
+                                <h5 class="fw-bold mb-1 text-white" id="modalAchievementName">--</h5>
+                                <span class="badge" id="modalAchievementStatus">--</span>
+                            </div>
+                        </div>
+                        <p class="text-white opacity-90 mb-2" id="modalAchievementDesc">--</p>
+                        <div class="p-3 rounded border border-secondary mb-2" style="background-color: #131b2e;">
+                            <div class="small text-info fw-semibold text-uppercase">Unlock Criteria</div>
+                            <div class="small text-white mt-1" id="modalAchievementCriteria">--</div>
+                        </div>
+                        <div class="small text-warning fw-semibold" id="modalAchievementProgress">Progress: --</div>
+                    </div>
+                    <div class="modal-footer border-secondary">
+                        <button type="button" class="btn btn-outline-light btn-sm shadow-none px-4" data-bs-dismiss="modal">Close</button>
+                    </div>
+                </div>
+            </div>
+        </div>
 
         <!-- Pop-Up Sidebar (Ranked Table Seating) -->
         <div class="offcanvas offcanvas-end midnight-offcanvas border-start"

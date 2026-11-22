@@ -377,7 +377,8 @@ test('getFriendsData should return resolved friends, requests, and unreadCounts 
     expect(res.json).toHaveBeenCalledWith({
         friends: ['bob'],
         friendRequests: ['charlie'],
-        unreadCounts: { bob: 2 }
+        unreadCounts: { bob: 2 },
+        onlineStatus: { bob: false }
     });
 });
 

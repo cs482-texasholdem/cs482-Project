@@ -47,6 +47,7 @@ app.get('/logout', UserCont.logout);
 app.get('/deluser/:id', UserCont.deleteOne); 
 app.post('/api/auth/forgot-password', UserCont.requestPasswordReset);
 app.post('/api/auth/reset-password', UserCont.resetPasswordWithCode);
+app.get('/api/guest/points', UserCont.getGuestPoints);
 
 // Social & Friend System Routes
 app.get('/api/users/search', UserCont.searchUsers);        
@@ -67,6 +68,11 @@ app.patch('/api/reports/:id/resolve', reportCont.resolveReport);
 app.post('/api/reports/warn', reportCont.warnUser);
 app.get('/api/user/messages', UserCont.getUserMessages);
 app.delete('/api/user/messages/:msgId', UserCont.deleteUserMessage);
+
+// Achievements Routes
+const achievementCont = require('./controller/achievementController');
+app.get('/api/achievements', achievementCont.getAchievements);
+app.get('/api/achievements/:playerId', achievementCont.getAchievements);
 
 // Table Actions (Query/Body Table ID)
 const {createTable, joinTable, leaveTable, playerAction, startGame, nextRound, getTableStatus, postChatMessage} = require("./controller/tableController");
@@ -154,6 +160,32 @@ app.get('/api/games/:id/reconstruct', async (req, res) => {
     }
 });
 
-//module.exports = app;
+// Add to app.js (alongside table routes)
+const { getMonthlyPublicTableLeaderboards } = require("./util/leaderboardUtil");
+const tableControllerModule = require("./controller/tableController");
+
+app.get("/api/tables/public/leaderboards", async (req, res) => {
+    try {
+        const data = await getMonthlyPublicTableLeaderboards({
+            tableManager: tableControllerModule.tableManager || null
+        });
+        res.status(200).json(data);
+    } catch (error) {
+        console.error("Error computing public table leaderboards:", error);
+        res.status(500).json({ error: "Failed to load monthly public table leaderboards." });
+    }
+});
+
+//Sponsor banner & admin moderation routes
+const sponsorRoutes = require("./routes/sponsorRoutes");
+app.use(sponsorRoutes);
+
+if (require.main === module) {
+    const port = process.env.PORT || 3000;
+    app.listen(port, () => {
+        console.log(`Server listening on port ${port}`);
+    });
+}
+
 exports.app = app;
 exports.sessionMiddleware = sessionMiddleware;

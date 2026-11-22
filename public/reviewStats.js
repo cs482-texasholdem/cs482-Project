@@ -2,9 +2,8 @@
  * ============================================================================
  * File Name: reviewStats.js
  * Purpose: Frontend controller for reviewStats.html. Retrieves player ID from 
- *          URL query strings, computes 7 statistical metrics, and renders 
- *          a public summary of the player's last 5 games without leaking 
- *          unrevealed hole cards.
+ *          URL query strings, computes 7 statistical metrics, displays earned
+ *          badges/achievements, and renders a summary of the last 5 games.
  * ============================================================================
  */
 
@@ -12,12 +11,12 @@ document.addEventListener("DOMContentLoaded", async function() {
     const targetPlayerId = await getTargetPlayerId();
     document.getElementById("stats-player-id").textContent = targetPlayerId;
 
-    await loadPlayerStatistics(targetPlayerId);
+    await Promise.all([
+        loadPlayerStatistics(targetPlayerId),
+        loadEarnedAchievements(targetPlayerId)
+    ]);
 });
 
-/**
- * Extracts player ID from URL parameters or falls back to storage/session identity.
- */
 async function getTargetPlayerId() {
     const urlParams = new URLSearchParams(window.location.search);
     let id = urlParams.get("playerId") || urlParams.get("id");
@@ -41,17 +40,73 @@ async function getTargetPlayerId() {
     return localStorage.getItem("guestPlayerId") || sessionStorage.getItem("guestPlayerId") || "Guest_Player";
 }
 
-/**
- * Fetches game records and computes 7 player performance metrics.
- */
+async function loadEarnedAchievements(playerId) {
+    const badgesContainer = document.getElementById("stats-earned-badges");
+    const listContainer = document.getElementById("stats-earned-achievements-list");
+    const countBadge = document.getElementById("stats-earned-count");
+    if (!badgesContainer || !listContainer) return;
+
+    try {
+        const res = await fetch(`/api/achievements/${encodeURIComponent(playerId)}`);
+        if (!res.ok) throw new Error("Failed to load player achievements.");
+        const data = await res.json();
+        const earned = data.completedAchievements || [];
+
+        if (countBadge) {
+            countBadge.textContent = `${earned.length} / ${data.totalCount || 20} Earned`;
+        }
+
+        if (earned.length === 0) {
+            badgesContainer.innerHTML = `<span class="text-secondary small fst-italic">No badges or achievements earned yet.</span>`;
+            listContainer.innerHTML = "";
+            return;
+        }
+
+        badgesContainer.innerHTML = "";
+        listContainer.innerHTML = "";
+
+        earned.forEach(ach => {
+            const pill = document.createElement("div");
+            pill.className = "earned-badge-pill";
+            pill.innerHTML = `
+                <div class="achievement-badge-graphic ${ach.theme || "badge-gold"}">
+                    <i class="bi ${ach.icon || "bi-award-fill"}"></i>
+                </div>
+                <div>
+                    <div class="fw-bold small text-white">${ach.name}</div>
+                    <div class="text-success" style="font-size: 0.72rem;">Earned</div>
+                </div>
+            `;
+            badgesContainer.appendChild(pill);
+
+            const col = document.createElement("div");
+            col.className = "col-md-6";
+            col.innerHTML = `
+                <div class="achievement-card achievement-completed d-flex align-items-center gap-3">
+                    <div class="achievement-badge-graphic ${ach.theme || "badge-gold"}">
+                        <i class="bi ${ach.icon || "bi-award-fill"}"></i>
+                    </div>
+                    <div>
+                        <div class="fw-bold text-white">${ach.name}</div>
+                        <div class="small text-white opacity-75">${ach.shortDesc}</div>
+                        <div class="small text-warning mt-1">${ach.progressText || "Unlocked"}</div>
+                    </div>
+                </div>
+            `;
+            listContainer.appendChild(col);
+        });
+    } catch (err) {
+        console.error("Error loading earned achievements:", err);
+        badgesContainer.innerHTML = `<span class="text-danger small">Failed to load achievements.</span>`;
+    }
+}
+
 async function loadPlayerStatistics(playerId) {
     try {
         const response = await fetch('/api/games');
         if (!response.ok) throw new Error("Failed to load games history.");
 
         const games = await response.json();
-
-        // Filter games involving this player
         const playerGames = games.filter(g => g.initialPlayers && g.initialPlayers.includes(playerId));
 
         if (playerGames.length === 0) {
@@ -59,7 +114,6 @@ async function loadPlayerStatistics(playerId) {
             return;
         }
 
-        // --- STATISTICAL CALCULATIONS ---
         const totalGames = playerGames.length;
         
         let gamesWon = 0;
@@ -100,7 +154,6 @@ async function loadPlayerStatistics(playerId) {
         const foldRate = totalActions > 0 ? ((foldActions / totalActions) * 100).toFixed(1) : "0.0";
         const dealerWinRate = dealerGames > 0 ? ((dealerWins / dealerGames) * 100).toFixed(1) : "0.0";
 
-        // Render calculated 7 stats
         document.getElementById("stat-total-games").textContent = totalGames;
         document.getElementById("stat-win-rate").textContent = `${winRate}%`;
         document.getElementById("stat-chips-won").textContent = totalChipsWon.toLocaleString();
@@ -109,7 +162,6 @@ async function loadPlayerStatistics(playerId) {
         document.getElementById("stat-fold-rate").textContent = `${foldRate}%`;
         document.getElementById("stat-dealer-win-rate").textContent = `${dealerWinRate}% (${dealerWins}/${dealerGames} Dealer Hands)`;
 
-        // --- RENDER LAST 5 GAMES SUMMARY ---
         const last5Games = playerGames.slice(0, 5);
         renderLast5Games(last5Games, playerId);
 
