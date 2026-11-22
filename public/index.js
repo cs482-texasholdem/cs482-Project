@@ -2,137 +2,111 @@
  * ============================================================================
  * File Name: index.js
  * Author: Bonita Rodrigues, Gigi Li
- * Purpose: Frontend controller script for the User Dashboard homepage. Manages 
+ * Purpose: Frontend controller script for the User Dashboard homepage. Manages
  *          dynamic user profile/points loading, earned achievement badges at
  *          the top, progress bars for all achievements at the bottom, user
- *          search, and asynchronous friend list/request rendering.
+ *          search, friend list/request rendering, direct friend chat, player
+ *          reports, user notifications, and custom poker table creation.
  * ============================================================================
  */
 
-document.addEventListener("DOMContentLoaded", async function() {
+let activeChatFriend = null;
+let currentLoggedInUser = null;
+let friendChatModalInstance = null;
 
-    //Clear local storage and disconnect socket on logout to prevent session persistence
-    const logoutLink = document.getElementById("logout-link");
-    if (logoutLink) {
-        logoutLink.addEventListener("click", () => {
-            localStorage.clear();
-            sessionStorage.clear();
-            if (typeof socket !== 'undefined' && socket) {
-                socket.disconnect();
-            }
-        });
-    }
-    
-    let activeUsername = "";
+document.addEventListener("DOMContentLoaded", async function () {
+    setupLogoutHandler();
 
-    // ------------------------------------------------------------------------
-    // 1. Fetch & Populate Logged-In User Profile & Points
-    // ------------------------------------------------------------------------
-    try {
-        // Request the active session user from '/loggeduser' without stale browser caching
-        const response = await fetch('/loggeduser', { cache: 'no-store' });
-        if (response.ok) {
-            const user = await response.json();
-            if (user) {
-                // Clear leftover guest identifiers once a real account session is active
-                sessionStorage.removeItem('identityMode');
-                sessionStorage.removeItem('guestPlayerId');
-                localStorage.removeItem('guestPlayerId');
-
-                const resolvedName = user.username || (user.email ? user.email.split('@')[0] : '');
-                currentLoggedInUser = resolvedName || null;
-
-                const usernameDisplay = document.getElementById('dashboardUsername');
-                const pointsDisplay = document.getElementById('dashboardPoints');
-
-                if (usernameDisplay) {
-                    // Show the logged-in user's username on the dashboard banner
-                    usernameDisplay.textContent = resolvedName || 'Player';
-                }
-                if (pointsDisplay) {
-                    // Render the user's latest saved points balance
-                    pointsDisplay.innerHTML = `<i class="bi bi-coin"></i> ${(user.points !== undefined ? user.points : 1000).toLocaleString()}`;
-                }
-
-                // Make the dashboard visible only after session user and points are populated
-                document.body.style.visibility = 'visible';
-            } else {
-                // Redirect immediately to login if no authenticated user is found
-                window.location.replace('login.html');
-                return;
-            }
-        } else {
-            window.location.replace('login.html');
-            return;
-        }
-    } catch (err) {
-        console.error("Failed to load user session info:", err);
-        window.location.replace('login.html');
+    const activeUsername = await initializeDashboardSession();
+    if (!activeUsername) {
         return;
     }
 
-    // ------------------------------------------------------------------------
-    // 1b. Load Earned Badges (Top) & All Achievement Progress Bars (Bottom)
-    // ------------------------------------------------------------------------
-    if (activeUsername) {
-        await loadDashboardAchievements(activeUsername);
-    }
+    currentLoggedInUser = activeUsername;
 
-    // ------------------------------------------------------------------------
-    // 1b. Load Earned Badges (Top) & All Achievement Progress Bars (Bottom)
-    // ------------------------------------------------------------------------
-    if (activeUsername) {
-        await loadDashboardAchievements(activeUsername);
-    }
+    await Promise.all([
+        loadDashboardAchievements(activeUsername),
+        loadFriendsData(),
+        loadUserMessages()
+    ]);
 
-    // ------------------------------------------------------------------------
-    // 2. Automatically Load Friends & Requests Feed on Page Load
-    // ------------------------------------------------------------------------
-    loadFriendsData();
-
-    // ------------------------------------------------------------------------
-    // 3. Friend Search & Social Lookup Functionality
-    // ------------------------------------------------------------------------
-    const searchBtn = document.getElementById("searchBtn");
-    const searchInput = document.getElementById("userSearchInput");
-    const searchResults = document.getElementById("searchResults");
-
-    if (searchBtn && searchInput && searchResults) {
-        searchBtn.addEventListener("click", async () => {
-            const query = searchInput.value.trim();
-            if (!query) return;
-
-            try {
-                const response = await fetch(`/api/users/search?q=${encodeURIComponent(query)}`);
-                const users = await response.json();
-
-                searchResults.innerHTML = "";
-                
-                if (!users || users.length === 0) {
-                    searchResults.innerHTML = `<div class="p-2 text-muted small">No users found.</div>`;
-                    return;
-                }
-
-                users.forEach(user => {
-                    const displayIdentifier = user.username || (user.email ? user.email.split('@')[0] : user.login);
-                    searchResults.innerHTML += `
-                        <div class="list-group-item d-flex justify-content-between align-items-center border-secondary py-2 px-3 rounded mb-1" style="background-color: #1f6ab6 !important;">
-                            <span class="fw-semibold text-white">
-                                <i class="bi bi-person-fill text-white me-2"></i>${displayIdentifier}
-                            </span>
-                            <form action="/friends/request" method="POST" class="m-0">
-                                <input type="hidden" name="targetUser" value="${displayIdentifier}">
-                                <button type="submit" class="btn btn-sm btn-outline-light fw-semibold shadow-none">Request Friend</button>
-                            </form>
-                        </div>
-                    `;
-                });
-            } catch (err) {
-                console.error("User search failed:", err);
-            }
-        });
-    }
+    setupFriendSearchHandler();
+    setupReportPlayerHandlers();
+    setupCreateTableHandler();
+    setupFriendChatHandlers();
 });
+
+// ============================================================================
+// Session & Logout
+// ============================================================================
+
+function setupLogoutHandler() {
+    const logoutLink = document.getElementById("logout-link");
+    if (!logoutLink) return;
+
+    logoutLink.addEventListener("click", () => {
+        localStorage.clear();
+        sessionStorage.clear();
+        if (typeof socket !== "undefined" && socket && typeof socket.disconnect === "function") {
+            socket.disconnect();
+        }
+    });
+}
+
+async function initializeDashboardSession() {
+    try {
+        const response = await fetch("/loggeduser", { cache: "no-store" });
+        if (!response.ok) {
+            window.location.replace("login.html");
+            return null;
+        }
+
+        const user = await response.json();
+        if (!user) {
+            window.location.replace("login.html");
+            return null;
+        }
+
+        sessionStorage.removeItem("identityMode");
+        sessionStorage.removeItem("guestPlayerId");
+        localStorage.removeItem("guestPlayerId");
+
+        const resolvedName = user.username || (user.email ? user.email.split("@")[0] : "");
+        if (!resolvedName) {
+            window.location.replace("login.html");
+            return null;
+        }
+
+        const usernameDisplay = document.getElementById("dashboardUsername");
+        const pointsDisplay = document.getElementById("dashboardPoints");
+
+        if (usernameDisplay) {
+            usernameDisplay.textContent = resolvedName;
+        }
+        if (pointsDisplay) {
+            const pointsValue = user.points !== undefined ? user.points : 1000;
+            renderPointsBalance(pointsDisplay, pointsValue);
+        }
+
+        document.body.style.visibility = "visible";
+        return resolvedName;
+    } catch (err) {
+        console.error("Failed to load user session info:", err);
+        window.location.replace("login.html");
+        return null;
+    }
+}
+
+function renderPointsBalance(container, pointsValue) {
+    container.textContent = "";
+    const icon = document.createElement("i");
+    icon.className = "bi bi-coin me-1";
+    container.append(icon, document.createTextNode(Number(pointsValue).toLocaleString()));
+}
+
+// ============================================================================
+// Achievements & Badges
+// ============================================================================
 
 async function loadDashboardAchievements(playerId) {
     const badgesContainer = document.getElementById("dashboardEarnedBadges");
@@ -142,90 +116,25 @@ async function loadDashboardAchievements(playerId) {
 
     try {
         const res = await fetch(`/api/achievements/${encodeURIComponent(playerId)}`);
-        if (!res.ok) throw new Error("Failed to load achievements.");
-        const data = await res.json();
+        if (!res.ok) {
+            throw new Error("Failed to load achievements.");
+        }
 
-        const allAchievements = data.achievements || [];
-        const earned = data.completedAchievements || [];
+        const data = await res.json();
+        const allAchievements = Array.isArray(data.achievements) ? data.achievements : [];
+        const earned = Array.isArray(data.completedAchievements) ? data.completedAchievements : [];
 
         if (countBadge) {
             countBadge.textContent = `${earned.length} Badge${earned.length === 1 ? "" : "s"} Earned`;
         }
         if (overallBadge) {
-            overallBadge.textContent = `${data.completedCount || earned.length} / ${data.totalCount || allAchievements.length} Completed`;
+            const total = data.totalCount || allAchievements.length;
+            const completed = data.completedCount !== undefined ? data.completedCount : earned.length;
+            overallBadge.textContent = `${completed} / ${total} Completed`;
         }
 
-        // Top Earned Badges Showcase
-        if (badgesContainer) {
-            if (earned.length === 0) {
-                badgesContainer.innerHTML = `
-                    <span class="small text-white opacity-75 fst-italic">
-                        No badges earned yet. Play hands in the Poker Lobby to unlock achievements!
-                    </span>
-                `;
-            } else {
-                badgesContainer.innerHTML = "";
-                earned.forEach(ach => {
-                    const pill = document.createElement("div");
-                    pill.className = "earned-badge-pill";
-                    pill.title = `${ach.name}: ${ach.shortDesc}`;
-                    pill.innerHTML = `
-                        <div class="achievement-badge-graphic ${ach.theme || "badge-gold"}">
-                            <i class="bi ${ach.icon || "bi-award-fill"}"></i>
-                        </div>
-                        <div>
-                            <div class="fw-bold small text-white">${ach.name}</div>
-                            <div class="text-warning" style="font-size: 0.72rem;">${ach.shortDesc}</div>
-                        </div>
-                    `;
-                    badgesContainer.appendChild(pill);
-                });
-            }
-        }
-
-        // Bottom All-Achievements Progress Bars Grid
-        if (progressGrid) {
-            progressGrid.innerHTML = "";
-            allAchievements.forEach(ach => {
-                const pct = Math.max(0, Math.min(100, Number(ach.percent) || (ach.completed ? 100 : 0)));
-                const barClass = ach.completed ? "bg-success" : "bg-info";
-                const cardClass = ach.completed ? "achievement-completed" : "achievement-locked";
-                const badgeLockClass = ach.completed ? "" : "locked-badge";
-                const statusPill = ach.completed
-                    ? `<span class="badge bg-success"><i class="bi bi-check-circle-fill me-1"></i>Completed</span>`
-                    : `<span class="badge bg-secondary">${pct}%</span>`;
-
-                const col = document.createElement("div");
-                col.className = "col-md-6 col-lg-4";
-                col.innerHTML = `
-                    <div class="achievement-card ${cardClass} d-flex flex-column justify-content-between">
-                        <div class="d-flex align-items-start gap-3 mb-2">
-                            <div class="achievement-badge-graphic ${ach.theme || "badge-gold"} ${badgeLockClass}">
-                                <i class="bi ${ach.icon || "bi-award-fill"}"></i>
-                            </div>
-                            <div class="flex-grow-1">
-                                <div class="d-flex justify-content-between align-items-center gap-2 mb-1">
-                                    <h6 class="fw-bold text-white mb-0">${ach.name}</h6>
-                                    ${statusPill}
-                                </div>
-                                <p class="small text-white opacity-75 mb-1">${ach.shortDesc}</p>
-                                <div class="small text-secondary">${ach.criteria || ""}</div>
-                            </div>
-                        </div>
-                        <div class="pt-2">
-                            <div class="d-flex justify-content-between align-items-center small mb-1">
-                                <span class="text-warning fw-semibold">${ach.progressText || ""}</span>
-                                <span class="text-info fw-semibold">${pct}%</span>
-                            </div>
-                            <div class="progress achievement-progress-bar" role="progressbar" aria-valuenow="${pct}" aria-valuemin="0" aria-valuemax="100">
-                                <div class="progress-bar ${barClass}" style="width: ${pct}%;"></div>
-                            </div>
-                        </div>
-                    </div>
-                `;
-                progressGrid.appendChild(col);
-            });
-        }
+        renderEarnedBadges(badgesContainer, earned);
+        renderAchievementProgressGrid(progressGrid, allAchievements);
     } catch (err) {
         console.error("Error loading dashboard achievements:", err);
         if (badgesContainer) {
@@ -237,160 +146,410 @@ async function loadDashboardAchievements(playerId) {
     }
 }
 
+function createBadgeGraphic(theme, iconClass, extraClasses = "") {
+    const badge = document.createElement("div");
+    badge.className = `achievement-badge-graphic ${theme || "badge-gold"} ${extraClasses}`.trim();
+
+    const icon = document.createElement("i");
+    icon.className = `bi ${iconClass || "bi-award-fill"}`;
+    badge.appendChild(icon);
+
+    return badge;
+}
+
+function renderEarnedBadges(container, earned) {
+    if (!container) return;
+    container.textContent = "";
+
+    if (earned.length === 0) {
+        const emptyMsg = document.createElement("span");
+        emptyMsg.className = "small text-white opacity-75 fst-italic";
+        emptyMsg.textContent = "No badges earned yet. Play hands in the Poker Lobby to unlock achievements!";
+        container.appendChild(emptyMsg);
+        return;
+    }
+
+    earned.forEach((ach) => {
+        const pill = document.createElement("div");
+        pill.className = "earned-badge-pill";
+        pill.title = `${ach.name}: ${ach.shortDesc}`;
+
+        const textWrap = document.createElement("div");
+
+        const titleEl = document.createElement("div");
+        titleEl.className = "fw-bold small text-white";
+        titleEl.textContent = ach.name;
+
+        const descEl = document.createElement("div");
+        descEl.className = "text-warning";
+        descEl.style.fontSize = "0.72rem";
+        descEl.textContent = ach.shortDesc;
+
+        textWrap.append(titleEl, descEl);
+        pill.append(createBadgeGraphic(ach.theme, ach.icon), textWrap);
+        container.appendChild(pill);
+    });
+}
+
+function renderAchievementProgressGrid(container, achievements) {
+    if (!container) return;
+    container.textContent = "";
+
+    achievements.forEach((ach) => {
+        const pct = Math.max(0, Math.min(100, Number(ach.percent) || (ach.completed ? 100 : 0)));
+        const barClass = ach.completed ? "bg-success" : "bg-info";
+        const cardClass = ach.completed ? "achievement-completed" : "achievement-locked";
+        const badgeLockClass = ach.completed ? "" : "locked-badge";
+
+        const col = document.createElement("div");
+        col.className = "col-md-6 col-lg-4";
+
+        const card = document.createElement("div");
+        card.className = `achievement-card ${cardClass} d-flex flex-column justify-content-between`;
+
+        const topRow = document.createElement("div");
+        topRow.className = "d-flex align-items-start gap-3 mb-2";
+
+        const body = document.createElement("div");
+        body.className = "flex-grow-1";
+
+        const headerRow = document.createElement("div");
+        headerRow.className = "d-flex justify-content-between align-items-center gap-2 mb-1";
+
+        const nameEl = document.createElement("h6");
+        nameEl.className = "fw-bold text-white mb-0";
+        nameEl.textContent = ach.name;
+
+        const statusPill = document.createElement("span");
+        if (ach.completed) {
+            statusPill.className = "badge bg-success";
+            statusPill.innerHTML = `<i class="bi bi-check-circle-fill me-1"></i>`;
+            statusPill.appendChild(document.createTextNode("Completed"));
+        } else {
+            statusPill.className = "badge bg-secondary";
+            statusPill.textContent = `${pct}%`;
+        }
+
+        headerRow.append(nameEl, statusPill);
+
+        const descEl = document.createElement("p");
+        descEl.className = "small text-white opacity-75 mb-1";
+        descEl.textContent = ach.shortDesc;
+
+        const criteriaEl = document.createElement("div");
+        criteriaEl.className = "small text-secondary";
+        criteriaEl.textContent = ach.criteria || "";
+
+        body.append(headerRow, descEl, criteriaEl);
+        topRow.append(createBadgeGraphic(ach.theme, ach.icon, badgeLockClass), body);
+
+        const progressWrap = document.createElement("div");
+        progressWrap.className = "pt-2";
+
+        const progressMeta = document.createElement("div");
+        progressMeta.className = "d-flex justify-content-between align-items-center small mb-1";
+
+        const progressLabel = document.createElement("span");
+        progressLabel.className = "text-warning fw-semibold";
+        progressLabel.textContent = ach.progressText || "";
+
+        const pctLabel = document.createElement("span");
+        pctLabel.className = "text-info fw-semibold";
+        pctLabel.textContent = `${pct}%`;
+
+        progressMeta.append(progressLabel, pctLabel);
+
+        const progressBarOuter = document.createElement("div");
+        progressBarOuter.className = "progress achievement-progress-bar";
+        progressBarOuter.setAttribute("role", "progressbar");
+        progressBarOuter.setAttribute("aria-valuenow", String(pct));
+        progressBarOuter.setAttribute("aria-valuemin", "0");
+        progressBarOuter.setAttribute("aria-valuemax", "100");
+
+        const progressBarInner = document.createElement("div");
+        progressBarInner.className = `progress-bar ${barClass}`;
+        progressBarInner.style.width = `${pct}%`;
+
+        progressBarOuter.appendChild(progressBarInner);
+        progressWrap.append(progressMeta, progressBarOuter);
+        card.append(topRow, progressWrap);
+        col.appendChild(card);
+        container.appendChild(col);
+    });
+}
+
+// ============================================================================
+// Friends & Friend Requests
+// ============================================================================
+
 async function loadFriendsData() {
     const pendingContainer = document.getElementById("pendingRequestsList");
     const friendsContainer = document.getElementById("friendListContainer");
 
     try {
-        const response = await fetch('/api/friends/data');
+        const response = await fetch("/api/friends/data", { cache: "no-store" });
         if (!response.ok) return;
+
         const data = await response.json();
         const unreadCounts = data.unreadCounts || {};
 
-        if (pendingContainer) {
-            pendingContainer.innerHTML = "";
-            if (!data.friendRequests || data.friendRequests.length === 0) {
-                pendingContainer.innerHTML = `<div class="p-2 small text-white opacity-75 fst-italic">No pending requests.</div>`;
-            } else {
-                data.friendRequests.forEach(requester => {
-                    pendingContainer.innerHTML += `
-                        <div class="list-group-item d-flex justify-content-between align-items-center border-secondary mb-1 rounded py-2 px-3" style="background-color: #165da3 !important;">
-                            <span class="fw-semibold text-white">
-                                <i class="bi bi-person-fill text-white me-2"></i>${requester}
-                            </span>
-                            <div class="btn-group">
-                                <form action="/friends/accept" method="POST" class="m-0 me-1">
-                                    <input type="hidden" name="requester" value="${requester}">
-                                    <button type="submit" class="btn btn-sm btn-outline-success shadow-none" title="Accept"><i class="bi bi-check-lg"></i></button>
-                                </form>
-                                <form action="/friends/decline" method="POST" class="m-0">
-                                    <input type="hidden" name="requester" value="${requester}">
-                                    <button type="submit" class="btn btn-sm btn-outline-danger shadow-none" title="Decline"><i class="bi bi-x-lg"></i></button>
-                                </form>
-                            </div>
-                        </div>
-                    `;
-                });
-            }
-        }
-
-        // 2. Render Active Friends List with Chat Icon Button & Unread Badge
-        if (friendsContainer) {
-            friendsContainer.innerHTML = "";
-            if (!data.friends || data.friends.length === 0) {
-                friendsContainer.innerHTML = `<div class="p-2 small text-white opacity-75 fst-italic">No friends added yet.</div>`;
-            } else {
-                data.friends.forEach(friend => {
-                    const friendName = typeof friend === "string"
-                        ? friend
-                        : (friend.username || friend.name || String(friend));
-                    const unreadCount = Number(unreadCounts[friendName] || 0);
-
-                    const row = document.createElement("div");
-                    row.className = "list-group-item d-flex justify-content-between align-items-center border-secondary mb-1 rounded py-2 px-3";
-                    row.style.cssText = "background-color: #165da3 !important;";
-
-                    const nameSpan = document.createElement("span");
-                    nameSpan.className = "fw-semibold text-white";
-                    nameSpan.innerHTML = `<i class="bi bi-circle-fill text-success small me-2"></i>`;
-                    nameSpan.appendChild(document.createTextNode(friendName));
-
-                    const rightGroup = document.createElement("div");
-                    rightGroup.className = "d-flex align-items-center gap-2";
-
-                    const badge = document.createElement("span");
-                    badge.className = "badge bg-success text-white";
-                    badge.textContent = "Online";
-
-                    const chatBtn = document.createElement("button");
-                    chatBtn.type = "button";
-                    chatBtn.className = "btn btn-sm btn-outline-light py-0 px-2 shadow-none position-relative";
-                    chatBtn.title = unreadCount > 0
-                        ? `Chat with ${friendName} (${unreadCount} unread)`
-                        : `Chat with ${friendName}`;
-                    chatBtn.setAttribute("aria-label", chatBtn.title);
-                    chatBtn.innerHTML = `<i class="bi bi-chat-dots-fill"></i>`;
-
-                    if (unreadCount > 0) {
-                        const unreadBadge = document.createElement("span");
-                        unreadBadge.className = "position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger";
-                        unreadBadge.style.fontSize = "0.65rem";
-                        unreadBadge.textContent = unreadCount > 99 ? "99+" : String(unreadCount);
-                        chatBtn.appendChild(unreadBadge);
-                    }
-
-                    chatBtn.addEventListener("click", () => openFriendChatModal(friendName));
-
-                    rightGroup.append(badge, chatBtn);
-                    row.append(nameSpan, rightGroup);
-                    friendsContainer.appendChild(row);
-                });
-            }
-        }
+        renderPendingRequests(pendingContainer, data.friendRequests || []);
+        renderFriendsList(friendsContainer, data.friends || [], unreadCounts);
     } catch (err) {
         console.error("Failed to load friends data:", err);
     }
 }
 
-document.addEventListener("DOMContentLoaded", function() {
+function renderPendingRequests(container, requests) {
+    if (!container) return;
+    container.textContent = "";
+
+    if (!requests.length) {
+        const empty = document.createElement("div");
+        empty.className = "p-2 small text-white opacity-75 fst-italic";
+        empty.textContent = "No pending requests.";
+        container.appendChild(empty);
+        return;
+    }
+
+    requests.forEach((requester) => {
+        const row = document.createElement("div");
+        row.className = "list-group-item d-flex justify-content-between align-items-center border-secondary mb-1 rounded py-2 px-3";
+        row.style.cssText = "background-color: #165da3 !important;";
+
+        const nameSpan = document.createElement("span");
+        nameSpan.className = "fw-semibold text-white";
+        nameSpan.innerHTML = `<i class="bi bi-person-fill text-white me-2"></i>`;
+        nameSpan.appendChild(document.createTextNode(requester));
+
+        const btnGroup = document.createElement("div");
+        btnGroup.className = "btn-group";
+
+        btnGroup.append(
+            createFriendRequestActionForm("/friends/accept", "requester", requester, "btn-outline-success", "bi-check-lg", "Accept"),
+            createFriendRequestActionForm("/friends/decline", "requester", requester, "btn-outline-danger", "bi-x-lg", "Decline")
+        );
+
+        row.append(nameSpan, btnGroup);
+        container.appendChild(row);
+    });
+}
+
+function createFriendRequestActionForm(actionUrl, fieldName, value, btnClass, iconClass, title) {
+    const form = document.createElement("form");
+    form.action = actionUrl;
+    form.method = "POST";
+    form.className = "m-0";
+    if (actionUrl === "/friends/accept") {
+        form.classList.add("me-1");
+    }
+
+    const hidden = document.createElement("input");
+    hidden.type = "hidden";
+    hidden.name = fieldName;
+    hidden.value = value;
+
+    const btn = document.createElement("button");
+    btn.type = "submit";
+    btn.className = `btn btn-sm ${btnClass} shadow-none`;
+    btn.title = title;
+    btn.innerHTML = `<i class="bi ${iconClass}"></i>`;
+
+    form.append(hidden, btn);
+    return form;
+}
+
+function renderFriendsList(container, friends, unreadCounts) {
+    if (!container) return;
+    container.textContent = "";
+
+    if (!friends.length) {
+        const empty = document.createElement("div");
+        empty.className = "p-2 small text-white opacity-75 fst-italic";
+        empty.textContent = "No friends added yet.";
+        container.appendChild(empty);
+        return;
+    }
+
+    friends.forEach((friend) => {
+        const friendName = typeof friend === "string"
+            ? friend
+            : (friend.username || friend.name || String(friend));
+        const unreadCount = Number(unreadCounts[friendName] || 0);
+
+        const row = document.createElement("div");
+        row.className = "list-group-item d-flex justify-content-between align-items-center border-secondary mb-1 rounded py-2 px-3";
+        row.style.cssText = "background-color: #165da3 !important;";
+
+        const nameSpan = document.createElement("span");
+        nameSpan.className = "fw-semibold text-white";
+        nameSpan.innerHTML = `<i class="bi bi-circle-fill text-success small me-2"></i>`;
+        nameSpan.appendChild(document.createTextNode(friendName));
+
+        const rightGroup = document.createElement("div");
+        rightGroup.className = "d-flex align-items-center gap-2";
+
+        const onlineBadge = document.createElement("span");
+        onlineBadge.className = "badge bg-success text-white";
+        onlineBadge.textContent = "Online";
+
+        const chatBtn = document.createElement("button");
+        chatBtn.type = "button";
+        chatBtn.className = "btn btn-sm btn-outline-light py-0 px-2 shadow-none position-relative";
+        chatBtn.title = unreadCount > 0
+            ? `Chat with ${friendName} (${unreadCount} unread)`
+            : `Chat with ${friendName}`;
+        chatBtn.setAttribute("aria-label", chatBtn.title);
+        chatBtn.innerHTML = `<i class="bi bi-chat-dots-fill"></i>`;
+
+        if (unreadCount > 0) {
+            const unreadBadge = document.createElement("span");
+            unreadBadge.className = "position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger";
+            unreadBadge.style.fontSize = "0.65rem";
+            unreadBadge.textContent = unreadCount > 99 ? "99+" : String(unreadCount);
+            chatBtn.appendChild(unreadBadge);
+        }
+
+        chatBtn.addEventListener("click", () => openFriendChatModal(friendName));
+
+        rightGroup.append(onlineBadge, chatBtn);
+        row.append(nameSpan, rightGroup);
+        container.appendChild(row);
+    });
+}
+
+function setupFriendSearchHandler() {
+    const searchBtn = document.getElementById("searchBtn");
+    const searchInput = document.getElementById("userSearchInput");
+    const searchResults = document.getElementById("searchResults");
+
+    if (!searchBtn || !searchInput || !searchResults) return;
+
+    searchBtn.addEventListener("click", async () => {
+        const query = searchInput.value.trim();
+        if (!query) return;
+
+        try {
+            const response = await fetch(`/api/users/search?q=${encodeURIComponent(query)}`);
+            const users = await response.json();
+
+            searchResults.textContent = "";
+
+            if (!Array.isArray(users) || users.length === 0) {
+                const empty = document.createElement("div");
+                empty.className = "p-2 text-muted small";
+                empty.textContent = "No users found.";
+                searchResults.appendChild(empty);
+                return;
+            }
+
+            users.forEach((user) => {
+                const displayIdentifier = user.username || (user.email ? user.email.split("@")[0] : user.login);
+                if (!displayIdentifier) return;
+
+                const item = document.createElement("div");
+                item.className = "list-group-item d-flex justify-content-between align-items-center border-secondary py-2 px-3 rounded mb-1";
+                item.style.cssText = "background-color: #1f6ab6 !important;";
+
+                const label = document.createElement("span");
+                label.className = "fw-semibold text-white";
+                label.innerHTML = `<i class="bi bi-person-fill text-white me-2"></i>`;
+                label.appendChild(document.createTextNode(displayIdentifier));
+
+                const form = createFriendRequestActionForm(
+                    "/friends/request",
+                    "targetUser",
+                    displayIdentifier,
+                    "btn-outline-light fw-semibold",
+                    "",
+                    `Send friend request to ${displayIdentifier}`
+                );
+                form.classList.remove("me-1");
+                form.innerHTML = "";
+
+                const hidden = document.createElement("input");
+                hidden.type = "hidden";
+                hidden.name = "targetUser";
+                hidden.value = displayIdentifier;
+
+                const submitBtn = document.createElement("button");
+                submitBtn.type = "submit";
+                submitBtn.className = "btn btn-sm btn-outline-light fw-semibold shadow-none";
+                submitBtn.textContent = "Request Friend";
+
+                form.append(hidden, submitBtn);
+                item.append(label, form);
+                searchResults.appendChild(item);
+            });
+        } catch (err) {
+            console.error("User search failed:", err);
+        }
+    });
+}
+
+// ============================================================================
+// Player Reports
+// ============================================================================
+
+function setupReportPlayerHandlers() {
     const reportInput = document.getElementById("reportedUsername");
     const suggestionsBox = document.getElementById("reportUserSuggestions");
     const reportForm = document.getElementById("reportUserForm");
 
     if (reportInput && suggestionsBox) {
-        reportInput.addEventListener("input", async function() {
+        reportInput.addEventListener("input", async function () {
             const query = this.value.trim();
-            if (query.length < 1) {
-                suggestionsBox.innerHTML = "";
-                return;
-            }
+            suggestionsBox.textContent = "";
+            if (query.length < 1) return;
 
             try {
                 const response = await fetch(`/api/users/search?q=${encodeURIComponent(query)}`);
                 const users = await response.json();
 
-                suggestionsBox.innerHTML = "";
-                if (users && users.length > 0) {
-                    users.forEach(user => {
-                        const name = user.username || user.email.split('@')[0];
-                        const item = document.createElement("button");
-                        item.type = "button";
-                        item.className = "list-group-item list-group-item-action py-1 px-2 text-white border-secondary";
-                        item.style.backgroundColor = "#131b2e";
-                        item.innerHTML = `<i class="bi bi-person me-2"></i>${name}`;
-                        
-                        item.addEventListener("click", function() {
-                            reportInput.value = name;
-                            suggestionsBox.innerHTML = "";
-                        });
+                if (!Array.isArray(users) || users.length === 0) return;
 
-                        suggestionsBox.appendChild(item);
+                users.forEach((user) => {
+                    const name = user.username || (user.email ? user.email.split("@")[0] : "");
+                    if (!name) return;
+
+                    const item = document.createElement("button");
+                    item.type = "button";
+                    item.className = "list-group-item list-group-item-action py-1 px-2 text-white border-secondary";
+                    item.style.backgroundColor = "#131b2e";
+                    item.innerHTML = `<i class="bi bi-person me-2"></i>`;
+                    item.appendChild(document.createTextNode(name));
+
+                    item.addEventListener("click", function () {
+                        reportInput.value = name;
+                        suggestionsBox.textContent = "";
                     });
-                }
+
+                    suggestionsBox.appendChild(item);
+                });
             } catch (err) {
                 console.error("Autocomplete search failed:", err);
             }
         });
 
-        document.addEventListener("click", function(e) {
+        document.addEventListener("click", function (e) {
             if (!reportInput.contains(e.target) && !suggestionsBox.contains(e.target)) {
-                suggestionsBox.innerHTML = "";
+                suggestionsBox.textContent = "";
             }
         });
     }
 
     if (reportForm) {
-        reportForm.addEventListener("submit", async function(e) {
+        reportForm.addEventListener("submit", async function (e) {
             e.preventDefault();
 
-            const reportedUsername = document.getElementById("reportedUsername").value;
-            const reason = document.getElementById("reportReason").value;
-            const details = document.getElementById("reportDetails").value;
+            const reportedUsername = document.getElementById("reportedUsername")?.value.trim() || "";
+            const reason = document.getElementById("reportReason")?.value || "";
+            const details = document.getElementById("reportDetails")?.value || "";
 
             try {
-                const response = await fetch('/api/reports', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                const response = await fetch("/api/reports", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({ reportedUsername, reason, details })
                 });
 
@@ -399,8 +558,10 @@ document.addEventListener("DOMContentLoaded", function() {
                 if (response.ok) {
                     alert("Report successfully submitted to administration.");
                     reportForm.reset();
-                    const modalEl = document.getElementById('reportModal');
-                    const modalInstance = bootstrap.Modal.getInstance(modalEl);
+                    const modalEl = document.getElementById("reportModal");
+                    const modalInstance = modalEl && typeof bootstrap !== "undefined"
+                        ? bootstrap.Modal.getInstance(modalEl)
+                        : null;
                     if (modalInstance) modalInstance.hide();
                 } else {
                     alert(result.error || "Failed to submit report.");
@@ -411,73 +572,114 @@ document.addEventListener("DOMContentLoaded", function() {
             }
         });
     }
-});
+}
 
-document.addEventListener("DOMContentLoaded", async function() {
-    await loadUserMessages();
-});
+// ============================================================================
+// User Notifications / Warnings
+// ============================================================================
 
 async function loadUserMessages() {
+    const badge = document.getElementById("msgBadge");
+    const modalBody = document.getElementById("messagesModalBody");
+    if (!badge || !modalBody) return;
+
     try {
-        const response = await fetch('/api/user/messages');
+        const response = await fetch("/api/user/messages", { cache: "no-store" });
         if (!response.ok) return;
 
         const messages = await response.json();
-        const badge = document.getElementById('msgBadge');
-        const modalBody = document.getElementById('messagesModalBody');
+        modalBody.textContent = "";
 
-        if (messages.length > 0) {
-            badge.style.display = 'inline-block';
-            badge.textContent = messages.length;
-
-            modalBody.innerHTML = "";
-            let accordionHtml = `<div class="accordion accordion-flush" id="messagesAccordion">`;
-            
-            messages.reverse().forEach((msg, index) => {
-                const dateStr = new Date(msg.date).toLocaleString();
-                const collapseId = `collapseMsg${index}`;
-                const headingId = `headingMsg${index}`;
-
-                accordionHtml += `
-                    <div class="accordion-item bg-dark border border-secondary mb-2 rounded overflow-hidden">
-                        <h2 class="accordion-header" id="${headingId}">
-                            <button class="accordion-button collapsed bg-dark text-white shadow-none d-flex justify-content-between align-items-center" 
-                                type="button" data-bs-toggle="collapse" data-bs-target="#${collapseId}" aria-expanded="false" aria-controls="${collapseId}">
-                                <span>
-                                    <i class="bi bi-exclamation-triangle-fill text-danger me-2"></i> 
-                                    <strong>${msg.sender}</strong>
-                                </span>
-                                <small class="text-white opacity-75 ms-auto me-3">${dateStr}</small>
-                            </button>
-                        </h2>
-                        <div id="${collapseId}" class="accordion-collapse collapse" aria-labelledby="${headingId}" data-bs-parent="#messagesAccordion">
-                            <div class="accordion-body bg-dark text-white border-top border-secondary p-3">
-                                <p class="mb-3">${msg.text}</p>
-                                <div class="text-end">
-                                    <button class="btn btn-outline-danger btn-sm shadow-none" onclick="deleteMessage('${msg._id}')">
-                                        <i class="bi bi-trash-fill me-1"></i> Delete Message
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                `;
-            });
-            accordionHtml += `</div>`;
-            modalBody.innerHTML = accordionHtml;
-        } else {
-            badge.style.display = 'none';
-            modalBody.innerHTML = `<p class="text-white opacity-75 text-center fst-italic my-3">You have no new messages or warnings.</p>`;
+        if (!Array.isArray(messages) || messages.length === 0) {
+            badge.style.display = "none";
+            const empty = document.createElement("p");
+            empty.className = "text-white opacity-75 text-center fst-italic my-3";
+            empty.textContent = "You have no new messages or warnings.";
+            modalBody.appendChild(empty);
+            return;
         }
+
+        badge.style.display = "inline-block";
+        badge.textContent = String(messages.length);
+
+        const accordion = document.createElement("div");
+        accordion.className = "accordion accordion-flush";
+        accordion.id = "messagesAccordion";
+
+        [...messages].reverse().forEach((msg, index) => {
+            const dateStr = msg.date ? new Date(msg.date).toLocaleString() : "";
+            const collapseId = `collapseMsg${index}`;
+            const headingId = `headingMsg${index}`;
+
+            const item = document.createElement("div");
+            item.className = "accordion-item bg-dark border border-secondary mb-2 rounded overflow-hidden";
+
+            const header = document.createElement("h2");
+            header.className = "accordion-header";
+            header.id = headingId;
+
+            const toggleBtn = document.createElement("button");
+            toggleBtn.type = "button";
+            toggleBtn.className = "accordion-button collapsed bg-dark text-white shadow-none d-flex justify-content-between align-items-center";
+            toggleBtn.setAttribute("data-bs-toggle", "collapse");
+            toggleBtn.setAttribute("data-bs-target", `#${collapseId}`);
+            toggleBtn.setAttribute("aria-expanded", "false");
+            toggleBtn.setAttribute("aria-controls", collapseId);
+
+            const senderWrap = document.createElement("span");
+            senderWrap.innerHTML = `<i class="bi bi-exclamation-triangle-fill text-danger me-2"></i>`;
+            const senderStrong = document.createElement("strong");
+            senderStrong.textContent = msg.sender || "Administrator";
+            senderWrap.appendChild(senderStrong);
+
+            const dateSmall = document.createElement("small");
+            dateSmall.className = "text-white opacity-75 ms-auto me-3";
+            dateSmall.textContent = dateStr;
+
+            toggleBtn.append(senderWrap, dateSmall);
+            header.appendChild(toggleBtn);
+
+            const collapseDiv = document.createElement("div");
+            collapseDiv.id = collapseId;
+            collapseDiv.className = "accordion-collapse collapse";
+            collapseDiv.setAttribute("aria-labelledby", headingId);
+            collapseDiv.setAttribute("data-bs-parent", "#messagesAccordion");
+
+            const bodyDiv = document.createElement("div");
+            bodyDiv.className = "accordion-body bg-dark text-white border-top border-secondary p-3";
+
+            const textP = document.createElement("p");
+            textP.className = "mb-3";
+            textP.textContent = msg.text || "";
+
+            const actionWrap = document.createElement("div");
+            actionWrap.className = "text-end";
+
+            const delBtn = document.createElement("button");
+            delBtn.type = "button";
+            delBtn.className = "btn btn-outline-danger btn-sm shadow-none";
+            delBtn.innerHTML = `<i class="bi bi-trash-fill me-1"></i>`;
+            delBtn.appendChild(document.createTextNode("Delete Message"));
+            delBtn.addEventListener("click", () => deleteMessage(msg._id));
+
+            actionWrap.appendChild(delBtn);
+            bodyDiv.append(textP, actionWrap);
+            collapseDiv.appendChild(bodyDiv);
+            item.append(header, collapseDiv);
+            accordion.appendChild(item);
+        });
+
+        modalBody.appendChild(accordion);
     } catch (err) {
         console.error("Error loading user messages:", err);
     }
 }
 
 async function deleteMessage(msgId) {
+    if (!msgId) return;
     try {
-        const response = await fetch(`/api/user/messages/${msgId}`, {
-            method: 'DELETE'
+        const response = await fetch(`/api/user/messages/${encodeURIComponent(msgId)}`, {
+            method: "DELETE"
         });
 
         if (response.ok) {
@@ -490,102 +692,74 @@ async function deleteMessage(msgId) {
     }
 }
 
-
 // ============================================================================
 // Create Custom Poker Table
 // ============================================================================
 
-document.addEventListener("DOMContentLoaded", function() {
-    const createTableForm = document.getElementById("createTableForm");
-
-    if (createTableForm) {
-        createTableForm.addEventListener("submit", async function(e) {
-            e.preventDefault();
-
-            // Retrieve form values
-            const tableName = document.getElementById("newTableName").value.trim();
-            const blinds = document.getElementById("newTableBlinds").value.trim();
-            const buyIn = document.getElementById("newTableMinBuyin").value;
-            const maxPlayers = document.getElementById("newTableMaxPlayers").value;
-            const visibility = document.getElementById("newTableVisibility").value;
-
-            // Split blinds into small and big blind values
-            const blindValues = blinds.split("/").map(value =>
-                Number(value.trim().replace("$", ""))
-            );
-
-            if (
-                blindValues.length !== 2 ||
-                blindValues.some(value => !Number.isFinite(value) || value <= 0)
-            ) {
-                alert("Please enter blinds in the format $2 / $4.");
-                return;
-            }
-            if (
-                blindValues.length !== 2 ||
-                blindValues.some(value => !Number.isFinite(value) || value <= 0)
-            ) {
-                alert("Please enter blinds in the format $2 / $4.");
-                return;
-            }
-
-            const tableData = {
-                tableName,
-                maxPlayers,
-                buyIn,
-                smallBlind: blindValues[0],
-                bigBlind: blindValues[1],
-                visibility
-            };
-            const tableData = {
-                tableName,
-                maxPlayers,
-                buyIn,
-                smallBlind: blindValues[0],
-                bigBlind: blindValues[1],
-                visibility
-            };
-
-            try {
-                // Send request to backend
-                const response = await fetch("/api/tables/create", {
-                    method: "POST",
-                    headers: {
-                        "Content-Type": "application/json"
-                    },
-                    body: JSON.stringify(tableData)
-                });
-
-                const result = await response.json();
-
-                if (response.ok) {
-                    alert("Table created successfully!");
-                    createTableForm.reset();
-                    // Redirect to newly created table
-                    window.location.href =
-                        `tableDisplay.html?tableId=${encodeURIComponent(result.tableId)}`;
-                } else {
-                    alert(result.error || "Failed to create table.");
-                }
-                } else {
-                    alert(result.error || "Failed to create table.");
-                }
-
-            } catch (err) {
-                console.error("Error creating table:", err);
-                alert("Network error. Please try again.");
-            }
-        });
+function parseBlindsInput(blindsString) {
+    const parts = blindsString.split("/").map((value) =>
+        Number(value.trim().replace("$", ""))
+    );
+    if (parts.length !== 2 || parts.some((value) => !Number.isFinite(value) || value <= 0)) {
+        return null;
     }
-});
+    return { smallBlind: parts[0], bigBlind: parts[1] };
+}
 
+function setupCreateTableHandler() {
+    const createTableForm = document.getElementById("createTableForm");
+    if (!createTableForm) return;
+
+    createTableForm.addEventListener("submit", async function (e) {
+        e.preventDefault();
+
+        const tableName = document.getElementById("newTableName")?.value.trim() || "";
+        const blindsRaw = document.getElementById("newTableBlinds")?.value.trim() || "";
+        const buyIn = document.getElementById("newTableMinBuyin")?.value;
+        const maxPlayers = document.getElementById("newTableMaxPlayers")?.value;
+        const visibility = document.getElementById("newTableVisibility")?.value;
+
+        const parsedBlinds = parseBlindsInput(blindsRaw);
+        if (!parsedBlinds) {
+            alert("Please enter blinds in the format $2 / $4.");
+            return;
+        }
+
+        const tableData = {
+            tableName,
+            maxPlayers,
+            buyIn,
+            smallBlind: parsedBlinds.smallBlind,
+            bigBlind: parsedBlinds.bigBlind,
+            visibility
+        };
+
+        try {
+            const response = await fetch("/api/tables/create", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(tableData)
+            });
+
+            const result = await response.json();
+
+            if (response.ok) {
+                alert("Table created successfully!");
+                createTableForm.reset();
+                window.location.href = `tableDisplay.html?tableId=${encodeURIComponent(result.tableId)}`;
+            } else {
+                alert(result.error || "Failed to create table.");
+            }
+        } catch (err) {
+            console.error("Error creating table:", err);
+            alert("Network error. Please try again.");
+        }
+    });
+}
 
 // ============================================================================
-// FRIEND DIRECT CHAT (PERSISTENT MONGODB: SEND, EDIT OWN, DELETE OWN)
+// Friend Direct Chat
 // ============================================================================
-let activeChatFriend = null;
-let currentLoggedInUser = null;
-let friendChatModalInstance = null;
 
 function getCurrentUsername() {
     if (currentLoggedInUser) return currentLoggedInUser;
@@ -595,7 +769,9 @@ function getCurrentUsername() {
 
 async function fetchFriendMessages(friendUsername) {
     try {
-        const res = await fetch(`/api/friends/chat/${encodeURIComponent(friendUsername)}`);
+        const res = await fetch(`/api/friends/chat/${encodeURIComponent(friendUsername)}`, {
+            cache: "no-store"
+        });
         if (!res.ok) return [];
         const data = await res.json();
         return Array.isArray(data.messages) ? data.messages : [];
@@ -610,10 +786,13 @@ function renderFriendChatMessages(messages) {
     if (!container) return;
 
     const me = getCurrentUsername();
-    container.innerHTML = "";
+    container.textContent = "";
 
     if (!messages.length) {
-        container.innerHTML = `<p class="text-white opacity-75 text-center small fst-italic my-auto">No messages yet. Say hello!</p>`;
+        const empty = document.createElement("p");
+        empty.className = "text-white opacity-75 text-center small fst-italic my-auto";
+        empty.textContent = "No messages yet. Say hello!";
+        container.appendChild(empty);
         return;
     }
 
@@ -646,7 +825,6 @@ function renderFriendChatMessages(messages) {
             textEl.className = "small text-white";
             textEl.textContent = msg.text;
 
-            // Only the message sender can edit or delete non-deleted messages
             if (isMine && messageId) {
                 const controls = document.createElement("div");
                 controls.className = "d-flex gap-1";
@@ -794,7 +972,14 @@ async function openFriendChatModal(friendUsername) {
     }, 150);
 }
 
-document.addEventListener("DOMContentLoaded", () => {
+function setupFriendChatHandlers() {
+    const modalEl = document.getElementById("friendChatModal");
+    if (modalEl) {
+        modalEl.addEventListener("hidden.bs.modal", () => {
+            activeChatFriend = null;
+        });
+    }
+
     const chatForm = document.getElementById("friendChatForm");
     if (chatForm) {
         chatForm.addEventListener("submit", async (event) => {
@@ -823,9 +1008,7 @@ document.addEventListener("DOMContentLoaded", () => {
         });
     }
 
-    // Poll periodically so new messages, edits, deletions, and unread badges appear without manual reloads
     setInterval(async () => {
-        // Pause active thread refresh while an inline edit box is open so typing isn't interrupted
         const isEditing = Boolean(document.querySelector("#friendChatMessages .edit-message-box"));
 
         if (activeChatFriend && !isEditing) {
@@ -833,9 +1016,8 @@ document.addEventListener("DOMContentLoaded", () => {
             renderFriendChatMessages(messages);
         }
 
-        // Refresh friend list & unread badges while viewing the dashboard outside the modal
         if (!activeChatFriend) {
             await loadFriendsData();
         }
     }, 3000);
-});
+}
