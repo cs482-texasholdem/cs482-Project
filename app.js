@@ -25,7 +25,10 @@ if (process.env.NODE_ENV !== "test") {
         ttl: 60 * 60 * 24 * 7
     });
 }
-app.use(session(sessionOptions));
+
+const sessionMiddleware = session(sessionOptions);
+app.use(sessionMiddleware);
+
 app.use(express.static('public'));
 
 // User Actions
@@ -159,3 +162,4 @@ if (require.main === module) {
 }
 
 exports.app = app;
+exports.sessionMiddleware = sessionMiddleware;

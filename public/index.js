@@ -5,14 +5,62 @@
  * Purpose: Frontend controller script for the User Dashboard homepage. Manages
  *          dynamic user profile/points loading, earned achievement badges at
  *          the top, progress bars for all achievements at the bottom, user
- *          search, friend list/request rendering, direct friend chat, player
- *          reports, user notifications, and custom poker table creation.
+ *          search, friend list/request rendering, real-time presence, direct
+ *          friend chat, player reports, user notifications, and custom poker
+ *          table creation.
  * ============================================================================
  */
 
 let activeChatFriend = null;
 let currentLoggedInUser = null;
 let friendChatModalInstance = null;
+let presenceSocket = null;
+
+function initializePresence() {
+    if (presenceSocket || typeof io !== "function") return;
+
+    presenceSocket = io({
+        withCredentials: true
+    });
+
+    // Refresh statuses after connecting or reconnecting
+    presenceSocket.on("connect", () => {
+        loadFriendsData();
+    });
+
+    // Update friends' statuses when they connect/disconnect
+    presenceSocket.on("PRESENCE_UPDATED", ({ username, online }) => {
+        updateFriendStatus(username, online);
+    });
+}
+
+function updateFriendStatus(username, online) {
+    const friendsContainer = document.getElementById("friendListContainer");
+    if (!friendsContainer) return;
+
+    const friendRows = friendsContainer.querySelectorAll("[data-friend-username]");
+
+    friendRows.forEach((row) => {
+        if (row.dataset.friendUsername !== username) return;
+
+        const indicator = row.querySelector(".friend-indicator");
+        const badge = row.querySelector(".friend-status");
+
+        if (indicator) {
+            indicator.className = online
+                ? "bi bi-circle-fill text-success small me-2 friend-indicator"
+                : "bi bi-circle-fill text-secondary small me-2 friend-indicator";
+        }
+
+        if (badge) {
+            badge.className = online
+                ? "badge bg-success text-white friend-status"
+                : "badge bg-secondary text-white friend-status";
+
+            badge.textContent = online ? "Online" : "Offline";
+        }
+    });
+}
 
 document.addEventListener("DOMContentLoaded", async function () {
     setupLogoutHandler();
@@ -23,6 +71,8 @@ document.addEventListener("DOMContentLoaded", async function () {
     }
 
     currentLoggedInUser = activeUsername;
+
+    initializePresence();
 
     await Promise.all([
         loadDashboardAchievements(activeUsername),
@@ -47,6 +97,9 @@ function setupLogoutHandler() {
     logoutLink.addEventListener("click", () => {
         localStorage.clear();
         sessionStorage.clear();
+        if (presenceSocket) {
+            presenceSocket.disconnect();
+        }
         if (typeof socket !== "undefined" && socket && typeof socket.disconnect === "function") {
             socket.disconnect();
         }
@@ -292,9 +345,10 @@ async function loadFriendsData() {
 
         const data = await response.json();
         const unreadCounts = data.unreadCounts || {};
+        const onlineStatus = data.onlineStatus || {};
 
         renderPendingRequests(pendingContainer, data.friendRequests || []);
-        renderFriendsList(friendsContainer, data.friends || [], unreadCounts);
+        renderFriendsList(friendsContainer, data.friends || [], unreadCounts, onlineStatus);
     } catch (err) {
         console.error("Failed to load friends data:", err);
     }
@@ -359,7 +413,7 @@ function createFriendRequestActionForm(actionUrl, fieldName, value, btnClass, ic
     return form;
 }
 
-function renderFriendsList(container, friends, unreadCounts) {
+function renderFriendsList(container, friends, unreadCounts, onlineStatus = {}) {
     if (!container) return;
     container.textContent = "";
 
@@ -376,22 +430,26 @@ function renderFriendsList(container, friends, unreadCounts) {
             ? friend
             : (friend.username || friend.name || String(friend));
         const unreadCount = Number(unreadCounts[friendName] || 0);
+        const isOnline = onlineStatus[friendName] === true;
 
         const row = document.createElement("div");
         row.className = "list-group-item d-flex justify-content-between align-items-center border-secondary mb-1 rounded py-2 px-3";
         row.style.cssText = "background-color: #165da3 !important;";
+        row.dataset.friendUsername = friendName;
 
         const nameSpan = document.createElement("span");
         nameSpan.className = "fw-semibold text-white";
-        nameSpan.innerHTML = `<i class="bi bi-circle-fill text-success small me-2"></i>`;
+        nameSpan.innerHTML = `<i class="bi bi-circle-fill ${isOnline ? "text-success" : "text-secondary"} small me-2 friend-indicator"></i>`;
         nameSpan.appendChild(document.createTextNode(friendName));
 
         const rightGroup = document.createElement("div");
         rightGroup.className = "d-flex align-items-center gap-2";
 
-        const onlineBadge = document.createElement("span");
-        onlineBadge.className = "badge bg-success text-white";
-        onlineBadge.textContent = "Online";
+        const statusBadge = document.createElement("span");
+        statusBadge.className = isOnline
+            ? "badge bg-success text-white friend-status"
+            : "badge bg-secondary text-white friend-status";
+        statusBadge.textContent = isOnline ? "Online" : "Offline";
 
         const chatBtn = document.createElement("button");
         chatBtn.type = "button";
@@ -412,7 +470,7 @@ function renderFriendsList(container, friends, unreadCounts) {
 
         chatBtn.addEventListener("click", () => openFriendChatModal(friendName));
 
-        rightGroup.append(onlineBadge, chatBtn);
+        rightGroup.append(statusBadge, chatBtn);
         row.append(nameSpan, rightGroup);
         container.appendChild(row);
     });
