@@ -1,0 +1,730 @@
+<!--
+  ============================================================================
+  File Name: tutorial.html
+  Purpose: Interactive Texas Hold'em Poker Tutorial & Bot Practice Arena.
+           Guides beginners through game overview, hand rankings (with optional
+           tie-breaking details), app betting controls, blinds, mucking
+           mechanics, a scripted walkthrough hand, and unlimited multi-difficulty
+           bot practice rounds.
+  ============================================================================
+-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Texas Hold'em - Interactive Tutorial</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css" rel="stylesheet" />
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.bundle.min.js"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.13.1/font/bootstrap-icons.min.css">
+    <link rel="stylesheet" href="style.css">
+    <style>
+        body {
+            background-color: #0e223f;
+            color: #ffffff;
+        }
+        .tutorial-timeline {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+            background-color: #0b132b;
+            border: 1px solid #315CA8;
+            border-radius: 12px;
+            padding: 0.85rem;
+        }
+        .timeline-step-btn {
+            flex: 1 1 130px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            background-color: #131b2e;
+            color: #d1d5db;
+            border-radius: 8px;
+            padding: 0.55rem 0.75rem;
+            font-size: 0.85rem;
+            font-weight: 600;
+            text-align: left;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        .timeline-step-btn:hover {
+            border-color: #f1c40f;
+            color: #ffffff;
+        }
+        .timeline-step-btn.active {
+            background-color: #1f6ab6;
+            border-color: #f1c40f;
+            color: #ffffff;
+            box-shadow: 0 0 0 2px rgba(241, 196, 15, 0.25);
+        }
+        .timeline-step-btn.completed .step-index {
+            background-color: #198754;
+            color: #ffffff;
+        }
+        .step-index {
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            background-color: #202B40;
+            color: #f1c40f;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.75rem;
+            font-weight: 700;
+            flex-shrink: 0;
+        }
+        .tutorial-card {
+            background-color: #0b132b;
+            border: 1px solid #315CA8;
+            border-radius: 14px;
+            padding: 1.75rem;
+        }
+        .playing-card-mini {
+            width: 44px;
+            height: 62px;
+            border-radius: 6px;
+            background: #F4F7FC;
+            border: 1px solid #315CA8;
+            color: #202B40;
+            font-weight: 800;
+            font-size: 0.95rem;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.35);
+            user-select: none;
+        }
+        .playing-card-mini.red {
+            color: #D42C25;
+        }
+        .playing-card-mini.face-down {
+            background: linear-gradient(135deg, #1f6ab6 0%, #101c3a 100%);
+            color: #f1c40f;
+            border-color: #f1c40f;
+        }
+        .hand-rank-item {
+            background-color: #131b2e;
+            border: 1px solid rgba(255, 255, 255, 0.14);
+            border-radius: 10px;
+            padding: 0.9rem 1rem;
+            cursor: pointer;
+            transition: border-color 0.2s, transform 0.15s;
+        }
+        .hand-rank-item:hover, .hand-rank-item.selected {
+            border-color: #f1c40f;
+            transform: translateY(-1px);
+        }
+        .control-spotlight {
+            outline: 3px solid #f1c40f !important;
+            box-shadow: 0 0 18px rgba(241, 196, 15, 0.55) !important;
+            border-radius: 8px;
+        }
+        .demo-table-surface {
+            background: radial-gradient(circle at center, #1b5e3a 0%, #113c25 75%, #0b2919 100%);
+            border: 6px solid #4a2e16;
+            border-radius: 28px;
+            padding: 1.5rem;
+            box-shadow: inset 0 0 24px rgba(0, 0, 0, 0.65);
+        }
+        .bot-seat-box {
+            background-color: rgba(11, 19, 43, 0.9);
+            border: 1px solid #315CA8;
+            border-radius: 10px;
+            padding: 0.75rem;
+        }
+        .bot-seat-box.active-turn {
+            border-color: #f1c40f;
+            box-shadow: 0 0 12px rgba(241, 196, 15, 0.45);
+        }
+        .bot-seat-box.folded-seat {
+            opacity: 0.55;
+        }
+        .bot-seat-box.winner-seat {
+            border-color: #2ecc71;
+            box-shadow: 0 0 14px rgba(46, 204, 113, 0.6);
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Top Navigation Bar -->
+    <nav class="navbar navbar-expand-sm custom-navbar px-3" data-bs-theme="dark">
+        <div class="container-fluid">
+            <a class="navbar-brand fw-bold text-white" href="lobby.html">
+                <i class="bi bi-suit-spade-fill text-warning me-1"></i> Texas Hold'em Tutorial
+            </a>
+            <div class="d-flex flex-wrap align-items-center gap-2">
+                <a class="btn btn-outline-light btn-sm" href="index.html">
+                    <i class="bi bi-house-fill me-1"></i> Dashboard
+                </a>
+                <a class="btn btn-outline-light btn-sm" href="lobby.html">
+                    <i class="bi bi-dice-5-fill me-1"></i> Poker Lobby
+                </a>
+                <button type="button" id="skipTutorialBtn" class="btn btn-warning btn-sm fw-bold text-dark">
+                    <i class="bi bi-skip-forward-fill me-1"></i> Skip Tutorial & Play
+                </button>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container my-4">
+
+        <!-- Interactive Tutorial Timeline -->
+        <div class="mb-4">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <span class="small text-uppercase fw-bold text-info">
+                    <i class="bi bi-signpost-split-fill me-1"></i> Tutorial Timeline (Jump to Any Section)
+                </span>
+                <span class="small text-warning fw-semibold" id="tutorialProgressLabel">Step 1 of 7</span>
+            </div>
+            <div class="tutorial-timeline" id="tutorialTimeline" role="navigation" aria-label="Tutorial sections">
+                <button type="button" class="timeline-step-btn active" data-step="0">
+                    <span class="step-index">1</span>
+                    <span>Overview</span>
+                </button>
+                <button type="button" class="timeline-step-btn" data-step="1">
+                    <span class="step-index">2</span>
+                    <span>Hand Rankings</span>
+                </button>
+                <button type="button" class="timeline-step-btn" data-step="2">
+                    <span class="step-index">3</span>
+                    <span>Controls & Betting</span>
+                </button>
+                <button type="button" class="timeline-step-btn" data-step="3">
+                    <span class="step-index">4</span>
+                    <span>Blinds</span>
+                </button>
+                <button type="button" class="timeline-step-btn" data-step="4">
+                    <span class="step-index">5</span>
+                    <span>Mucking</span>
+                </button>
+                <button type="button" class="timeline-step-btn" data-step="5">
+                    <span class="step-index">6</span>
+                    <span>Guided Hand</span>
+                </button>
+                <button type="button" class="timeline-step-btn" data-step="6">
+                    <span class="step-index">7</span>
+                    <span>Bot Practice</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- ================================================================ -->
+        <!-- STEP 1: HIGH-LEVEL OVERVIEW                                      -->
+        <!-- ================================================================ -->
+        <section class="tutorial-step-panel tutorial-card" data-step-panel="0">
+            <div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-3">
+                <div>
+                    <span class="badge bg-primary mb-2">Section 1 · High-Level Overview</span>
+                    <h2 class="fw-bold text-white mb-1">Welcome to No-Limit Texas Hold'em</h2>
+                    <p class="text-white opacity-75 mb-0">No prior poker experience required—here is how a hand works from start to finish.</p>
+                </div>
+                <button type="button" class="btn btn-outline-warning btn-sm" data-skip-section>
+                    Skip Section <i class="bi bi-arrow-right-short"></i>
+                </button>
+            </div>
+
+            <div class="row g-3 my-2">
+                <div class="col-md-4">
+                    <div class="p-3 rounded border border-secondary h-100" style="background-color: #131b2e;">
+                        <h5 class="fw-bold text-warning"><i class="bi bi-bullseye me-2"></i>The Goal</h5>
+                        <p class="small text-white opacity-90 mb-0">
+                            Win the <strong>Total Pot</strong> (the pile of chips bet during the hand). You win either by making the best 5-card poker hand at the end, or by making every other player fold before the end.
+                        </p>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="p-3 rounded border border-secondary h-100" style="background-color: #131b2e;">
+                        <h5 class="fw-bold text-info"><i class="bi bi-suit-club-fill me-2"></i>Your Cards & Community Cards</h5>
+                        <p class="small text-white opacity-90 mb-0">
+                            Every player gets <strong>2 private hole cards</strong> face down. Up to <strong>5 shared community cards</strong> are dealt face up in the middle of the table. You combine any 5 of those 7 cards to make your best hand.
+                        </p>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="p-3 rounded border border-secondary h-100" style="background-color: #131b2e;">
+                        <h5 class="fw-bold text-success"><i class="bi bi-arrow-repeat me-2"></i>The 4 Betting Rounds</h5>
+                        <ul class="small text-white opacity-90 mb-0 ps-3">
+                            <li><strong>Pre-Flop:</strong> Everyone receives 2 private cards.</li>
+                            <li><strong>Flop:</strong> 3 community cards are revealed.</li>
+                            <li><strong>Turn:</strong> A 4th community card is revealed.</li>
+                            <li><strong>River & Showdown:</strong> A 5th card is revealed, followed by final betting and revealing hands.</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <div class="d-flex justify-content-end mt-4">
+                <button type="button" class="btn btn-primary fw-bold px-4" data-next-step>
+                    Next: Hand Rankings <i class="bi bi-arrow-right ms-1"></i>
+                </button>
+            </div>
+        </section>
+
+        <!-- ================================================================ -->
+        <!-- STEP 2: HAND HIERARCHY (WITH OPTIONAL TIE-BREAKING DETAILS)      -->
+        <!-- ================================================================ -->
+        <section class="tutorial-step-panel tutorial-card d-none" data-step-panel="1">
+            <div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-3">
+                <div>
+                    <span class="badge bg-primary mb-2">Section 2 · Poker Hand Hierarchy</span>
+                    <h2 class="fw-bold text-white mb-1">Poker Hands from Strongest to Weakest</h2>
+                    <p class="text-white opacity-75 mb-0">
+                        Click any hand below if you want to inspect tie-breaking rules and examples (optional—you can move on whenever you're ready).
+                    </p>
+                </div>
+                <button type="button" class="btn btn-outline-warning btn-sm" data-skip-section>
+                    Skip Section <i class="bi bi-arrow-right-short"></i>
+                </button>
+            </div>
+
+            <div class="row g-4 mt-1">
+                <div class="col-lg-7">
+                    <div class="d-flex flex-column gap-2" id="handRankingsList"></div>
+                </div>
+                <div class="col-lg-5">
+                    <div class="p-4 rounded border border-warning h-100" style="background-color: #131b2e;" id="handDetailPanel">
+                        <span class="badge bg-warning text-dark mb-2">Optional Deep Dive</span>
+                        <h4 class="fw-bold text-white" id="detailHandTitle">Select a Hand on the Left</h4>
+                        <p class="small text-white opacity-90" id="detailHandSummary">
+                            Click any of the 10 poker hands to see how ties are broken (kickers, higher pairs, or split pots) and view a concrete example.
+                        </p>
+                        <div class="d-flex gap-2 my-3" id="detailHandCards"></div>
+                        <div class="p-3 rounded border border-secondary" style="background-color: #0b132b;">
+                            <div class="small text-info fw-bold text-uppercase mb-1">
+                                <i class="bi bi-scales me-1"></i> Tie-Breaking Rule
+                            </div>
+                            <p class="small text-white mb-0" id="detailHandTieBreaker">
+                                If two players hold the exact same hand category, higher card ranks break the tie. If all 5 best cards match in rank, the pot is split equally!
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="d-flex justify-content-between mt-4">
+                <button type="button" class="btn btn-outline-light" data-prev-step>
+                    <i class="bi bi-arrow-left me-1"></i> Previous
+                </button>
+                <button type="button" class="btn btn-primary fw-bold px-4" data-next-step>
+                    Next: App Controls & Betting <i class="bi bi-arrow-right ms-1"></i>
+                </button>
+            </div>
+        </section>
+
+        <!-- ================================================================ -->
+        <!-- STEP 3: CONTROLS WALKTHROUGH & BETTING RULES (BEFORE BLINDS)     -->
+        <!-- ================================================================ -->
+        <section class="tutorial-step-panel tutorial-card d-none" data-step-panel="2">
+            <div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-3">
+                <div>
+                    <span class="badge bg-primary mb-2">Section 3 · Controls & Betting Rules</span>
+                    <h2 class="fw-bold text-white mb-1">Walking Through Every Table Control</h2>
+                    <p class="text-white opacity-75 mb-0">
+                        Step through each control on our betting bar one by one to learn how betting rounds work.
+                    </p>
+                </div>
+                <button type="button" class="btn btn-outline-warning btn-sm" data-skip-section>
+                    Skip Section <i class="bi bi-arrow-right-short"></i>
+                </button>
+            </div>
+
+            <!-- Interactive Control Tour Guide Box -->
+            <div class="p-3 rounded border border-warning mb-4" style="background-color: #131b2e;">
+                <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
+                    <span class="badge bg-warning text-dark fw-bold" id="controlTourCounter">Control 1 of 6</span>
+                    <div class="btn-group btn-group-sm">
+                        <button type="button" class="btn btn-outline-light" id="prevControlTourBtn">
+                            <i class="bi bi-chevron-left"></i> Prev Control
+                        </button>
+                        <button type="button" class="btn btn-warning text-dark fw-bold" id="nextControlTourBtn">
+                            Next Control <i class="bi bi-chevron-right"></i>
+                        </button>
+                    </div>
+                </div>
+                <h5 class="fw-bold text-white mb-1" id="controlTourTitle">--</h5>
+                <p class="small text-white opacity-90 mb-0" id="controlTourDesc">--</p>
+            </div>
+
+            <!-- Simulated App Betting Panel Mirroring tableDisplay.html -->
+            <div class="p-4 rounded border border-secondary" style="background-color: #101c3a;">
+                <div class="d-flex justify-content-between align-items-center mb-3" id="demo-bet-summary">
+                    <span>Current Highest Bet: <strong class="text-warning" id="demo-current-bet">$20</strong></span>
+                    <span>Your Current Bet: <strong class="text-info" id="demo-your-bet">$0</strong></span>
+                    <span>Chips Available: <strong class="text-success" id="demo-available-chips">$1,000</strong></span>
+                </div>
+
+                <div class="row align-items-center g-3 mb-3" id="demo-raise-controls">
+                    <div class="col-md-4">
+                        <label for="demo-raise-amount" class="form-label small text-info fw-semibold mb-1">Raise Amount ($)</label>
+                        <input type="number" class="form-control form-control-sm bg-dark text-white border-secondary" id="demo-raise-amount" min="40" max="1000" value="40">
+                    </div>
+                    <div class="col-md-8">
+                        <label for="demo-bet-scale" class="form-label small text-info fw-semibold mb-1">Adjust Raise Slider ($40 min – $1,000 All-In)</label>
+                        <input type="range" class="form-range" id="demo-bet-scale" min="40" max="1000" step="10" value="40">
+                    </div>
+                </div>
+
+                <div class="d-flex flex-wrap gap-2 justify-content-center pt-2">
+                    <button type="button" class="btn btn-danger fw-bold px-4" id="demo-btn-fold">Fold</button>
+                    <button type="button" class="btn btn-secondary fw-bold px-4" id="demo-btn-check">Check</button>
+                    <button type="button" class="btn btn-primary fw-bold px-4" id="demo-btn-call">Call ($20)</button>
+                    <button type="button" class="btn btn-success fw-bold px-4" id="demo-btn-raise">Raise to $40</button>
+                </div>
+
+                <div class="alert alert-dark border-info text-white small mt-3 mb-0" id="demo-control-feedback">
+                    Try clicking the highlighted button or using the "Next Control" button above to inspect each control!
+                </div>
+            </div>
+
+            <div class="d-flex justify-content-between mt-4">
+                <button type="button" class="btn btn-outline-light" data-prev-step>
+                    <i class="bi bi-arrow-left me-1"></i> Previous
+                </button>
+                <button type="button" class="btn btn-primary fw-bold px-4" data-next-step>
+                    Next: Understanding Blinds <i class="bi bi-arrow-right ms-1"></i>
+                </button>
+            </div>
+        </section>
+
+        <!-- ================================================================ -->
+        <!-- STEP 4: BLINDS (EXPLAINED AFTER CONTROLS & BETTING)              -->
+        <!-- ================================================================ -->
+        <section class="tutorial-step-panel tutorial-card d-none" data-step-panel="3">
+            <div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-3">
+                <div>
+                    <span class="badge bg-primary mb-2">Section 4 · Forced Bets (Blinds)</span>
+                    <h2 class="fw-bold text-white mb-1">How Small & Big Blinds Kick Off Every Hand</h2>
+                    <p class="text-white opacity-75 mb-0">
+                        Now that you know how betting works, here is why there is already money in the pot before cards are dealt.
+                    </p>
+                </div>
+                <button type="button" class="btn btn-outline-warning btn-sm" data-skip-section>
+                    Skip Section <i class="bi bi-arrow-right-short"></i>
+                </button>
+            </div>
+
+            <div class="row g-3 my-2">
+                <div class="col-md-4">
+                    <div class="p-3 rounded border border-secondary h-100" style="background-color: #131b2e;">
+                        <span class="badge bg-warning text-dark mb-2">Dealer Button (D)</span>
+                        <h5 class="fw-bold text-white">Rotates Clockwise</h5>
+                        <p class="small text-white opacity-90 mb-0">
+                            The <strong>D</strong> badge marks the nominal dealer. It moves one seat clockwise after every hand so everyone takes turns paying blinds fairly.
+                        </p>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="p-3 rounded border border-secondary h-100" style="background-color: #131b2e;">
+                        <span class="badge bg-info text-dark mb-2">Small Blind (SB)</span>
+                        <h5 class="fw-bold text-white">Half Forced Bet</h5>
+                        <p class="small text-white opacity-90 mb-0">
+                            The seat left of the Dealer posts the <strong>Small Blind</strong> automatically (e.g., $10 in a $10/$20 game). In a 2-player heads-up hand, the Dealer posts the Small Blind.
+                        </p>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="p-3 rounded border border-secondary h-100" style="background-color: #131b2e;">
+                        <span class="badge bg-danger mb-2">Big Blind (BB)</span>
+                        <h5 class="fw-bold text-white">Full Forced Bet</h5>
+                        <p class="small text-white opacity-90 mb-0">
+                            The next seat posts the <strong>Big Blind</strong> (e.g., $20), which sets the initial <em>Current Highest Bet</em> that Pre-Flop players must at least Call to stay in.
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="p-3 rounded border border-info mt-3" style="background-color: #131b2e;">
+                <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+                    <div>
+                        <strong class="text-warning">Interactive Blind Rotation Preview:</strong>
+                        <span class="small text-white ms-2" id="blindRotationSummary">Hand #1: You are Dealer (D), Bot A posts Small Blind ($10), Bot B posts Big Blind ($20).</span>
+                    </div>
+                    <button type="button" class="btn btn-sm btn-outline-warning fw-semibold" id="rotateBlindsBtn">
+                        <i class="bi bi-arrow-clockwise me-1"></i> Simulate Next Hand Rotation
+                    </button>
+                </div>
+            </div>
+
+            <div class="d-flex justify-content-between mt-4">
+                <button type="button" class="btn btn-outline-light" data-prev-step>
+                    <i class="bi bi-arrow-left me-1"></i> Previous
+                </button>
+                <button type="button" class="btn btn-primary fw-bold px-4" data-next-step>
+                    Next: Mucking Mechanics <i class="bi bi-arrow-right ms-1"></i>
+                </button>
+            </div>
+        </section>
+
+        <!-- ================================================================ -->
+        <!-- STEP 5: MUCKING MECHANICS                                        -->
+        <!-- ================================================================ -->
+        <section class="tutorial-step-panel tutorial-card d-none" data-step-panel="4">
+            <div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-3">
+                <div>
+                    <span class="badge bg-primary mb-2">Section 5 · App Showdown & Privacy</span>
+                    <h2 class="fw-bold text-white mb-1">How Mucking Works in Our App</h2>
+                    <p class="text-white opacity-75 mb-0">
+                        Control whether opponents get to see your losing cards at Showdown.
+                    </p>
+                </div>
+                <button type="button" class="btn btn-outline-warning btn-sm" data-skip-section>
+                    Skip Section <i class="bi bi-arrow-right-short"></i>
+                </button>
+            </div>
+
+            <div class="row g-4 align-items-center my-2">
+                <div class="col-md-6">
+                    <ul class="list-group list-group-flush rounded">
+                        <li class="list-group-item bg-dark text-white border-secondary">
+                            <strong class="text-warning">1. Folding Automatically Mucks:</strong> Whenever you click <strong>Fold</strong>, your cards are immediately discarded face-down so nobody sees them.
+                        </li>
+                        <li class="list-group-item bg-dark text-white border-secondary">
+                            <strong class="text-info">2. "Muck Losing Cards" Switch:</strong> In our betting panel, toggling <strong>Muck Losing Cards ON</strong> hides your hole cards at Showdown if another player beats your hand.
+                        </li>
+                        <li class="list-group-item bg-dark text-white border-secondary">
+                            <strong class="text-success">3. Winners Always Reveal:</strong> If you win the pot at Showdown, your winning hand is always shown to prove the win—even if Muck Losing Cards is switched on.
+                        </li>
+                    </ul>
+                </div>
+                <div class="col-md-6">
+                    <div class="p-4 rounded border border-secondary text-center" style="background-color: #131b2e;">
+                        <div class="form-check form-switch d-inline-flex align-items-center gap-2 mb-3">
+                            <input class="form-check-input" type="checkbox" role="switch" id="tutorialMuckSwitch" checked style="width: 3rem; height: 1.5rem;">
+                            <label class="form-check-label fw-bold text-white" for="tutorialMuckSwitch">Muck Losing Cards</label>
+                        </div>
+                        <p class="small text-white opacity-75 mb-3">
+                            Simulate losing at Showdown with the switch ON vs. OFF:
+                        </p>
+                        <div class="d-flex justify-content-center gap-2 mb-3" id="muckPreviewCards"></div>
+                        <div class="small fw-semibold text-warning" id="muckPreviewStatus">
+                            Muck ON: Your losing hand stays hidden (🂠 🂠) from opponents!
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="d-flex justify-content-between mt-4">
+                <button type="button" class="btn btn-outline-light" data-prev-step>
+                    <i class="bi bi-arrow-left me-1"></i> Previous
+                </button>
+                <button type="button" class="btn btn-primary fw-bold px-4" data-next-step>
+                    Next: Guided Walkthrough Hand <i class="bi bi-arrow-right ms-1"></i>
+                </button>
+            </div>
+        </section>
+
+        <!-- ================================================================ -->
+        <!-- STEP 6: HARD-CODED GUIDED GAME WITH BOTS                         -->
+        <!-- ================================================================ -->
+        <section class="tutorial-step-panel tutorial-card d-none" data-step-panel="5">
+            <div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-3">
+                <div>
+                    <span class="badge bg-primary mb-2">Section 6 · Scripted Guided Hand</span>
+                    <h2 class="fw-bold text-white mb-1">Guided Hand: Putting Every Mechanic Together</h2>
+                    <p class="text-white opacity-75 mb-0">
+                        Play through a curated hand against two bots that demonstrates Blinds, Calling, Raising, Folding, and Showdown/Mucking.
+                    </p>
+                </div>
+                <div class="d-flex gap-2">
+                    <button type="button" class="btn btn-outline-info btn-sm" id="restartGuidedHandBtn">
+                        <i class="bi bi-arrow-counterclockwise me-1"></i> Restart Guided Hand
+                    </button>
+                    <button type="button" class="btn btn-outline-warning btn-sm" data-skip-section>
+                        Skip to Free Play <i class="bi bi-arrow-right-short"></i>
+                    </button>
+                </div>
+            </div>
+
+            <div class="demo-table-surface my-3">
+                <div class="row g-3 mb-3">
+                    <div class="col-md-6">
+                        <div class="bot-seat-box" id="guided-bot-1">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <strong class="text-white">Bot Nova <span class="badge bg-warning text-dark">SB $10</span></strong>
+                                <span class="badge bg-secondary" id="guided-bot-1-status">Waiting</span>
+                            </div>
+                            <div class="small text-info mt-1">Chips: <span id="guided-bot-1-chips">$990</span> · Bet: <span id="guided-bot-1-bet">$10</span></div>
+                            <div class="d-flex gap-1 mt-2" id="guided-bot-1-cards"></div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="bot-seat-box" id="guided-bot-2">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <strong class="text-white">Bot Atlas <span class="badge bg-danger">BB $20</span></strong>
+                                <span class="badge bg-secondary" id="guided-bot-2-status">Waiting</span>
+                            </div>
+                            <div class="small text-info mt-1">Chips: <span id="guided-bot-2-chips">$980</span> · Bet: <span id="guided-bot-2-bet">$20</span></div>
+                            <div class="d-flex gap-1 mt-2" id="guided-bot-2-cards"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="text-center my-3">
+                    <span class="badge bg-dark border border-warning text-warning px-3 py-2 fs-6">
+                        Total Pot: $<span id="guided-pot">30</span> · Stage: <span id="guided-stage">Pre-Flop</span>
+                    </span>
+                    <div class="d-flex justify-content-center gap-2 mt-3" id="guided-community-cards"></div>
+                </div>
+
+                <div class="bot-seat-box mt-3" id="guided-player-seat">
+                    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2">
+                        <div>
+                            <strong class="text-white">You <span class="badge bg-primary">Dealer (D)</span></strong>
+                            <div class="small text-success">Chips: $<span id="guided-player-chips">1000</span> · Your Bet: $<span id="guided-player-bet">0</span></div>
+                        </div>
+                        <div class="d-flex gap-2" id="guided-player-cards"></div>
+                        <div class="form-check form-switch">
+                            <input class="form-check-input" type="checkbox" id="guided-muck-toggle">
+                            <label class="form-check-label small text-white" for="guided-muck-toggle">Muck Losing Cards</label>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="p-3 rounded border border-warning mb-3" style="background-color: #131b2e;">
+                <div class="fw-bold text-warning mb-1" id="guided-coach-title">Coach Guidance</div>
+                <p class="small text-white mb-2" id="guided-coach-text"></p>
+                <div class="d-flex flex-wrap gap-2" id="guided-action-buttons"></div>
+            </div>
+
+            <div class="d-flex justify-content-between mt-4">
+                <button type="button" class="btn btn-outline-light" data-prev-step>
+                    <i class="bi bi-arrow-left me-1"></i> Previous
+                </button>
+                <button type="button" class="btn btn-success fw-bold px-4" data-next-step>
+                    Next: Unlimited Bot Practice <i class="bi bi-arrow-right ms-1"></i>
+                </button>
+            </div>
+        </section>
+
+        <!-- ================================================================ -->
+        <!-- STEP 7: UNLIMITED PRACTICE ROUNDS WITH BOT DIFFICULTY SELECTOR   -->
+        <!-- ================================================================ -->
+        <section class="tutorial-step-panel tutorial-card d-none" data-step-panel="6">
+            <div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-3">
+                <div>
+                    <span class="badge bg-success mb-2">Section 7 · Free Play Practice Arena</span>
+                    <h2 class="fw-bold text-white mb-1">Practice Unlimited Rounds vs. Poker Bots</h2>
+                    <p class="text-white opacity-75 mb-0">
+                        Choose your bot difficulty and play as many hands as you want before entering the live Poker Lobby.
+                    </p>
+                </div>
+                <div class="d-flex flex-wrap align-items-center gap-2">
+                    <label for="botDifficultySelect" class="small fw-bold text-info mb-0">Bot Difficulty:</label>
+                    <select id="botDifficultySelect" class="form-select form-select-sm bg-dark text-white border-warning" style="width: auto;">
+                        <option value="easy">Easy (Passive / Calling Station)</option>
+                        <option value="medium" selected>Medium (Balanced Hand Strength)</option>
+                        <option value="hard">Hard (Aggressive / Pot-Odds Aware)</option>
+                    </select>
+                    <button type="button" class="btn btn-warning btn-sm fw-bold text-dark" id="dealPracticeHandBtn">
+                        <i class="bi bi-play-fill me-1"></i> Deal New Hand
+                    </button>
+                    <button type="button" class="btn btn-outline-light btn-sm" id="resetPracticeChipsBtn">
+                        Reset Chips ($1,000)
+                    </button>
+                </div>
+            </div>
+
+            <div class="demo-table-surface my-3">
+                <div class="row g-3 mb-3">
+                    <div class="col-md-6">
+                        <div class="bot-seat-box" id="prac-bot-0">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <strong class="text-white" id="prac-bot-0-name">Bot Alpha</strong>
+                                <span class="badge bg-secondary" id="prac-bot-0-status">Ready</span>
+                            </div>
+                            <div class="small text-info mt-1">
+                                Chips: $<span id="prac-bot-0-chips">1000</span> · Bet: $<span id="prac-bot-0-bet">0</span>
+                            </div>
+                            <div class="d-flex gap-1 mt-2" id="prac-bot-0-cards"></div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="bot-seat-box" id="prac-bot-1">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <strong class="text-white" id="prac-bot-1-name">Bot Bravo</strong>
+                                <span class="badge bg-secondary" id="prac-bot-1-status">Ready</span>
+                            </div>
+                            <div class="small text-info mt-1">
+                                Chips: $<span id="prac-bot-1-chips">1000</span> · Bet: $<span id="prac-bot-1-bet">0</span>
+                            </div>
+                            <div class="d-flex gap-1 mt-2" id="prac-bot-1-cards"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="text-center my-3">
+                    <div class="d-inline-flex flex-wrap justify-content-center gap-2">
+                        <span class="badge bg-dark border border-warning text-warning px-3 py-2 fs-6">
+                            Total Pot: $<span id="prac-pot">0</span>
+                        </span>
+                        <span class="badge bg-dark border border-info text-info px-3 py-2 fs-6">
+                            Round: <span id="prac-round">Pre-Flop</span>
+                        </span>
+                        <span class="badge bg-dark border border-secondary text-white px-3 py-2 fs-6">
+                            Hand #<span id="prac-hand-num">0</span>
+                        </span>
+                    </div>
+                    <div class="d-flex justify-content-center gap-2 mt-3" id="prac-community-cards"></div>
+                    <p class="small text-warning fw-semibold mt-2 mb-0" id="prac-table-status">
+                        Select a bot difficulty and click "Deal New Hand" to begin!
+                    </p>
+                </div>
+
+                <div class="bot-seat-box mt-3" id="prac-player-seat">
+                    <div class="d-flex flex-wrap justify-content-between align-items-center gap-3">
+                        <div>
+                            <strong class="text-white" id="prac-player-label">You</strong>
+                            <div class="small text-success">
+                                Chips: $<span id="prac-player-chips">1000</span> · Your Bet: $<span id="prac-player-bet">0</span>
+                            </div>
+                            <div class="small text-info" id="prac-hand-eval">Hand Strength: --</div>
+                        </div>
+
+                        <div class="d-flex gap-2" id="prac-player-cards"></div>
+
+                        <div class="form-check form-switch">
+                            <input class="form-check-input" type="checkbox" id="prac-muck-toggle">
+                            <label class="form-check-label small text-white" for="prac-muck-toggle">Muck Losing Cards</label>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Practice Action Controls -->
+            <div class="p-3 rounded border border-secondary" style="background-color: #131b2e;">
+                <div class="row align-items-center g-2 mb-2">
+                    <div class="col-md-4">
+                        <label for="prac-raise-amount" class="small text-info fw-semibold">Raise To ($)</label>
+                        <input type="number" class="form-control form-control-sm bg-dark text-white border-secondary" id="prac-raise-amount" min="40" max="1000" step="10" value="40">
+                    </div>
+                    <div class="col-md-8">
+                        <label for="prac-bet-scale" class="small text-info fw-semibold">Raise Slider</label>
+                        <input type="range" class="form-range" id="prac-bet-scale" min="40" max="1000" step="10" value="40">
+                    </div>
+                </div>
+                <div class="d-flex flex-wrap justify-content-center gap-2">
+                    <button type="button" class="btn btn-danger fw-bold px-4" id="prac-btn-fold" disabled>Fold</button>
+                    <button type="button" class="btn btn-secondary fw-bold px-4" id="prac-btn-check" disabled>Check</button>
+                    <button type="button" class="btn btn-primary fw-bold px-4" id="prac-btn-call" disabled>Call</button>
+                    <button type="button" class="btn btn-success fw-bold px-4" id="prac-btn-raise" disabled>Raise</button>
+                </div>
+            </div>
+
+            <div class="d-flex justify-content-between align-items-center mt-4">
+                <button type="button" class="btn btn-outline-light" data-prev-step>
+                    <i class="bi bi-arrow-left me-1"></i> Previous
+                </button>
+                <a href="lobby.html" class="btn btn-warning fw-bold text-dark px-4">
+                    <i class="bi bi-box-arrow-in-right me-1"></i> Ready! Go to Poker Lobby
+                </a>
+            </div>
+        </section>
+
+    </div>
+
+    <script src="tutorial.js"></script>
+</body>
+</html>
