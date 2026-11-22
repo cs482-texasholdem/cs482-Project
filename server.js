@@ -1,5 +1,9 @@
 require('dotenv').config();
-const { app } = require('./app');
+
+const { app, sessionMiddleware } = require('./app');
+const presence = require('./model/PresenceManager');
+
+
 const db = require('./model/DbConnection');
 const http = require('http');
 const { Server } = require('socket.io');
@@ -20,6 +24,8 @@ async function startServer() {
             cors: { origin: '*', methods: ['GET', 'POST'] }
         });
         app.set('io', io);
+        // Share Express authentication sessions with Socket.IO
+        io.engine.use(sessionMiddleware);
 
         const getTurnTimeRemaining = () => {
             if (!mainTable.gameInProgress || mainTable.gameOver || !mainTable.turnStartTime) {
@@ -31,19 +37,59 @@ async function startServer() {
         };
 
         io.on('connection', (socket) => {
-            console.log('A user connected:', socket.id);
+            // Get the logged-in user from the Express session
+            const sessionUser = socket.request.session?.user;
+
+            const username = sessionUser
+                ? (typeof sessionUser === 'object'
+                    ? sessionUser.username
+                    : sessionUser)
+                : null;
+
+            // Track logged-in users
+            if (username) {
+                socket.join('authenticated_users');
+                socket.join(`session:${socket.request.sessionID}`);
+
+                const becameOnline = presence.addUser(username, socket.id);
+
+                if (becameOnline) {
+                    io.to('authenticated_users').emit('PRESENCE_UPDATED', {
+                        username,
+                        online: true
+                    });
+                }
+            }
+
+            // Existing poker table functionality
             socket.on('join_table', (tableId) => {
                 socket.join(`table_${tableId}`);
 
-                // Immediately send the current countdown to the joining player
+                // Immediately send the current countdown
                 const turnTimeRemaining = getTurnTimeRemaining();
+
                 if (turnTimeRemaining !== null) {
                     socket.emit('TURN_TIMER', { turnTimeRemaining });
                 }
             });
+
             socket.on('leave_table', (tableId) => {
                 socket.leave(`table_${tableId}`);
                 console.log(`User ${socket.id} left table ${tableId}`);
+            });
+
+            // Detect when a user disconnects
+            socket.on('disconnect', () => {
+                if (!username) return;
+
+                const becameOffline = presence.removeUser(username, socket.id);
+
+                if (becameOffline) {
+                    io.to('authenticated_users').emit('PRESENCE_UPDATED', {
+                        username,
+                        online: false
+                    });
+                }
             });
         });
 

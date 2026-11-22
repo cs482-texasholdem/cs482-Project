@@ -14,7 +14,7 @@ const mongoose = require('mongoose');
 const dao = require('../model/UserDao');
 const passUtil = require('../util/PasswordUtil');
 const FriendMessage = require('../model/FriendMessage');
-
+const presence = require('../model/PresenceManager');
 
 /**
  * Helper utility to safely extract the current username string from session state.
@@ -464,10 +464,17 @@ exports.getFriendsData = async function(req, res) {
             unreadCounts[senderName] = (unreadCounts[senderName] || 0) + entry.count;
         }
 
+        const onlineStatus = {};
+
+        for (const username of resolvedFriends) {
+            onlineStatus[username] = presence.isOnline(username);
+        }
+
         res.json({
             friends: resolvedFriends,
             friendRequests: resolvedRequests,
-            unreadCounts
+            unreadCounts,
+            onlineStatus
         });
     } catch (error) {
         console.error("Error fetching friends data:", error);
@@ -782,6 +789,11 @@ exports.loggedUser = async function(req, res){
  */
 exports.logout = function(req, res){
     req.session.user = null; // Clear user data from session
+    const io = req.app.get('io');
+    if (io && req.sessionID) {
+        io.in(`session:${req.sessionID}`).disconnectSockets(true);
+    }
+    
     req.session.destroy((err) => {
         if (err) {
             console.error("Error destroying session during logout:", err);

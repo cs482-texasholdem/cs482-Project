@@ -8,6 +8,57 @@
  * ============================================================================
  */
 
+let presenceSocket = null;
+
+function initializePresence() {
+    if (presenceSocket) return;
+
+    presenceSocket = io({
+        withCredentials: true
+    });
+
+    // Refresh statuses after connecting or reconnecting
+    presenceSocket.on('connect', () => {
+        loadFriendsData();
+    });
+
+    // Update friends' statuses when they connect/disconnect
+    presenceSocket.on('PRESENCE_UPDATED', ({ username, online }) => {
+        updateFriendStatus(username, online);
+    });
+}
+
+function updateFriendStatus(username, online) {
+    const friendsContainer =
+        document.getElementById("friendListContainer");
+
+    if (!friendsContainer) return;
+
+    const friendRows =
+        friendsContainer.querySelectorAll("[data-friend-username]");
+
+    friendRows.forEach(row => {
+        if (row.dataset.friendUsername !== username) return;
+
+        const indicator = row.querySelector(".friend-indicator");
+        const badge = row.querySelector(".friend-status");
+
+        if (indicator) {
+            indicator.className = online
+                ? "bi bi-circle-fill text-success small me-2 friend-indicator"
+                : "bi bi-circle-fill text-secondary small me-2 friend-indicator";
+        }
+
+        if (badge) {
+            badge.className = online
+                ? "badge bg-success text-white friend-status"
+                : "badge bg-secondary text-white friend-status";
+
+            badge.textContent = online ? "Online" : "Offline";
+        }
+    });
+}
+
 // ============================================================================
 // DOM Content Loaded Initialization
 // ============================================================================
@@ -26,8 +77,8 @@ document.addEventListener("DOMContentLoaded", async function() {
         logoutLink.addEventListener("click", () => {
             localStorage.clear();
             sessionStorage.clear();
-            if (typeof socket !== 'undefined' && socket) {
-                socket.disconnect();
+            if (presenceSocket) {
+                presenceSocket.disconnect();
             }
         });
     }
@@ -78,9 +129,12 @@ document.addEventListener("DOMContentLoaded", async function() {
         return;
     }
 
+   // ------------------------------------------------------------------------
+    // 2. Initialize Online/Offline Presence
     // ------------------------------------------------------------------------
-    // 2. Automatically Load Friends & Requests Feed on Page Load
-    // ------------------------------------------------------------------------
+    initializePresence();
+
+    // Automatically load friends and their online/offline statuses
     loadFriendsData();
 
     // ------------------------------------------------------------------------
@@ -147,8 +201,13 @@ async function loadFriendsData() {
     try {
         const response = await fetch('/api/friends/data');
         if (!response.ok) return;
+
         const data = await response.json();
+        // Unread friend messages
         const unreadCounts = data.unreadCounts || {};
+
+        // Online/offline status
+        const onlineStatus = data.onlineStatus || {};
 
         // 1. Render Pending Friend Requests
         if (pendingContainer) {
@@ -190,23 +249,30 @@ async function loadFriendsData() {
                     const friendName = typeof friend === "string"
                         ? friend
                         : (friend.username || friend.name || String(friend));
+                    
                     const unreadCount = Number(unreadCounts[friendName] || 0);
+                    const isOnline = onlineStatus[friendName] === true;
 
                     const row = document.createElement("div");
                     row.className = "list-group-item d-flex justify-content-between align-items-center border-secondary mb-1 rounded py-2 px-3";
                     row.style.cssText = "background-color: #165da3 !important;";
+                    row.dataset.friendUsername = friendName;
 
                     const nameSpan = document.createElement("span");
                     nameSpan.className = "fw-semibold text-white";
-                    nameSpan.innerHTML = `<i class="bi bi-circle-fill text-success small me-2"></i>`;
+                    nameSpan.innerHTML = `
+                        <i class="bi bi-circle-fill ${isOnline ? 'text-success' : 'text-secondary'} small me-2 friend-indicator"></i>
+                    `;
                     nameSpan.appendChild(document.createTextNode(friendName));
 
                     const rightGroup = document.createElement("div");
                     rightGroup.className = "d-flex align-items-center gap-2";
 
                     const badge = document.createElement("span");
-                    badge.className = "badge bg-success text-white";
-                    badge.textContent = "Online";
+                    badge.className = isOnline
+                        ? "badge bg-success text-white friend-status"
+                        : "badge bg-secondary text-white friend-status"
+                    badge.textContent = isOnline ? "Online" : "Offline";
 
                     const chatBtn = document.createElement("button");
                     chatBtn.type = "button";
