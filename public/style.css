@@ -112,12 +112,16 @@ body {
 
 /* Save Points Button */
 .btn-save-points {
+    margin-left: 10px;
+    margin-right: 10px;
+    margin-top: 5px;
+    margin-bottom: 5px;
     background: linear-gradient(135deg, #f39c12 0%, #f1c40f 100%);
     border: 1.5px solid #d4ac0d;
     color: #1a1a1a;
-    font-size: 14px; 
-    font-weight: 700;
-    padding: 10px 20px; 
+    font-size: 15px;
+    font-weight: 800;
+    padding: 10px 20px;
     border-radius: 24px;
     box-shadow: 0 4px 12px rgba(241, 196, 15, 0.35);
     transition: all 0.2s ease-in-out;
@@ -128,6 +132,18 @@ body {
     border-color: #f1c40f;
     box-shadow: 0 6px 16px rgba(241, 196, 15, 0.55);
     transform: translateY(-2px);
+}
+
+.save-points-circle {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+}
+.save-points-circle .bi-suit-spade-fill {
+    color: #4a56f8;
+}
+.save-points-circle .bi-suit-heart-fill {
+    color: #bb1321;
 }
 
 .custom-navbar {
@@ -889,4 +905,69 @@ body.table-page {
 
 .earned-badge-pill .achievement-badge-graphic::after {
     display: none;
+}
+
+/* Navigation and account wrapper */
+.header-right {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 14px;
+}
+
+/* Account information */
+.table-page .account {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+
+    min-height: 34px;
+    padding: 5px 16px;
+
+    background: rgba(16, 28, 58, 0.55);
+    border: 1px solid rgba(82, 127, 209, 0.35);
+    border-radius: 8px;
+
+    color: var(--secondary-text);
+    font-size: 13px;
+    text-align: center;
+}
+
+.table-page .account strong {
+    color: var(--main-text);
+    font-weight: 650;
+}
+
+.account-divider {
+    color: rgba(169, 199, 245, 0.4);
+}
+
+/* Keep the save points button aligned */
+.account #save-points-container {
+    display: inline-flex;
+    align-items: center;
+}
+
+/* Responsive layout */
+@media (max-width: 750px) {
+    .table-page .top-bar {
+        flex-direction: column;
+        justify-content: center;
+        text-align: center;
+    }
+
+    .header-right {
+        width: 100%;
+    }
+
+    .navigation {
+        justify-content: center;
+    }
+
+    .table-page .account {
+        flex-wrap: wrap;
+        width: fit-content;
+        max-width: 100%;
+    }
 }
