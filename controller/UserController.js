@@ -136,7 +136,22 @@ exports.register = async function(req, res){
         let userData = {};
         userData.email = req.body.txt_email;         // Email address
         userData.username = req.body.txt_username;   // Username handle
-        userData.permission = 2;                     // Standard player
+        
+        //Validate optional sponsor code and assign sponsor permission (3) or player (2)
+        const requestedSponsorCode = typeof req.body?.txt_sponsor_code === "string"
+            ? req.body.txt_sponsor_code.trim()
+            : "";
+        const sponsorInfo = requestedSponsorCode ? validateSponsorCode(requestedSponsorCode) : null;
+
+        if (requestedSponsorCode && !sponsorInfo) {
+            return res.redirect('/signup.html?error=invalid_sponsor_code');
+        }
+
+        userData.permission = sponsorInfo ? 3 : 2;
+        if (sponsorInfo) {
+            userData.sponsorCode = sponsorInfo.code;
+            userData.sponsorName = req.body.txt_sponsor_name?.trim() || sponsorInfo.sponsorName;
+        }
         
         // Carry over kept guest points (from form or session), defaulting to 1000
         let startingPoints = 1000;
@@ -169,6 +184,9 @@ exports.register = async function(req, res){
             permission: userData.permission,
             points: userData.points
         };
+
+        // Route sponsors to their dedicated dashboard, standard players to index.html
+        const redirectTarget = userData.permission === 3 ? '/sponsorDashboard.html' : '/index.html';
 
         // Save session if available (Express session provides .save; some unit test mocks omit it)
         if (req.session && typeof req.session.save === "function") {
@@ -208,6 +226,8 @@ exports.login = async function(req, res){
 
             if(exports.adminCheck(req)){
                 res.redirect('admin.html'); 
+            } else if(exports.sponsorCheck(req)){
+                res.redirect('sponsorDashboard.html');
             } else {
                 res.redirect('index.html');
             }
@@ -776,7 +796,13 @@ exports.loggedUser = async function(req, res){
 
         if (freshUser) {
             const updatedSessionUser = typeof req.session.user === "object"
-                ? { ...req.session.user, points: freshUser.points }
+                ? {
+                    ...req.session.user,
+                    points: freshUser.points,
+                    permission: freshUser.permission ?? req.session.user.permission,
+                    sponsorCode: freshUser.sponsorCode ?? req.session.user.sponsorCode,
+                    sponsorName: freshUser.sponsorName ?? req.session.user.sponsorName
+                }
                 : freshUser;
 
             req.session.user = updatedSessionUser;
@@ -817,6 +843,36 @@ exports.logout = function(req, res){
     });
 };
 
+// ============================================================================
+// Sponsor Account & Code Helpers
+// ============================================================================
+
+// System-stored valid sponsor codes (update or move to DB/env as needed)
+const VALID_SPONSOR_CODES = {
+    "VIP2026": { sponsorName: "VIP Poker Club", active: true },
+    "MIDNIGHT21": { sponsorName: "Midnight Lounge", active: true },
+    "ACEPARTNER": { sponsorName: "Ace Partner Network", active: true }
+};
+
+function validateSponsorCode(rawCode) {
+    if (typeof rawCode !== "string") return null;
+    const normalized = rawCode.trim().toUpperCase();
+    const record = VALID_SPONSOR_CODES[normalized];
+    if (!record || record.active !== true) return null;
+    return {
+        code: normalized,
+        sponsorName: record.sponsorName
+    };
+}
+
+/**
+ * Helper utility to verify if the currently sessioned user holds sponsor privileges.
+ * @param {Object} req
+ * @returns {boolean}
+ */
+exports.sponsorCheck = function(req) {
+    return Boolean(req.session && req.session.user && Number(req.session.user.permission) === 3);
+};
 
 /**
  * Helper utility to verify if the currently sessioned user holds administrator privileges.

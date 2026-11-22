@@ -171,6 +171,10 @@ app.get("/api/tables/public/leaderboards", async (req, res) => {
     }
 });
 
+//Sponsor banner & admin moderation routes
+const sponsorRoutes = require("./routes/sponsorRoutes");
+app.use(sponsorRoutes);
+
 if (require.main === module) {
     const port = process.env.PORT || 3000;
     app.listen(port, () => {

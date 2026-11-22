@@ -8,6 +8,7 @@ const db = require('./model/DbConnection');
 const http = require('http');
 const { Server } = require('socket.io');
 const { mainTable, finishGame } = require('./controller/tableController');
+const SponsorBanner = require('./model/SponsorBanner');
 
 const PORT = process.env.PORT || 3000;
 
@@ -91,7 +92,86 @@ async function startServer() {
                     });
                 }
             });
+
+            //send banner immediately on connect and refresh when it updates
+            socket.emit('SPONSOR_BANNER_ROTATION', getCurrentBannerPayload());
+            socket.on('REQUEST_SPONSOR_BANNER', () => {
+                socket.emit('SPONSOR_BANNER_ROTATION', getCurrentBannerPayload());
+            });
+
         });
+
+        let activeBannersCache = [];
+        let activeBannerIndex = 0;
+        let currentBannerEndsAt = 0;
+
+        // load approve banners
+        function getCurrentBannerPayload() {
+            if (!activeBannersCache.length) {
+                return { banner: null, secondsRemaining: 0, totalBanners: 0 };
+            }
+            const safeIdx = activeBannerIndex % activeBannersCache.length;
+            const current = activeBannersCache[safeIdx];
+            const secondsRemaining = Math.max(0, Math.ceil((currentBannerEndsAt - Date.now()) / 1000));
+            return {
+                banner: current,
+                secondsRemaining,
+                totalBanners: activeBannersCache.length
+            };
+        }
+
+        async function refreshApprovedBanners(resetIndex = false) {
+            try {
+                const rows = await SponsorBanner.find({
+                    status: 'approved',
+                    isActive: true
+                })
+                    .select('_id sponsorName sponsorCode headline subtext linkUrl theme durationSec updatedAt')
+                    .sort({ updatedAt: -1 });
+
+                activeBannersCache = rows.map((b) => {
+                    let safeUrl = '';
+                    if (b.linkUrl) {
+                        try {
+                            const parsed = new URL(b.linkUrl);
+                            if (parsed.protocol === 'http:' || parsed.protocol === 'https:') {
+                                safeUrl = parsed.href;
+                            }
+                        } catch {
+                            safeUrl = '';
+                        }
+                    }
+                    const dur = Math.max(5, Math.min(30, Number(b.durationSec) || 20));
+                    return {
+                        id: String(b._id),
+                        sponsorName: b.sponsorName,
+                        sponsorCode: b.sponsorCode,
+                        headline: b.headline,
+                        subtext: b.subtext || '',
+                        linkUrl: safeUrl,
+                        theme: b.theme || 'midnight',
+                        durationSec: dur
+                    };
+                });
+
+                if (!activeBannersCache.length) {
+                    activeBannerIndex = 0;
+                    currentBannerEndsAt = 0;
+                } else {
+                    if (resetIndex || activeBannerIndex >= activeBannersCache.length) {
+                        activeBannerIndex = 0;
+                    }
+                    const durationMs = activeBannersCache[activeBannerIndex].durationSec * 1000;
+                    currentBannerEndsAt = Date.now() + durationMs;
+                }
+
+                io.emit('SPONSOR_BANNER_ROTATION', getCurrentBannerPayload());
+            } catch (err) {
+                console.error('Failed to refresh approved sponsor banners:', err);
+            }
+        }
+
+        refreshApprovedBanners(true);
 
         const intervalId = setInterval(() => {
             try {
