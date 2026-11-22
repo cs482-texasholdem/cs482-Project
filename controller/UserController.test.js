@@ -1183,3 +1183,167 @@ test('resetPasswordWithCode should return 500 when an unexpected error occurs', 
     expect(res.status).toHaveBeenCalledWith(500);
     expect(res.json).toHaveBeenCalledWith({ error: "Failed to reset password." });
 });
+
+// ==========================================
+// Avatar Preset Tests
+// ==========================================
+
+function avatarResponse() {
+    return {
+        status: jest.fn().mockReturnThis(),
+        json: jest.fn()
+    };
+}
+
+
+// Test retrieving available avatars
+test('getAvatarPresets returns available presets', function() {
+    const res = avatarResponse();
+
+    controller.getAvatarPresets({}, res);
+
+    expect(res.status).toHaveBeenCalledWith(200);
+    expect(res.json).toHaveBeenCalledWith({
+        avatars: expect.arrayContaining([
+            { id: 'default', name: 'Default' },
+            { id: 'ace', name: 'Ace of Spades' }
+        ])
+    });
+});
+
+
+// Test saving an avatar
+test('updateAvatar saves a valid preset', async function() {
+    const req = {
+        session: {
+            user: { username: 'alice' }
+        },
+        body: { avatar: 'queen' }
+    };
+
+    const res = avatarResponse();
+
+    dao.update.mockResolvedValue({
+        username: 'alice',
+        avatar: 'queen'
+    });
+
+    await controller.updateAvatar(req, res);
+
+    expect(dao.update).toHaveBeenCalledWith(
+        {
+            $or: [
+                { username: 'alice' },
+                { email: 'alice' }
+            ]
+        },
+        {
+            $set: { avatar: 'queen' }
+        }
+    );
+
+    expect(req.session.user.avatar).toBe('queen');
+    expect(res.status).toHaveBeenCalledWith(200);
+    expect(res.json).toHaveBeenCalledWith({
+        avatar: 'queen'
+    });
+});
+
+
+// Test authentication
+test('updateAvatar rejects unauthenticated requests', async function() {
+    const res = avatarResponse();
+
+    await controller.updateAvatar({
+        session: {},
+        body: { avatar: 'ace' }
+    }, res);
+
+    expect(res.status).toHaveBeenCalledWith(401);
+    expect(dao.update).not.toHaveBeenCalled();
+});
+
+
+// Test invalid avatar
+test('updateAvatar rejects unknown presets', async function() {
+    const res = avatarResponse();
+
+    await controller.updateAvatar({
+        session: {
+            user: { username: 'alice' }
+        },
+        body: { avatar: 'invalid_avatar' }
+    }, res);
+
+    expect(res.status).toHaveBeenCalledWith(400);
+    expect(dao.update).not.toHaveBeenCalled();
+});
+
+
+// Test missing user
+test('updateAvatar returns 404 if account does not exist', async function() {
+    const res = avatarResponse();
+
+    dao.update.mockResolvedValue(null);
+
+    await controller.updateAvatar({
+        session: {
+            user: { username: 'alice' }
+        },
+        body: { avatar: 'jack' }
+    }, res);
+
+    expect(res.status).toHaveBeenCalledWith(404);
+});
+
+
+// Test database failure
+test('updateAvatar handles DAO failures', async function() {
+    const res = avatarResponse();
+
+    dao.update.mockRejectedValue(new Error('DB failure'));
+
+    await controller.updateAvatar({
+        session: {
+            user: { username: 'alice' }
+        },
+        body: { avatar: 'ace' }
+    }, res);
+
+    expect(res.status).toHaveBeenCalledWith(500);
+});
+
+
+// Test avatar retrieval from MongoDB
+test('loggedUser returns fresh avatar alongside points', async function() {
+    const req = {
+        session: {
+            user: {
+                username: 'alice',
+                points: 1000
+            }
+        }
+    };
+
+    const res = {
+        status: jest.fn(),
+        send: jest.fn(),
+        end: jest.fn()
+    };
+
+    dao.findOne.mockResolvedValue({
+        username: 'alice',
+        points: 1250,
+        avatar: 'joker'
+    });
+
+    await controller.loggedUser(req, res);
+
+    expect(req.session.user.avatar).toBe('joker');
+
+    expect(res.send).toHaveBeenCalledWith(
+        expect.objectContaining({
+            avatar: 'joker'
+        })
+    );
+});

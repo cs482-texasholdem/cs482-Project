@@ -35,9 +35,14 @@ app.use(express.static('public'));
 const UserCont = require("./controller/UserController"); 
 app.post('/user', UserCont.postCreateOrUpdate);
 app.get('/user', UserCont.getAll);
+
 app.post('/register', UserCont.register);
 app.post('/loginuser', UserCont.login);
 app.get('/loggeduser', UserCont.loggedUser);
+
+app.get('/api/avatars', UserCont.getAvatarPresets);
+app.patch('/api/user/avatar', UserCont.updateAvatar);
+
 app.get('/logout', UserCont.logout); 
 app.get('/deluser/:id', UserCont.deleteOne); 
 app.post('/api/auth/forgot-password', UserCont.requestPasswordReset);

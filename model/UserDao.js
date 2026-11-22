@@ -10,6 +10,7 @@
  */
 
 const mongoose = require('mongoose');
+const { avatarIds } = require('../util/avatarPresets');
 
 /**
  * Mongoose Schema definition for application users.
@@ -23,6 +24,14 @@ const userSchema = new mongoose.Schema({
     permission: { type: Number, default: 2 },
     creation: { type: Date, default: Date.now },
     points: { type: Number, default: 1000 },
+
+    // Player's selected poker avatar
+    avatar: {
+        type: String,
+        enum: avatarIds,
+        default: "default"
+    },
+    
     isActive: { type: Boolean, default: true },
 
     // Password reset verification fields

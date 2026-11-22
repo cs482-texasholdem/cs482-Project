@@ -15,6 +15,7 @@ const dao = require('../model/UserDao');
 const passUtil = require('../util/PasswordUtil');
 const FriendMessage = require('../model/FriendMessage');
 const presence = require('../model/PresenceManager');
+const { avatarPresets, avatarIds } = require('../util/avatarPresets');
 
 /**
  * Helper utility to safely extract the current username string from session state.
@@ -740,6 +741,78 @@ exports.getGuestPoints = function(req, res) {
 // Session & Utility Controllers
 // ============================================================================
 
+// ============================================================================
+// Avatar Preset Controllers
+// ============================================================================
+
+// Return all available avatar presets
+exports.getAvatarPresets = function(req, res) {
+    return res.status(200).json({
+        avatars: avatarPresets
+    });
+};
+
+
+// Update the logged-in user's avatar
+exports.updateAvatar = async function(req, res) {
+
+    const username = getCurrentUsername(req);
+
+    // User must be logged in
+    if (!username) {
+        return res.status(401).json({
+            error: "Unauthorized"
+        });
+    }
+
+    const avatar = req.body?.avatar;
+
+    // Validate the selected avatar
+    if (typeof avatar !== "string" || !avatarIds.includes(avatar)) {
+        return res.status(400).json({
+            error: "Invalid avatar preset"
+        });
+    }
+
+    try {
+        // Update the user's avatar in MongoDB
+        const updatedUser = await dao.update(
+            {
+                $or: [
+                    { username },
+                    { email: username }
+                ]
+            },
+            {
+                $set: { avatar }
+            }
+        );
+
+        if (!updatedUser) {
+            return res.status(404).json({
+                error: "User not found"
+            });
+        }
+
+        // Update the active session
+        if (typeof req.session.user === "object") {
+            req.session.user.avatar = updatedUser.avatar || avatar;
+        }
+
+        return res.status(200).json({
+            avatar: updatedUser.avatar || avatar
+        });
+
+    } catch (error) {
+        console.error("Error updating avatar:", error);
+
+        return res.status(500).json({
+            error: "Failed to update avatar"
+        });
+    }
+};
+
+
 /**
  * Returns the currently active session user data as JSON to the client.
  * 
@@ -765,7 +838,11 @@ exports.loggedUser = async function(req, res){
 
         if (freshUser) {
             const updatedSessionUser = typeof req.session.user === "object"
-                ? { ...req.session.user, points: freshUser.points }
+                ? { 
+                    ...req.session.user, 
+                    points: freshUser.points,
+                    avatar: freshUser.avatar || "default" 
+                }
                 : freshUser;
 
             req.session.user = updatedSessionUser;
