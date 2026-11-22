@@ -3,8 +3,8 @@
   File Name: lobby.html
   Author: Camila Cosme, Gigi Li
   Purpose: Standalone poker lobby page displaying active tables and stakes, 
-             with integrated offcanvas seating buy-in controls and player
-             achievements for logged-in users.
+             monthly public table leaderboards, integrated offcanvas seating
+             buy-in controls, and player achievements for logged-in users.
   ============================================================================
 -->
  
@@ -201,7 +201,7 @@
                 </div>
                 
                 <!-- Public Lobby Section -->
-                <div id="publicLobbiesSection" class="mt-4 d-none">
+                <div id="publicLobbiesSection" class="col-12 mt-4 d-none">
 
                     <div class="card shadow-sm border-secondary midnight-card"
                         style="background-color: #0b132b; color: #ffffff;">
@@ -236,7 +236,34 @@
 
             </div>
 
-            <!-- Bottom Achievements Section (Shown When Logged In) -->
+            <div id="publicTableLeaderboardsSection" class="mt-5">
+                <div class="card shadow-sm border-secondary midnight-card" style="background-color: #0b132b; color: #ffffff;">
+                    <div class="card-body p-4">
+                        <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+                            <div>
+                                <h3 class="fw-bold mb-1 text-white">
+                                    <i class="bi bi-trophy-fill text-warning me-2"></i> Monthly Public Table Leaderboards
+                                </h3>
+                                <p class="text-white opacity-75 small mb-0">
+                                    Ranked by net points gained at each public table. Resets automatically on the 1st of every month (UTC).
+                                </p>
+                            </div>
+                            <span class="badge bg-warning text-dark fw-semibold px-3 py-2" id="leaderboardMonthBadge">
+                                Current Month
+                            </span>
+                        </div>
+
+                        <div class="row g-3" id="publicTableLeaderboardsGrid">
+                            <div class="col-12">
+                                <p class="text-white opacity-75 small fst-italic mb-0">
+                                    Loading monthly public table leaderboards...
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <div id="lobbyAchievementsSection" class="mt-5 d-none">
                 <div class="card shadow-sm border-secondary midnight-card" style="background-color: #0b132b; color: #ffffff;">
                     <div class="card-body p-4">
