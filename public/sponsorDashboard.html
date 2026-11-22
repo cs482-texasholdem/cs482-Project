@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sponsor Dashboard - Texas Hold'em</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.13.1/font/bootstrap-icons.min.css">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body class="table-page">
+    <header class="top-bar">
+        <h1>♠ Sponsor Dashboard</h1>
+        <nav class="navigation" aria-label="Sponsor navigation">
+            <a href="sponsorDashboard.html" class="selected">Sponsor Portal</a>
+            <a href="lobby.html">Lobby</a>
+            <a href="/logout">Logout</a>
+        </nav>
+        <div class="account">
+            Sponsor: <strong id="sponsor-name">Loading...</strong>
+            <span class="account-divider">|</span>
+            Code: <strong id="sponsor-code">--</strong>
+        </div>
+    </header>
+
+    <main class="sponsor-layout">
+        <section class="sponsor-card">
+            <h2 style="margin-top: 0;">Design &amp; Submit Banner</h2>
+            <p style="color: var(--secondary-text); font-size: 13px; margin-top: -6px;">
+                Banners are reviewed by an admin before entering the live rotation (up to 30s or shorter based on reading time).
+            </p>
+
+            <form id="sponsor-banner-form">
+                <div class="sponsor-field">
+                    <label for="banner-headline">Banner Headline / Message</label>
+                    <input type="text" id="banner-headline" name="headline" maxlength="100" required placeholder="e.g., Weekend High-Roller Freeroll at 8 PM!">
+                </div>
+
+                <div class="sponsor-field">
+                    <label for="banner-subtext">Supporting Copy (Optional)</label>
+                    <textarea id="banner-subtext" name="subtext" rows="2" maxlength="160" placeholder="Short friendly details for players..."></textarea>
+                </div>
+
+                <div class="sponsor-field">
+                    <label for="banner-url">Destination Link (https:// or http:// only)</label>
+                    <input type="url" id="banner-url" name="linkUrl" placeholder="https://example.com/promo">
+                </div>
+
+                <div class="sponsor-field">
+                    <label for="banner-theme">Banner Style Theme</label>
+                    <select id="banner-theme" name="theme">
+                        <option value="midnight">Midnight Casino Blue</option>
+                        <option value="gold">Royal Gold Accent</option>
+                        <option value="emerald">Emerald Felt Accent</option>
+                    </select>
+                </div>
+
+                <div class="sponsor-field">
+                    <label for="banner-duration">Rotation Duration (5–30 seconds)</label>
+                    <input type="number" id="banner-duration" name="durationSec" min="5" max="30" value="20">
+                </div>
+
+                <div class="sponsor-field">
+                    <label style="display: inline-flex; align-items: center; gap: 8px; cursor: pointer;">
+                        <input type="checkbox" id="banner-active" name="isActive" checked style="width: auto;">
+                        <span>Include in active rotation once approved</span>
+                    </label>
+                </div>
+
+                <button type="submit" class="sponsor-submit-btn">
+                    <i class="bi bi-send-check-fill"></i> Submit Banner for Approval
+                </button>
+                <span id="sponsor-form-feedback" style="margin-left: 12px; font-size: 13px; color: var(--secondary-text);"></span>
+            </form>
+        </section>
+
+        <aside style="display: flex; flex-direction: column; gap: 20px;">
+            <section class="sponsor-card">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                    <h3 style="margin: 0;">Live Side-Banner Preview</h3>
+                    <span id="banner-approval-status" class="status-pill">Draft / Pending</span>
+                </div>
+
+                <div id="banner-preview" class="sponsor-preview-box">
+                    <span class="sponsor-badge-tag">SPONSORED</span>
+                    <div id="preview-headline" style="font-weight: 800; font-size: 15px; margin-bottom: 4px;">
+                        Your banner headline appears here
+                    </div>
+                    <div id="preview-subtext" style="font-size: 12px; color: var(--secondary-text); margin-bottom: 10px;">
+                        Add a short message or link for players.
+                    </div>
+                    <a id="preview-link" href="#" target="_blank" rel="noopener noreferrer" style="display: none; font-size: 12px; color: #f1c40f; font-weight: 700;">
+                        Visit Sponsor Link →
+                    </a>
+                </div>
+            </section>
+
+            <section class="sponsor-card">
+                <h3 style="margin-top: 0;">My Submitted Banners</h3>
+                <div id="sponsor-banner-list" style="font-size: 13px; color: var(--secondary-text);">
+                    No banners submitted yet in this session.
+                </div>
+            </section>
+        </aside>
+    </main>
+
+    <script src="sponsorDashboard.js"></script>
+</body>
+</html>

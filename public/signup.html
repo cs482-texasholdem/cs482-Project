@@ -130,6 +130,43 @@
                                         <input class="form-control input-line" type="password" id="txt_pass_confirm" placeholder="Enter Confirm Password" minlength="6" required />
                                     </div>
 
+                                    <!-- Hidden Sponsor Code Section (Sponsors Only) -->
+                                    <div class="mb-2">
+                                        <button
+                                            type="button"
+                                            id="toggle-sponsor-fields-btn"
+                                            class="btn btn-sm btn-outline-primary"
+                                        >
+                                            <i class="bi bi-award-fill"></i> Registering as a Sponsor? Enter Sponsor Code
+                                        </button>
+                                    </div>
+
+                                    <div id="sponsor-signup-fields" style="display: none;">
+                                        <div class="mb-3">
+                                            <label for="txt_sponsor_code" class="form-label text-muted small mb-1">Sponsor Code (Sponsors Only)</label>
+                                            <input
+                                                type="text"
+                                                class="form-control input-line"
+                                                id="txt_sponsor_code"
+                                                name="txt_sponsor_code"
+                                                placeholder="e.g., SP-VIP-2026"
+                                                autocomplete="off"
+                                            />
+                                        </div>
+
+                                        <div class="mb-4">
+                                            <label for="txt_sponsor_name" class="form-label text-muted small mb-1">Sponsor / Brand Name (Optional)</label>
+                                            <input
+                                                type="text"
+                                                class="form-control input-line"
+                                                id="txt_sponsor_name"
+                                                name="txt_sponsor_name"
+                                                placeholder="Display name for your banners"
+                                                maxlength="80"
+                                            />
+                                        </div>
+                                    </div>
+
                                     <!-- Action Buttons -->
                                     <div class="d-flex justify-content-between align-items-center pt-2">
                                         <button type="reset" class="btn btn-link text-muted text-decoration-none px-0">Clear</button>
