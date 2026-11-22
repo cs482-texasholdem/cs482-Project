@@ -137,7 +137,18 @@ exports.register = async function(req, res){
         userData.email = req.body.txt_email;         // Email address
         userData.username = req.body.txt_username;   // Username handle
         userData.permission = 2;                     // Standard player
-        userData.points = 1000;                      // Fixed starting points for all new users
+        
+        // Carry over kept guest points (from form or session), defaulting to 1000
+        let startingPoints = 1000;
+        const sessionPoints = req.session && typeof req.session.pendingGuestPoints === "number" ? req.session.pendingGuestPoints : null; 
+        const rawBodyPoints = req.body?.txt_points ?? req.body?.keptPoints;
+        const bodyPoints = rawBodyPoints !== undefined && rawBodyPoints !== "" ? Number(rawBodyPoints) : null;
+        const candidatePoints = bodyPoints !== null && Number.isFinite(bodyPoints) ? bodyPoints : sessionPoints; 
+        
+        if (typeof candidatePoints === "number" && Number.isFinite(candidatePoints)) { 
+            startingPoints = Math.max(0, Math.min(1000000, Math.floor(candidatePoints))); 
+        }
+        userData.points = startingPoints; 
 
         // Clear any temporary guest points from session so stale values don't linger
         if (req.session) {
