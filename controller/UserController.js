@@ -800,7 +800,7 @@ exports.loggedUser = async function(req, res){
  */
 exports.logout = function(req, res){
     req.session.user = null; // Clear user data from session
-    const io = req.app.get('io');
+    const io = req.app?.get?.('io');
     if (io && req.sessionID) {
         io.in(`session:${req.sessionID}`).disconnectSockets(true);
     }
