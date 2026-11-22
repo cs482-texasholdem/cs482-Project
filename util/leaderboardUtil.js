@@ -9,6 +9,169 @@
 
 const GameDao = require("../model/GameDao");
 
+const LOUNGE_TIERS = [
+    { key: "beginner", label: "Beginner Lounge" },
+    { key: "intermediate", label: "Intermediate Lounge" },
+    { key: "advanced", label: "Advanced Lounge" }
+];
+
+function resolveLoungeTier({ tableId = "", gameMode = "", tableName = "" }) {
+    const combined = `${String(tableId)} ${String(gameMode)} ${String(tableName)}`.toLowerCase();
+
+    if (combined.includes("beginner")) return "beginner";
+    if (combined.includes("intermediate")) return "intermediate";
+    if (combined.includes("advanced")) return "advanced";
+
+    return null;
+}
+
+function buildLoungeMetadataMap(tableManager) {
+    const map = new Map();
+    for (const tier of LOUNGE_TIERS) {
+        map.set(tier.key, {
+            loungeKey: tier.key,
+            tableId: `lounge-${tier.key}`,
+            tableName: tier.label,
+            tableIds: new Set(),
+            playerCount: 0,
+            maxPlayers: 0
+        });
+    }
+
+    if (!tableManager || typeof tableManager.getAllTables !== "function") {
+        return map;
+    }
+
+    for (const table of tableManager.getAllTables()) {
+        if (!table) continue;
+        const tierKey = resolveLoungeTier({
+            tableId: table.tableId,
+            gameMode: table.gameMode,
+            tableName: table.tableName
+        });
+        if (!tierKey) continue;
+
+        const meta = map.get(tierKey);
+        if (table.tableId) {
+            meta.tableIds.add(String(table.tableId).trim());
+        }
+        meta.playerCount += typeof table.getPlayerCount === "function" ? table.getPlayerCount() : 0;
+        meta.maxPlayers += Number(table.maxPlayers) || 9;
+    }
+
+    return map;
+}
+
+async function getMonthlyPublicTableLeaderboards({ tableManager = null, referenceDate = new Date() } = {}) {
+    const { start, end } = getCurrentMonthUtcBounds(referenceDate);
+    const monthKey = getMonthKey(referenceDate);
+    const loungeMetaMap = buildLoungeMetadataMap(tableManager);
+
+    const allGames = await GameDao.readAll();
+    const monthlyGames = (Array.isArray(allGames) ? allGames : []).filter((game) => {
+        if (!game || !game.timestamp) return false;
+        const ts = new Date(game.timestamp);
+        return !Number.isNaN(ts.getTime()) && ts >= start && ts < end;
+    });
+
+    // loungeKey -> Map(playerKey -> { playerId, pointsGained, handsWon, handsPlayed })
+    const perLoungePlayerStats = new Map();
+    for (const tier of LOUNGE_TIERS) {
+        perLoungePlayerStats.set(tier.key, new Map());
+    }
+
+    for (const game of monthlyGames) {
+        const tableId = typeof game.tableId === "string" ? game.tableId.trim() : "";
+        const tierKey = resolveLoungeTier({
+            tableId,
+            gameMode: game.gameMode,
+            tableName: game.tableName
+        });
+        if (!tierKey) continue;
+
+        const meta = loungeMetaMap.get(tierKey);
+        if (tableId) {
+            meta.tableIds.add(tableId);
+        }
+
+        const playerMap = perLoungePlayerStats.get(tierKey);
+        const initialPlayers = Array.isArray(game.initialPlayers) ? game.initialPlayers : [];
+        const winners = Array.isArray(game.winners) ? game.winners : [];
+        const winnerSet = new Set(winners.map((w) => normalizePlayerId(w).toLowerCase()).filter(Boolean));
+        const potFinal = Math.max(0, Number(game.potFinal) || 0);
+        const actions = Array.isArray(game.actions) ? game.actions : [];
+
+        const winnerCount = winnerSet.size;
+        const potSharePerWinner = winnerCount > 0 ? potFinal / winnerCount : 0;
+
+        for (const rawPlayerId of initialPlayers) {
+            const playerId = normalizePlayerId(rawPlayerId);
+            if (!playerId) continue;
+
+            const playerKey = playerId.toLowerCase();
+            if (!playerMap.has(playerKey)) {
+                playerMap.set(playerKey, {
+                    playerId,
+                    pointsGained: 0,
+                    handsWon: 0,
+                    handsPlayed: 0
+                });
+            }
+
+            const stats = playerMap.get(playerKey);
+            stats.handsPlayed += 1;
+
+            const isWinner = winnerSet.has(playerKey);
+            const committed = getPlayerActionSpend(actions, playerKey);
+
+            if (isWinner) {
+                stats.handsWon += 1;
+                const netGain = Math.round(potSharePerWinner - committed);
+                stats.pointsGained += netGain;
+            } else if (committed > 0) {
+                stats.pointsGained -= Math.round(committed);
+            }
+        }
+    }
+
+    const tables = LOUNGE_TIERS.map((tier) => {
+        const meta = loungeMetaMap.get(tier.key);
+        const playerMap = perLoungePlayerStats.get(tier.key);
+
+        const leaderboard = Array.from(playerMap.values())
+            .sort(
+                (a, b) =>
+                    b.pointsGained - a.pointsGained ||
+                    b.handsWon - a.handsWon ||
+                    a.playerId.localeCompare(b.playerId)
+            )
+            .map((entry, idx) => ({
+                rank: idx + 1,
+                playerId: entry.playerId,
+                pointsGained: entry.pointsGained,
+                handsWon: entry.handsWon,
+                handsPlayed: entry.handsPlayed
+            }));
+
+        return {
+            loungeKey: tier.key,
+            tableId: meta.tableId,
+            tableName: tier.label,
+            tableIds: Array.from(meta.tableIds),
+            tableCount: meta.tableIds.size,
+            playerCount: meta.playerCount,
+            maxPlayers: meta.maxPlayers,
+            leaderboard
+        };
+    });
+
+    return {
+        month: monthKey,
+        resetsAt: end.toISOString(),
+        tables
+    };
+}
+
 function getCurrentMonthUtcBounds(referenceDate = new Date()) {
     const year = referenceDate.getUTCFullYear();
     const month = referenceDate.getUTCMonth();
@@ -83,117 +246,6 @@ function buildPublicTableMetadataMap(tableManager) {
     }
 
     return map;
-}
-
-/**
- * Computes monthly points gained per public table for the current calendar month.
- * @param {Object} [options]
- * @param {Object} [options.tableManager] Optional TableManager instance for live table metadata
- * @param {Date} [options.referenceDate] Optional reference date (defaults to current date)
- */
-async function getMonthlyPublicTableLeaderboards({ tableManager = null, referenceDate = new Date() } = {}) {
-    const { start, end } = getCurrentMonthUtcBounds(referenceDate);
-    const monthKey = getMonthKey(referenceDate);
-    const publicTableMeta = buildPublicTableMetadataMap(tableManager);
-
-    const allGames = await GameDao.readAll();
-    const monthlyGames = (Array.isArray(allGames) ? allGames : []).filter((game) => {
-        if (!game || !game.timestamp) return false;
-        const ts = new Date(game.timestamp);
-        return !Number.isNaN(ts.getTime()) && ts >= start && ts < end;
-    });
-
-    // tableId -> Map(playerKey -> { playerId, pointsGained, handsWon, handsPlayed })
-    const perTablePlayerStats = new Map();
-
-    for (const tableId of publicTableMeta.keys()) {
-        perTablePlayerStats.set(tableId, new Map());
-    }
-
-    for (const game of monthlyGames) {
-        const tableId = typeof game.tableId === "string" ? game.tableId.trim() : "";
-        if (!isPublicTableId(tableId, publicTableMeta)) continue;
-
-        if (!perTablePlayerStats.has(tableId)) {
-            perTablePlayerStats.set(tableId, new Map());
-        }
-
-        const playerMap = perTablePlayerStats.get(tableId);
-        const initialPlayers = Array.isArray(game.initialPlayers) ? game.initialPlayers : [];
-        const winners = Array.isArray(game.winners) ? game.winners : [];
-        const winnerSet = new Set(winners.map((w) => normalizePlayerId(w).toLowerCase()).filter(Boolean));
-        const potFinal = Math.max(0, Number(game.potFinal) || 0);
-        const actions = Array.isArray(game.actions) ? game.actions : [];
-
-        const winnerCount = winnerSet.size;
-        const potSharePerWinner = winnerCount > 0 ? potFinal / winnerCount : 0;
-
-        for (const rawPlayerId of initialPlayers) {
-            const playerId = normalizePlayerId(rawPlayerId);
-            if (!playerId) continue;
-
-            const playerKey = playerId.toLowerCase();
-            if (!playerMap.has(playerKey)) {
-                playerMap.set(playerKey, {
-                    playerId,
-                    pointsGained: 0,
-                    handsWon: 0,
-                    handsPlayed: 0
-                });
-            }
-
-            const stats = playerMap.get(playerKey);
-            stats.handsPlayed += 1;
-
-            const isWinner = winnerSet.has(playerKey);
-            const committed = getPlayerActionSpend(actions, playerKey);
-
-            if (isWinner) {
-                stats.handsWon += 1;
-                // Net gain approximates pot share minus player's recorded action commitment
-                const netGain = Math.round(potSharePerWinner - committed);
-                stats.pointsGained += netGain;
-            } else if (committed > 0) {
-                stats.pointsGained -= Math.round(committed);
-            }
-        }
-    }
-
-    const tables = [];
-    for (const [tableId, playerMap] of perTablePlayerStats.entries()) {
-        const meta = publicTableMeta.get(tableId) || {
-            tableId,
-            tableName: `Public Table (${tableId.slice(0, 8)})`,
-            smallBlind: null,
-            bigBlind: null,
-            buyIn: null,
-            playerCount: 0,
-            maxPlayers: 9
-        };
-
-        const leaderboard = Array.from(playerMap.values())
-            .sort((a, b) => b.pointsGained - a.pointsGained || b.handsWon - a.handsWon || a.playerId.localeCompare(b.playerId))
-            .map((entry, idx) => ({
-                rank: idx + 1,
-                playerId: entry.playerId,
-                pointsGained: entry.pointsGained,
-                handsWon: entry.handsWon,
-                handsPlayed: entry.handsPlayed
-            }));
-
-        tables.push({
-            ...meta,
-            leaderboard
-        });
-    }
-
-    tables.sort((a, b) => a.tableName.localeCompare(b.tableName));
-
-    return {
-        month: monthKey,
-        resetsAt: end.toISOString(),
-        tables
-    };
 }
 
 module.exports = {

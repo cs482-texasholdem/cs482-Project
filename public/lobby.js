@@ -389,7 +389,7 @@ async function loadPublicTableLeaderboards() {
             if (table.smallBlind && table.bigBlind) {
                 stakesEl.textContent = `Blinds: $${table.smallBlind} / $${table.bigBlind}`;
             } else {
-                stakesEl.textContent = `Table ID: ${table.tableId}`;
+                stakesEl.textContent = `${table.tableId}`;
             }
 
             titleWrap.append(titleEl, stakesEl);
