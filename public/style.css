@@ -1082,3 +1082,104 @@ body.table-page {
     color: #f1c40f;
     border: 1px solid #f1c40f;
 }
+
+
+/* ============================================================
+   Poker Avatar Selection
+   ============================================================ */
+
+/* Current avatar displayed on dashboard */
+.dashboard-avatar {
+    width: 75px;
+    height: 75px;
+    flex-shrink: 0;
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    border-radius: 50%;
+    border: 3px solid #527FD1;
+
+    background: #1B3260;
+    color: #F2D27A;
+
+    font-size: 36px;
+
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+
+/* Avatar grid inside modal */
+.avatar-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 14px;
+}
+
+
+/* Individual avatar option */
+.avatar-option {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+
+    gap: 8px;
+    padding: 16px 8px;
+
+    background: #131b2e;
+    border: 2px solid #315CA8;
+    border-radius: 12px;
+
+    color: #F4F7FC;
+    cursor: pointer;
+
+    transition: 0.2s ease;
+}
+
+.avatar-option i {
+    font-size: 36px;
+    color: #F2D27A;
+}
+
+.avatar-option span {
+    font-size: 12px;
+    text-align: center;
+    font-weight: 600;
+}
+
+
+/* Hover */
+.avatar-option:hover {
+    background: #1B3260;
+    border-color: #527FD1;
+    transform: translateY(-2px);
+}
+
+
+/* Currently selected preset */
+.avatar-option.selected {
+    background: #315CA8;
+    border-color: #F2D27A;
+    box-shadow: 0 0 12px rgba(242, 210, 122, 0.3);
+}
+
+.avatar-option:focus-visible {
+    outline: 3px solid #F2D27A;
+    outline-offset: 3px;
+}
+
+
+/* Responsive layout */
+@media (max-width: 480px) {
+    .avatar-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+
+    .dashboard-avatar {
+        width: 60px;
+        height: 60px;
+        font-size: 28px;
+    }
+}
