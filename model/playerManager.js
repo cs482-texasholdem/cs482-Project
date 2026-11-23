@@ -52,13 +52,18 @@ class PlayerManager {
     }
 
     // Allow passing a starting chip stack (such as a registered user's saved points), defaulting to 1000
-    addPlayer(playerId, startingChips = 1000) {
+    addPlayer(playerId, startingChips = 1000, gameInProgress = false) {
         if (typeof playerId !== "string" || !playerId.trim()) {
             return false;
         }
 
         const trimmedId = playerId.trim();
         if (this.hasPlayer(trimmedId)) {
+            return false;
+        }
+
+        // Prevent players from exceeding the table's maximum capacity
+        if (this.isFull()) {
             return false;
         }
 
@@ -70,7 +75,7 @@ class PlayerManager {
         const player = new Player(trimmedId, validChips);
         this.playerObjects.set(trimmedId, player);
         this.queue.push(trimmedId);
-        this.updateQueueDistribution(false);
+        this.updateQueueDistribution(gameInProgress);
         return true;
     }
 

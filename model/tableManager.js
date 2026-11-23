@@ -97,7 +97,10 @@ class TableManager {
         }
 
         for (const table of this.tables.values()) {
-            if (table.skillLevel === skillLevel && table.gameMode === gameMode && !table.isFull()) {
+            if (table.skillLevel === skillLevel && 
+                table.gameMode === gameMode && 
+                !table.isFull() && 
+                (!table.gameStarted || !table.gameInProgress)) {
                 return table;
             }
         }
@@ -106,19 +109,56 @@ class TableManager {
     }
 
     getOrCreateRankedTable(skillLevel) {
-        if (!["beginner", "intermediate", "advanced"].includes(skillLevel)) {
+            const rankedSettings = {
+            beginner: {
+                smallBlind: 1,
+                bigBlind: 2,
+                buyIn: 100,
+                name: "Beginner Lounge"
+            },
+
+            intermediate: {
+                smallBlind: 25,
+                bigBlind: 50,
+                buyIn: 2500,
+                name: "Intermediate Lounge"
+            },
+
+            advanced: {
+                smallBlind: 5,
+                bigBlind: 10,
+                buyIn: 500,
+                name: "Advanced Lounge"
+            }
+        };
+
+        const settings = rankedSettings[skillLevel];
+
+        if (!settings) {
             throw new Error("Invalid ranked skill level.");
         }
+   
+        // First, try to fill an existing waiting table
+         let table = this.findAvailableTable(skillLevel, "ranked");
 
-        //enter OR create new Ranked table logic
-        let table = this.findAvailableTable(skillLevel, "ranked");
-
+        // If all tables are full or currently playing, create a new one
         if (table === null) {
-            table = this.createTable(skillLevel, 30, "ranked");
+            table = this.createTable(
+                skillLevel,
+                30,
+                "ranked",
+                9,
+                settings.smallBlind,
+                settings.bigBlind
+            );
+
+            table.tableName = settings.name;
+            table.buyIn = settings.buyIn;
         }
 
         return table;
-    }
+        
+        }
 }
 
 module.exports = TableManager;

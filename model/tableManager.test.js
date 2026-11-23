@@ -223,3 +223,135 @@ describe('TableManager Comprehensive Unit Tests', () => {
         expect(() => manager.getOrCreateRankedTable("general")).toThrow("Invalid ranked skill level.");
     });
 });
+
+
+describe("Ranked Multitable Matchmaking", () => {
+    let manager;
+
+    beforeEach(() => {
+        manager = new TableManager();
+    });
+
+    // Simulates the table selection and joining steps.
+    // The controller endpoint is tested separately.
+    function joinRanked(playerId, skillLevel = "beginner") {
+        const table = manager.getOrCreateRankedTable(skillLevel);
+        const added = table.addPlayer(playerId);
+
+        expect(added).toBe(true);
+        expect(table.players).toContain(playerId);
+
+        return table;
+    }
+
+    test("Nine players should join the same ranked table", () => {
+        const firstTable = joinRanked("player1");
+
+        for (let i = 2; i <= 9; i++) {
+            const table = joinRanked(`player${i}`);
+            expect(table.tableId).toBe(firstTable.tableId);
+        }
+
+        expect(firstTable.getPlayerCount()).toBe(9);
+        expect(firstTable.isFull()).toBe(true);
+        expect(manager.getAllTables()).toHaveLength(1);
+    });
+
+    test("Tenth player should be assigned to another ranked table", () => {
+        let firstTable;
+
+        for (let i = 1; i <= 9; i++) {
+            firstTable = joinRanked(`player${i}`);
+        }
+
+        const secondTable = joinRanked("player10");
+
+        expect(secondTable.tableId).not.toBe(firstTable.tableId);
+        expect(firstTable.getPlayerCount()).toBe(9);
+        expect(secondTable.getPlayerCount()).toBe(1);
+        expect(manager.getAllTables()).toHaveLength(2);
+    });
+
+    test("Players cannot join a ranked game in progress", () => {
+        const firstTable = joinRanked("player1");
+        joinRanked("player2");
+
+        const result = firstTable.startGame();
+        expect(result.success).toBe(true);
+
+        const secondTable = joinRanked("player3");
+
+        expect(secondTable.tableId).not.toBe(firstTable.tableId);
+        expect(firstTable.players).not.toContain("player3");
+        expect(secondTable.players).toContain("player3");
+    });
+
+    test("Beginner, Intermediate, and Advanced use separate tables", () => {
+        const beginner = joinRanked("beginnerPlayer", "beginner");
+        const intermediate = joinRanked("intermediatePlayer", "intermediate");
+        const advanced = joinRanked("advancedPlayer", "advanced");
+
+        expect(beginner.tableId).not.toBe(intermediate.tableId);
+        expect(beginner.tableId).not.toBe(advanced.tableId);
+        expect(intermediate.tableId).not.toBe(advanced.tableId);
+
+        expect(manager.getAllTables()).toHaveLength(3);
+
+        expect(beginner.skillLevel).toBe("beginner");
+        expect(intermediate.skillLevel).toBe("intermediate");
+        expect(advanced.skillLevel).toBe("advanced");
+    });
+
+    test("Ranked players should not become spectators", () => {
+        for (let i = 1; i <= 10; i++) {
+            const playerId = `player${i}`;
+            const table = joinRanked(playerId);
+
+            expect(table.players).toContain(playerId);
+            expect(table.spectators).not.toContain(playerId);
+            expect(table.getSpectatorCount()).toBe(0);
+        }
+    });
+
+    test("Multiple tables maintain independent game states", () => {
+        const table1 = joinRanked("player1");
+        joinRanked("player2");
+
+        // Start the first game so matchmaking creates a new table.
+        expect(table1.startGame().success).toBe(true);
+
+        const table2 = joinRanked("player3");
+        joinRanked("player4");
+
+        expect(table2.startGame().success).toBe(true);
+
+        // Modify one table's state independently.
+        const originalTable2Pot = table2.pot;
+        const originalTable1Pot = table1.pot;
+
+        // Add 500 chips to the first table's main pot.
+        table1.potManager.pots[0].amount += 500;
+
+        // Verify the first table changed.
+        expect(table1.pot).toBe(originalTable1Pot + 500);
+
+        // Verify the second table was unaffected.
+        expect(table2.pot).toBe(originalTable2Pot);
+
+        expect(table1.playerManager).not.toBe(table2.playerManager);
+        expect(table1.deck).not.toBe(table2.deck);
+        expect(table1.playerHands).not.toBe(table2.playerHands);
+
+        expect(table1.players).toEqual(["player1", "player2"]);
+        expect(table2.players).toEqual(["player3", "player4"]);
+    });
+
+    test("Custom tables are never selected for ranked matchmaking", () => {
+        const custom = manager.createTable("beginner", 30, "custom");
+        const ranked = joinRanked("rankedPlayer", "beginner");
+
+        expect(ranked.tableId).not.toBe(custom.tableId);
+        expect(ranked.gameMode).toBe("ranked");
+        expect(custom.players).not.toContain("rankedPlayer");
+    });
+});

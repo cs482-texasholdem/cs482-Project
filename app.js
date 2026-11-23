@@ -75,11 +75,10 @@ app.get('/api/achievements', achievementCont.getAchievements);
 app.get('/api/achievements/:playerId', achievementCont.getAchievements);
 
 // Table Actions (Query/Body Table ID)
-const {createTable, joinTable, leaveTable, playerAction, startGame, nextRound, getTableStatus, postChatMessage, updateMuckPreference} = require("./controller/tableController");
-const { getGuestPoints } = require("./controller/UserController");
-app.get("/api/guest/points", getGuestPoints);
+const {createTable, joinRankedTable, joinTable, leaveTable, playerAction, startGame, nextRound, getTableStatus, postChatMessage, updateMuckPreference} = require("./controller/tableController");
 app.get("/api/table/status", getTableStatus);
 app.post("/api/table/join", joinTable);
+app.post("/api/table/ranked/join", joinRankedTable);
 app.post("/api/table/leave", leaveTable);
 app.post("/api/table/action", playerAction);
 app.post("/api/table/start", startGame);

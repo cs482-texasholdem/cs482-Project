@@ -332,7 +332,37 @@ if (joinTableForm) {
         input.value = resolvedPlayerId;
         this.appendChild(input);
 
-        HTMLFormElement.prototype.submit.call(this);
+        const selectedTableId = this.querySelector('input[name="tableId"]')?.value;
+
+        const skillLevel = selectedTableId?.replace("ranked-", "");
+
+        try {
+            const response = await fetch("/api/table/ranked/join", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({
+                    playerId: resolvedPlayerId,
+                    skillLevel
+                })
+            });
+
+            const data = await response.json();
+
+            if (!response.ok) {
+                throw new Error(data.error || "Failed to join ranked table.");
+            }
+
+            // Redirect using the ACTUAL dynamically assigned table ID
+            window.location.href =
+                `tableDisplay.html?tableId=${encodeURIComponent(data.tableId)}` +
+                `&playerId=${encodeURIComponent(resolvedPlayerId)}`;
+
+        } catch (error) {
+            console.error("Ranked matchmaking failed:", error);
+            alert(error.message);
+        }
     });
 }
 

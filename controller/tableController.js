@@ -375,6 +375,103 @@ function postChatMessage(req, res) {
     });
 }
 
+// ============================================================================
+// RANKED MATCHMAKING
+// ============================================================================
+
+async function joinRankedTable(req, res) {
+    const { playerId, skillLevel } = req.body || {};
+
+    if (typeof playerId !== "string" || !playerId.trim()) {
+        return res.status(400).json({
+            error: "Player ID is required."
+        });
+    }
+
+    if (!["beginner", "intermediate", "advanced"].includes(skillLevel)) {
+        return res.status(400).json({
+            error: "Invalid ranked skill level."
+        });
+    }
+
+    const id = playerId.trim();
+
+    // Check if the player is already assigned to a ranked table
+    const existingTable = tableManager.getAllTables().find(table =>
+        table.gameMode === "ranked" &&
+        table.hasPlayer(id)
+    );
+
+    if (existingTable) {
+        return res.status(200).json({
+            message: "Already assigned to a ranked table.",
+            tableId: existingTable.tableId,
+            isPlayer: existingTable.players.includes(id),
+            playerCount: existingTable.getPlayerCount()
+        });
+    }
+
+    // Retrieve the player's saved chips and avatar
+    let startingChips = 1000;
+    let playerAvatar = "default";
+
+    if (!id.startsWith("Guest_")) {
+        try {
+            const dbUser = await UserDao.findOne({
+                $or: [{ username: id }, { email: id }]
+            });
+
+            if (dbUser) {
+                if (typeof dbUser.points === "number") {
+                    startingChips = Math.max(0, Math.floor(dbUser.points));
+                }
+
+                playerAvatar = dbUser.avatar || "default";
+            }
+        } catch (err) {
+            console.error("Failed to load ranked player:", err);
+        }
+    }
+
+    // Find an available waiting table or create a new one
+    const table = tableManager.getOrCreateRankedTable(skillLevel);
+
+    // Never place a ranked player into an ongoing game
+    if (table.isFull() || table.gameInProgress) {
+        return res.status(409).json({
+            error: "Ranked table is no longer available."
+        });
+    }
+
+    // Assign the player to the selected ranked table
+    if (!table.addPlayer(id, startingChips)) {
+        return res.status(409).json({
+            error: "Could not join ranked table."
+        });
+    }
+
+    const player = table.playerManager.getPlayer(id);
+
+    if (player) {
+        player.avatar = playerAvatar;
+    }
+
+    ensureTableChat(table);
+    broadcastTableUpdate(req, table.tableId);
+
+    return res.status(200).json({
+        message: "Successfully joined ranked table.",
+        tableId: table.tableId,
+        tableName: table.tableName,
+        skillLevel: table.skillLevel,
+        gameMode: table.gameMode,
+        isPlayer: true,
+        playerCount: table.getPlayerCount(),
+        maxPlayers: table.maxPlayers
+    });
+}
+
+//custom tables
 async function joinTable(req, res) {
     const table = getRequestedTable(req);
 
@@ -390,13 +487,27 @@ async function joinTable(req, res) {
 
     const id = playerId.trim();
 
+    // Only custom tables can be joined directly.
+    // Ranked tables must use automatic matchmaking.
+    if (table.gameMode !== "custom") {
+        return res.status(403).json({
+            error: "Ranked tables use automatic matchmaking."
+        });
+    }
+
+    // Prevent joining a full custom table.
+    if (table.isFull()) {
+        return res.status(409).json({
+            error: "This custom table is full."
+        });
+    }
+
     if (table.hasPlayer(id)) {
         return res.status(200).json({
             message: "Player is already at the table.",
             isPlayer: table.players.includes(id)
         });
     }
-
     
 // Default values for guest players
 let startingChips = 1000;
@@ -664,6 +775,7 @@ function updateMuckPreference(req, res) {
 
 module.exports = {
     createTable,
+    joinRankedTable,
     joinTable,
     leaveTable,
     startGame,

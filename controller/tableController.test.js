@@ -3,7 +3,7 @@ jest.mock('../model/UserDao', () => ({
     findOne: jest.fn().mockResolvedValue(null)
 }));
 const GameDao = require('../model/GameDao');
-const { getTableStatus, tableManager, joinTable, leaveTable, startGame, finishGame, playerAction, nextRound, postChatMessage, mainTable} = require('../controller/tableController.js');
+const { getTableStatus, tableManager, joinTable, joinRankedTable, leaveTable, startGame, finishGame, playerAction, nextRound, postChatMessage, mainTable} = require('../controller/tableController.js');
 const TableManager = require('../model/tableManager');
 
 describe('Table Controller Unit Tests', () => {
@@ -776,4 +776,221 @@ describe('Multi-Table Controller Tests', () => {
         expect(res.status).toHaveBeenCalledWith(200);
     });
     
+});
+
+
+describe("Ranked Matchmaking Controller Tests", () => {
+    let req, res, mockIo;
+    let originalTables;
+
+    beforeEach(() => {
+        jest.clearAllMocks();
+
+        // Preserve existing tables, including custom tables.
+        originalTables = new Map(tableManager.tables);
+        tableManager.tables.clear();
+
+        mockIo = {
+            emit: jest.fn(),
+            to: jest.fn().mockReturnThis()
+        };
+
+        req = {
+            params: {},
+            query: {},
+            body: {},
+            session: {},
+            app: {
+                get: jest.fn((key) =>
+                    key === "io" ? mockIo : null
+                )
+            }
+        };
+
+        res = {
+            status: jest.fn().mockReturnThis(),
+            json: jest.fn().mockReturnThis()
+        };
+    });
+
+    afterEach(() => {
+        // Restore the tables that existed before each test.
+        tableManager.tables.clear();
+
+        for (const [id, table] of originalTables) {
+            tableManager.tables.set(id, table);
+        }
+    });
+
+    async function rankedJoin(playerId, skillLevel = "beginner") {
+        res.status.mockClear();
+        res.json.mockClear();
+
+        req.body = { playerId, skillLevel };
+
+        await joinRankedTable(req, res);
+
+        const response = res.json.mock.calls.at(-1)[0];
+
+        return {
+            status: res.status.mock.calls.at(-1)[0],
+            response,
+            table: response.tableId
+                ? tableManager.getTable(response.tableId)
+                : null
+        };
+    }
+
+    test("Nine ranked players join the same table", async () => {
+        const tableIds = [];
+
+        for (let i = 1; i <= 9; i++) {
+            const result = await rankedJoin(`Guest_Rank${i}`);
+
+            expect(result.status).toBe(200);
+            expect(result.response.isPlayer).toBe(true);
+
+            tableIds.push(result.response.tableId);
+        }
+
+        expect(new Set(tableIds).size).toBe(1);
+
+        const table = tableManager.getTable(tableIds[0]);
+
+        expect(table.getPlayerCount()).toBe(9);
+        expect(table.isFull()).toBe(true);
+        expect(table.getSpectatorCount()).toBe(0);
+    });
+
+    test("Tenth ranked player joins a new table", async () => {
+        let firstTableId;
+
+        for (let i = 1; i <= 9; i++) {
+            const result = await rankedJoin(`Guest_Rank${i}`);
+            expect(result.status).toBe(200);
+
+            firstTableId = result.response.tableId;
+        }
+
+        const tenth = await rankedJoin("Guest_Rank10");
+
+        expect(tenth.status).toBe(200);
+        expect(tenth.response.tableId).not.toBe(firstTableId);
+
+        const firstTable = tableManager.getTable(firstTableId);
+        const secondTable = tenth.table;
+
+        expect(firstTable.getPlayerCount()).toBe(9);
+        expect(secondTable.getPlayerCount()).toBe(1);
+
+        expect(secondTable.players).toContain("Guest_Rank10");
+        expect(firstTable.players).not.toContain("Guest_Rank10");
+    });
+
+    test("Players cannot join a ranked game in progress", async () => {
+        const first = await rankedJoin("Guest_A");
+        await rankedJoin("Guest_B");
+
+        const firstTable = first.table;
+
+        expect(firstTable.startGame().success).toBe(true);
+        expect(firstTable.gameInProgress).toBe(true);
+
+        const third = await rankedJoin("Guest_C");
+
+        expect(third.status).toBe(200);
+        expect(third.response.tableId).not.toBe(firstTable.tableId);
+
+        expect(firstTable.players).not.toContain("Guest_C");
+        expect(third.table.players).toContain("Guest_C");
+    });
+
+    test("Different skill levels have separate ranked tables", async () => {
+        const beginner = await rankedJoin("Guest_Beginner", "beginner");
+        const intermediate = await rankedJoin("Guest_Intermediate", "intermediate");
+        const advanced = await rankedJoin("Guest_Advanced", "advanced");
+
+        expect(beginner.status).toBe(200);
+        expect(intermediate.status).toBe(200);
+        expect(advanced.status).toBe(200);
+
+        const ids = [
+            beginner.response.tableId,
+            intermediate.response.tableId,
+            advanced.response.tableId
+        ];
+
+        expect(new Set(ids).size).toBe(3);
+
+        expect(beginner.table.skillLevel).toBe("beginner");
+        expect(intermediate.table.skillLevel).toBe("intermediate");
+        expect(advanced.table.skillLevel).toBe("advanced");
+    });
+
+    test("Duplicate ranked joins do not create another player", async () => {
+        const first = await rankedJoin("Guest_Duplicate");
+        const second = await rankedJoin("Guest_Duplicate");
+
+        expect(first.status).toBe(200);
+        expect(second.status).toBe(200);
+
+        expect(second.response.tableId).toBe(first.response.tableId);
+        expect(first.table.getPlayerCount()).toBe(1);
+    });
+
+    test("Direct joining of ranked tables is rejected", async () => {
+        const ranked = tableManager.getOrCreateRankedTable("beginner");
+
+        req.body = {
+            tableId: ranked.tableId,
+            playerId: "Guest_DirectJoin"
+        };
+
+        await joinTable(req, res);
+
+        expect(res.status).toHaveBeenCalledWith(403);
+        expect(ranked.players).not.toContain("Guest_DirectJoin");
+    });
+
+    test("Ranked joining does not modify custom tables", async () => {
+        const custom = tableManager.createTable(
+            "general", 30, "custom"
+        );
+
+        custom.addPlayer("Guest_CustomPlayer");
+
+        const ranked = await rankedJoin("Guest_RankedPlayer");
+
+        expect(ranked.status).toBe(200);
+        expect(ranked.table.tableId).not.toBe(custom.tableId);
+
+        expect(custom.players).toEqual(["Guest_CustomPlayer"]);
+        expect(custom.gameMode).toBe("custom");
+        expect(ranked.table.gameMode).toBe("ranked");
+    });
+
+    test("Invalid ranked skill level is rejected", async () => {
+        const result = await rankedJoin("Guest_Invalid", "general");
+
+        expect(result.status).toBe(400);
+        expect(result.response.error).toBe("Invalid ranked skill level.");
+    });
+
+    test("Missing ranked player ID is rejected", async () => {
+        const result = await rankedJoin("", "beginner");
+
+        expect(result.status).toBe(400);
+        expect(result.response.error).toBe("Player ID is required.");
+    });
+
+    test("Ranked joins broadcast updates to the correct table", async () => {
+        const result = await rankedJoin("Guest_Broadcast");
+
+        expect(result.status).toBe(200);
+
+        expect(mockIo.emit).toHaveBeenCalledWith(
+            "TABLE_UPDATED",
+            { tableId: result.response.tableId }
+        );
+    });
 });
