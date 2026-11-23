@@ -1,7 +1,6 @@
 /**
  * ============================================================================
  * File Name: index.js
- * Author: Bonita Rodrigues, Gigi Li
  * Purpose: Frontend controller script for the User Dashboard homepage. Manages
  *          dynamic user profile/points loading, earned achievement badges at
  *          the top, progress bars for all achievements at the bottom, user
@@ -15,6 +14,20 @@ let activeChatFriend = null;
 let currentLoggedInUser = null;
 let friendChatModalInstance = null;
 let presenceSocket = null;
+// Avatar selection state
+let currentAvatar = "default";
+let selectedAvatar = "default";
+let availableAvatars = [];
+
+// Poker avatar icons
+const avatarIcons = {
+    default: "bi-person-fill",
+    ace: "bi-suit-spade-fill",
+    queen: "bi-suit-heart-fill",
+    king: "bi-suit-diamond-fill",
+    jack: "bi-suit-club-fill",
+    joker: "bi-dice-5-fill"
+};
 
 function initializePresence() {
     if (presenceSocket || typeof io !== "function") return;
@@ -84,6 +97,7 @@ document.addEventListener("DOMContentLoaded", async function () {
     setupReportPlayerHandlers();
     setupCreateTableHandler();
     setupFriendChatHandlers();
+    setupAvatarHandler();
 });
 
 // ============================================================================
@@ -140,6 +154,12 @@ async function initializeDashboardSession() {
             const pointsValue = user.points !== undefined ? user.points : 1000;
             renderPointsBalance(pointsDisplay, pointsValue);
         }
+
+        // Load saved avatar from session
+        currentAvatar = user.avatar || "default";
+        selectedAvatar = currentAvatar;
+
+        updateDashboardAvatar();
 
         document.body.style.visibility = "visible";
         return resolvedName;
@@ -1078,4 +1098,177 @@ function setupFriendChatHandlers() {
             await loadFriendsData();
         }
     }, 3000);
+}
+
+
+// ============================================================================
+// Avatar Selection
+// ============================================================================
+
+// Display the selected avatar on the dashboard
+function updateDashboardAvatar() {
+    const avatarDisplay = document.getElementById("dashboardAvatar");
+    
+    if (!avatarDisplay) return;
+
+    const iconClass = avatarIcons[currentAvatar] || avatarIcons.default;
+
+    avatarDisplay.innerHTML = "";
+
+    const icon = document.createElement("i");
+    icon.className = `bi ${iconClass}`;
+
+    avatarDisplay.appendChild(icon);
+}
+
+
+// Retrieve the available presets from the backend
+async function loadAvatarPresets() {
+    const response = await fetch("/api/avatars");
+
+    if (!response.ok) {
+        throw new Error("Could not load avatar presets.");
+    }
+
+    const data = await response.json();
+
+    if (!Array.isArray(data.avatars)) {
+        throw new Error("Invalid avatar data.");
+    }
+
+    availableAvatars = data.avatars;
+
+    updateDashboardAvatar();
+    renderAvatarPresets();
+}
+
+
+// Create the avatar selection cards
+function renderAvatarPresets() {
+    const grid = document.getElementById("avatarPresetGrid");
+
+    if (!grid) return;
+
+    grid.textContent = "";
+
+    availableAvatars.forEach(avatar => {
+        const card = document.createElement("button");
+
+        card.type = "button";
+        card.className = "avatar-option";
+
+        if (avatar.id === selectedAvatar) {
+            card.classList.add("selected");
+        }
+
+        card.setAttribute(
+            "aria-pressed",
+            String(avatar.id === selectedAvatar)
+        );
+
+        const icon = document.createElement("i");
+        icon.className = `bi ${avatarIcons[avatar.id] || avatarIcons.default}`;
+
+        const name = document.createElement("span");
+        name.textContent = avatar.name;
+
+        card.append(icon, name);
+
+        card.addEventListener("click", () => {
+            selectedAvatar = avatar.id;
+            renderAvatarPresets();
+
+            const message = document.getElementById("avatarMessage");
+            if (message) message.textContent = "";
+        });
+
+        grid.appendChild(card);
+    });
+}
+
+
+// Save the avatar selection to MongoDB
+async function saveSelectedAvatar() {
+    const saveButton = document.getElementById("saveAvatarBtn");
+    const message = document.getElementById("avatarMessage");
+
+    if (saveButton) saveButton.disabled = true;
+
+    try {
+        const response = await fetch("/api/user/avatar", {
+            method: "PATCH",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+                avatar: selectedAvatar
+            })
+        });
+
+        if (!response.ok) {
+            throw new Error("Failed to save avatar.");
+        }
+
+        const data = await response.json();
+
+        currentAvatar = data.avatar;
+        selectedAvatar = currentAvatar;
+
+        updateDashboardAvatar();
+
+        if (message) {
+            message.className = "small text-success mt-3 mb-0";
+            message.textContent = "Avatar updated successfully!";
+        }
+
+        const modalElement = document.getElementById("avatarModal");
+
+        if (modalElement) {
+            bootstrap.Modal.getOrCreateInstance(modalElement).hide();
+        }
+
+    } catch (error) {
+        console.error("Avatar update failed:", error);
+
+        if (message) {
+            message.className = "small text-danger mt-3 mb-0";
+            message.textContent = "Could not save avatar. Please try again.";
+        }
+    } finally {
+        if (saveButton) saveButton.disabled = false;
+    }
+}
+
+
+// Initialize avatar selection events
+function setupAvatarHandler() {
+    const modal = document.getElementById("avatarModal");
+    const saveButton = document.getElementById("saveAvatarBtn");
+
+    if (!modal || !saveButton) return;
+
+    modal.addEventListener("show.bs.modal", async () => {
+        selectedAvatar = currentAvatar;
+
+        const message = document.getElementById("avatarMessage");
+        if (message) message.textContent = "";
+
+        const grid = document.getElementById("avatarPresetGrid");
+
+        try {
+            if (!availableAvatars.length) {
+                await loadAvatarPresets();
+            } else {
+                renderAvatarPresets();
+            }
+        } catch (error) {
+            console.error("Failed to load avatars:", error);
+
+            if (grid) {
+                grid.textContent = "Unable to load avatar presets.";
+            }
+        }
+    });
+
+    saveButton.addEventListener("click", saveSelectedAvatar);
 }

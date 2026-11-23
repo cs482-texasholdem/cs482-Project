@@ -726,16 +726,32 @@ class ActiveTable {
         this.gameOver = true;
 
         const showdownHands = {};
-        for (const playerId of this.playerManager.players) {
-            const p = this.playerManager.getPlayer(playerId);
-            if (p && !p.folded) {
+
+        // Only reveal cards when at least two players
+        // remain for a real showdown.
+        const isActualShowdown = activeNonFolded.length > 1;
+
+        if (isActualShowdown) {
+            for (const playerId of this.playerManager.players) {
+                const p = this.playerManager.getPlayer(playerId);
+
+                if (!p || p.folded) continue;
+
                 const hand = this.playerHands.get(playerId);
-                if (hand) {
-                    if (p.muckPreference && !winners.includes(playerId)) {
-                        continue;
-                    }
-                    showdownHands[playerId] = hand.map(c => Deck.cardToText(c));
+
+                if (!hand) continue;
+
+                // Winners must reveal their cards at showdown.
+                const isWinner = winners.includes(playerId);
+
+                // Losing players may muck their cards.
+                if (p.muckPreference && !isWinner) {
+                    continue;
                 }
+
+                showdownHands[playerId] = hand.map(c =>
+                    Deck.cardToText(c)
+                );
             }
         }
 

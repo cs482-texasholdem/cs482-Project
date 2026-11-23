@@ -105,13 +105,39 @@
                 <!-- Left: User Welcome & Stats Banner -->
                 <div class="col-lg-7">
                     <div class="card p-4 border-secondary midnight-card h-100 shadow-sm" style="background-color: #0b132b; color: #ffffff;">
-                        <div class="d-flex flex-column justify-content-between h-100">
-                            <div>
-                                <h2 class="fw-bold text-white mb-2">
-                                    Welcome back, <span id="dashboardUsername" class="text-light">Player</span>!
-                                </h2>
-                                <p class="text-white opacity-90 small mb-4">Ready for high stakes and strategic play? Manage your circle or head over to the poker lobby to take your seat.</p>
-                            </div>
+                        <div class="d-flex flex-column justify-content-between h-100">          
+                            
+                <div class="d-flex align-items-center gap-3 mb-3">
+
+                    <!-- User's selected avatar -->
+                    <div id="dashboardAvatar" class="dashboard-avatar">
+                        <i class="bi bi-person-fill"></i>
+                    </div>
+
+                    <div>
+                        <h2 class="fw-bold text-white mb-1">
+                            Welcome back,
+                            <span id="dashboardUsername" class="text-light">Player</span>!
+                        </h2>
+
+                        <!-- Opens avatar selection modal -->
+                        <button
+                            type="button"
+                            class="btn btn-sm btn-outline-info"
+                            data-bs-toggle="modal"
+                            data-bs-target="#avatarModal">
+                            <i class="bi bi-pencil-square me-1"></i>
+                            Change Avatar
+                        </button>
+                    </div>
+                </div>
+
+                <p class="text-white opacity-90 small mb-4">
+                    Ready for high stakes and strategic play?
+                    Manage your circle or head over to the poker lobby to take your seat.
+                </p>
+
+
                             <div class="p-3 rounded border border-secondary d-inline-flex align-items-center justify-content-between w-100" style="background-color: #131b2e;">
                                 <div>
                                     <span class="d-block small text-uppercase text-info fw-semibold opacity-75">Your Points</span>
@@ -350,7 +376,66 @@
 
         </div> 
 
-       <!-- POP-UP MODAL: Report Player -->
+       
+        <!-- Avatar Selection Modal -->
+        <div class="modal fade" id="avatarModal" tabindex="-1"
+            aria-labelledby="avatarModalLabel" aria-hidden="true">
+
+            <div class="modal-dialog modal-dialog-centered">
+                <div class="modal-content border-secondary text-white shadow-lg"
+                    style="background-color: #0b132b;">
+
+                    <div class="modal-header border-secondary">
+                        <h5 class="modal-title fw-bold" id="avatarModalLabel">
+                            <i class="bi bi-person-circle text-info me-2"></i>
+                            Choose Your Avatar
+                        </h5>
+
+                        <button type="button"
+                                class="btn-close btn-close-white"
+                                data-bs-dismiss="modal"
+                                aria-label="Close"></button>
+                    </div>
+
+                    <div class="modal-body p-4">
+
+                        <p class="small text-white opacity-75">
+                            Select your poker-themed profile avatar.
+                        </p>
+
+                        <!-- Avatar presets dynamically appear here -->
+                        <div id="avatarPresetGrid" class="avatar-grid">
+                            <p class="small text-white opacity-75">
+                                Loading avatars...
+                            </p>
+                        </div>
+
+                        <p id="avatarMessage" class="small mt-3 mb-0"
+                        role="status" aria-live="polite"></p>
+
+                    </div>
+
+                    <div class="modal-footer border-secondary">
+                        <button type="button"
+                                class="btn btn-outline-light"
+                                data-bs-dismiss="modal">
+                            Cancel
+                        </button>
+
+                        <button type="button"
+                                class="btn btn-primary fw-bold"
+                                id="saveAvatarBtn">
+                            Save Avatar
+                        </button>
+                    </div>
+
+                </div>
+            </div>
+        </div>
+
+       
+       
+        <!-- POP-UP MODAL: Report Player -->
         <div class="modal fade" id="reportModal" tabindex="-1" aria-labelledby="reportModalLabel" aria-hidden="true">
             <div class="modal-dialog modal-dialog-centered">
                 <div class="modal-content border-secondary text-white shadow-lg" style="background-color: #0b132b;">
