@@ -3,9 +3,9 @@
  * File Name: tutorial.js
  * Purpose: Interactive controller for tutorial.html. Manages timeline navigation,
  *          section skipping, hand hierarchy & optional tie-breaker inspection,
- *          step-by-step control walkthrough, blinds rotation preview, mucking
- *          preview, a curated guided hand with bots, and an unlimited multi-
- *          difficulty bot practice engine with full 5-of-7 hand evaluation.
+ *          step-by-step live control walkthrough, interactive table blinds
+ *          rotation preview, mucking preview, a curated guided hand, and an
+ *          unlimited multi-difficulty bot practice engine.
  * ============================================================================
  */
 
@@ -93,29 +93,106 @@ function goToTutorialStep(stepIndex) {
 }
 
 // ============================================================================
-// Card Rendering Helper
+// Shared Card & Seat Rendering Helpers (Matching tableDisplay.js)
 // ============================================================================
 
-function createCardElement(cardText, faceDown = false) {
-    const el = document.createElement("div");
-    el.className = "playing-card-mini";
-    if (faceDown) {
-        el.classList.add("face-down");
-        el.textContent = "🂠";
-        return el;
+function formatCardText(cardOrText, faceDown = false) {
+    if (faceDown) return "🂠";
+    if (typeof cardOrText === "number") {
+        return Deck.cardToText(cardOrText);
     }
-    if (cardText.includes("♥") || cardText.includes("♦")) {
-        el.classList.add("red");
-    }
-    el.textContent = cardText;
-    return el;
+    return String(cardOrText || "🂠");
 }
 
-function renderCardRow(container, cards, faceDown = false) {
+function createGameplayCardElement(cardOrText, faceDown = false) {
+    const text = formatCardText(cardOrText, faceDown);
+    const card = document.createElement("div");
+    card.className = "card";
+
+    if (faceDown || text === "🂠") {
+        card.classList.add("face-down");
+        card.textContent = "🂠";
+        return card;
+    }
+
+    if (text.includes("♥") || text.includes("♦")) {
+        card.classList.add("red-suit");
+    }
+
+    card.textContent = text;
+    return card;
+}
+
+function renderGameplayCards(container, cards, faceDown = false) {
     if (!container) return;
-    container.textContent = "";
+    container.innerHTML = "";
     cards.forEach((c) => {
-        container.appendChild(createCardElement(c, faceDown));
+        const isHidden = faceDown || c === "🂠";
+        container.appendChild(createGameplayCardElement(c, isHidden));
+    });
+}
+
+function renderTableSeats(leftContainer, rightContainer, seats) {
+    if (!leftContainer || !rightContainer) return;
+    leftContainer.innerHTML = "";
+    rightContainer.innerHTML = "";
+
+    const half = Math.ceil(seats.length / 2);
+
+    seats.forEach((p, index) => {
+        const seat = document.createElement("div");
+        let statusClass = "";
+        if (p.folded) {
+            statusClass = "folded";
+        } else if (p.isActiveTurn || p.isCurrent) {
+            statusClass = "active";
+        }
+
+        seat.className = `player-seat ${statusClass} ${p.isWinner ? "winner-seat" : ""}`.trim();
+
+        const nameSpan = document.createElement("span");
+        nameSpan.className = "player-name";
+        nameSpan.textContent = p.name + (p.isCurrent ? " (You)" : "");
+
+        if (p.isDealer) {
+            const dealerBadge = document.createElement("span");
+            dealerBadge.className = "dealer-badge";
+            dealerBadge.textContent = "D";
+            nameSpan.appendChild(dealerBadge);
+        }
+
+        if (p.blindRole === "SB" || p.blindRole === "BB") {
+            const blindBadge = document.createElement("span");
+            blindBadge.className = `blind-badge ${p.blindRole.toLowerCase()}`;
+            blindBadge.textContent = p.blindRole;
+            nameSpan.appendChild(blindBadge);
+        }
+
+        const statusSpan = document.createElement("span");
+        statusSpan.className = "player-status";
+        statusSpan.textContent = p.status;
+
+        const chipsSpan = document.createElement("span");
+        chipsSpan.className = "player-chips";
+        const betSuffix = p.bet > 0 ? ` · Bet: ${p.bet}` : "";
+        chipsSpan.textContent = `${Number(p.chips).toLocaleString()} chips${betSuffix}`;
+
+        seat.append(nameSpan, statusSpan, chipsSpan);
+
+        if (Array.isArray(p.cards) && p.cards.length > 0) {
+            const cardsRow = document.createElement("div");
+            cardsRow.className = "seat-cards";
+            p.cards.forEach((c) => {
+                cardsRow.appendChild(createGameplayCardElement(c, !p.revealCards));
+            });
+            seat.appendChild(cardsRow);
+        }
+
+        if (index < half) {
+            leftContainer.appendChild(seat);
+        } else {
+            rightContainer.appendChild(seat);
+        }
     });
 }
 
@@ -244,43 +321,48 @@ function selectHandDetail(hand, selectedElement) {
     if (titleEl) titleEl.textContent = `#${hand.rank} — ${hand.name}`;
     if (summaryEl) summaryEl.textContent = hand.shortDesc;
     if (tieEl) tieEl.textContent = hand.tieBreaker;
-    renderCardRow(cardsEl, hand.cards, false);
+    renderGameplayCards(cardsEl, hand.cards, false);
 }
 
 // ============================================================================
-// 3. Step-by-Step App Controls & Betting Rules Walkthrough
+// 3. Step-by-Step App Controls & Betting Rules Walkthrough (Live Gameplay UI)
 // ============================================================================
 
-const CONTROL_STEPS = [ // TODO: Match UI of actual gameplay
+const CONTROL_STEPS = [
+    {
+        targetId: "demo-your-hand-panel",
+        title: "1. Your Hand Panel (Hole Cards, Chips & Current Bet)",
+        desc: "Directly beneath the table, you see your private 2 hole cards (A♠ K♥), your total remaining chips (1,000), and how much you have already bet in the current round (0)."
+    },
     {
         targetId: "demo-bet-summary",
-        title: "1. Bet Summary Bar (Current Bet & Chips Available)",
-        desc: "Before acting, check 'Current Highest Bet' ($20 here) vs. 'Your Current Bet' ($0). To stay in the hand, your total bet for the round must match the Current Highest Bet."
-    },
-    {
-        targetId: "demo-btn-fold",
-        title: "2. Fold Button",
-        desc: "Clicking 'Fold' forfeits your cards and exits the current hand immediately. You lose any chips you already put into the pot, but you risk nothing further."
-    },
-    {
-        targetId: "demo-btn-check",
-        title: "3. Check Button",
-        desc: "Clicking 'Check' passes the action to the next player without betting any chips. You can ONLY Check when Your Current Bet already equals the Current Highest Bet (for example, $0 vs. $0)."
-    },
-    {
-        targetId: "demo-btn-call",
-        title: "4. Call Button",
-        desc: "When another player has bet or raised ($20 here), 'Check' is disabled. Clicking 'Call' matches the Current Highest Bet so you stay in the round."
+        title: "2. Bet Summary Bar (Current Bet & Chips Available)",
+        desc: "At the top of the 'Your Turn' panel, compare 'Current Bet' (20) with 'Your Bet' (0). To stay in the hand, your total round bet must match Current Bet."
     },
     {
         targetId: "demo-raise-controls",
-        title: "5. Raise Amount Input & Slider",
-        desc: "Use the number input or slider to choose a total bet higher than the Current Highest Bet. A valid raise must increase the bet by at least the previous raise increment (or Big Blind)."
+        title: "3. Adjust Raise Amount (Number Input, Slider & Min/Max Labels)",
+        desc: "Type an exact total bet into the number box or drag the slider between the minimum legal raise (40) and your all-in maximum (1,000)."
+    },
+    {
+        targetId: "demo-muck-container",
+        title: "4. Muck Losing Cards Toggle Switch",
+        desc: "Before acting, toggle 'Muck Losing Cards' ON if you want your hole cards hidden face-down when losing at Showdown."
+    },
+    {
+        targetId: "demo-btn-fold",
+        title: "5. Fold Button",
+        desc: "Clicking the circular 'Fold' button discards your cards immediately and exits the hand without risking any more chips."
+    },
+    {
+        targetId: "demo-btn-check",
+        title: "6. Check & Call Buttons",
+        desc: "'Check' passes the turn for free ONLY when Your Bet already equals Current Bet. When facing a bet (like 20 here), 'Check' is disabled and 'Call' matches the 20 bet."
     },
     {
         targetId: "demo-btn-raise",
-        title: "6. Raise Button",
-        desc: "Clicking 'Raise' commits your chosen raise amount to the pot and forces every remaining player to either Call your new higher bet, Re-Raise, or Fold."
+        title: "7. Raise Button",
+        desc: "Clicking the circular 'Raise' button commits the amount selected on the slider/input, forcing remaining players to Call, Re-Raise, or Fold."
     }
 ];
 
@@ -292,46 +374,63 @@ function initControlsWalkthrough() {
     const raiseInput = document.getElementById("demo-raise-amount");
     const betScale = document.getElementById("demo-bet-scale");
     const raiseBtn = document.getElementById("demo-btn-raise");
+    const checkBtn = document.getElementById("demo-btn-check");
+    const callBtn = document.getElementById("demo-btn-call");
+    const foldBtn = document.getElementById("demo-btn-fold");
+    const muckToggle = document.getElementById("demo-muck-toggle");
     const feedback = document.getElementById("demo-control-feedback");
 
-    if (prevBtn) {
-        prevBtn.addEventListener("click", () => {
-            currentControlIdx = (currentControlIdx - 1 + CONTROL_STEPS.length) % CONTROL_STEPS.length;
-            renderControlTourStep();
-        });
-    }
+    renderGameplayCards(document.getElementById("demo-player-cards"), ["A♠", "K♥"], false);
 
-    if (nextBtn) {
-        nextBtn.addEventListener("click", () => {
-            currentControlIdx = (currentControlIdx + 1) % CONTROL_STEPS.length;
-            renderControlTourStep();
-        });
-    }
+    // Match live gameplay state: facing a 20 Big Blind, so Check is disabled
+    if (checkBtn) checkBtn.disabled = true;
 
-    if (betScale && raiseInput && raiseBtn) {
+    prevBtn?.addEventListener("click", () => {
+        currentControlIdx = (currentControlIdx - 1 + CONTROL_STEPS.length) % CONTROL_STEPS.length;
+        renderControlTourStep();
+    });
+
+    nextBtn?.addEventListener("click", () => {
+        currentControlIdx = (currentControlIdx + 1) % CONTROL_STEPS.length;
+        renderControlTourStep();
+    });
+
+    if (betScale && raiseInput) {
         betScale.addEventListener("input", () => {
             raiseInput.value = betScale.value;
-            raiseBtn.textContent = `Raise to $${betScale.value}`;
         });
         raiseInput.addEventListener("input", () => {
             const val = Math.max(40, Math.min(1000, Number(raiseInput.value) || 40));
             betScale.value = String(val);
-            raiseBtn.textContent = `Raise to $${val}`;
         });
     }
 
-    document.getElementById("demo-btn-fold")?.addEventListener("click", () => {
-        if (feedback) feedback.textContent = "Fold clicked: You mucked your hand and exited the round without risking more chips.";
+    foldBtn?.addEventListener("click", () => {
+        if (feedback) feedback.textContent = "Fold clicked: Your cards are mucked and you exit the current hand.";
     });
-    document.getElementById("demo-btn-check")?.addEventListener("click", () => {
-        if (feedback) feedback.textContent = "Check clicked: In a live hand, Check is only enabled when Current Highest Bet equals Your Current Bet ($20 is owed right now, so Call or Raise is required).";
+
+    callBtn?.addEventListener("click", () => {
+        document.getElementById("demo-your-bet").textContent = "20";
+        document.getElementById("demo-your-chips").textContent = "980";
+        document.getElementById("demo-available-chips").textContent = "980";
+        if (feedback) feedback.textContent = "Call clicked: You matched the 20 bet! Your Bet is now 20 and Chips Available is 980.";
     });
-    document.getElementById("demo-btn-call")?.addEventListener("click", () => {
-        if (feedback) feedback.textContent = "Call clicked: You matched the $20 bet! Your bet is now $20 and your remaining chips are $980.";
-    });
+
     raiseBtn?.addEventListener("click", () => {
-        const amt = Number(raiseInput?.value) || 40;
-        if (feedback) feedback.textContent = `Raise clicked: You raised the bet to $${amt}! Opponents must now match $${amt} or fold.`;
+        const amt = Math.max(40, Math.min(1000, Number(raiseInput?.value) || 40));
+        document.getElementById("demo-your-bet").textContent = String(amt);
+        document.getElementById("demo-current-bet").textContent = String(amt);
+        document.getElementById("demo-your-chips").textContent = (1000 - amt).toLocaleString();
+        document.getElementById("demo-available-chips").textContent = (1000 - amt).toLocaleString();
+        if (feedback) feedback.textContent = `Raise clicked: You raised the table bet to ${amt}! Opponents must match ${amt} or fold.`;
+    });
+
+    muckToggle?.addEventListener("change", () => {
+        if (feedback) {
+            feedback.textContent = muckToggle.checked
+                ? "Muck Losing Cards ON: Your cards will remain hidden if you lose at Showdown."
+                : "Muck Losing Cards OFF: Your cards will be shown at Showdown.";
+        }
     });
 
     renderControlTourStep();
@@ -354,25 +453,96 @@ function renderControlTourStep() {
 }
 
 // ============================================================================
-// 4. Blinds Rotation Preview
+// 4. Interactive Table Blinds Rotation Preview
 // ============================================================================
 
-function initBlindsPreview() { // TODO: Make more interactive by showing actual table.
-    const rotations = [
-        "Hand #1: You are Dealer (D), Bot A posts Small Blind ($10), Bot B posts Big Blind ($20). You act first Pre-Flop!",
-        "Hand #2: Bot A is Dealer (D), Bot B posts Small Blind ($10), You post Big Blind ($20). You act last Pre-Flop!",
-        "Hand #3: Bot B is Dealer (D), You post Small Blind ($10), Bot A posts Big Blind ($20)."
-    ];
-    let idx = 0;
+function initBlindsPreview() {
+    const leftSide = document.getElementById("blind-left-side");
+    const rightSide = document.getElementById("blind-right-side");
+    const commCards = document.getElementById("blind-community-cards");
+    const firstActorEl = document.getElementById("blind-first-actor");
+    const potEl = document.getElementById("blind-pot-total");
+    const summaryEl = document.getElementById("blindRotationSummary");
+    const rotateBtn = document.getElementById("rotateBlindsBtn");
 
-    const btn = document.getElementById("rotateBlindsBtn");
-    const summary = document.getElementById("blindRotationSummary");
-    if (btn && summary) {
-        btn.addEventListener("click", () => {
-            idx = (idx + 1) % rotations.length;
-            summary.textContent = rotations[idx];
+    if (!leftSide || !rightSide) return;
+
+    const basePlayers = [
+        { id: "you", name: "You", isCurrent: true, cards: ["A♠", "K♥"], revealCards: true },
+        { id: "nova", name: "Bot Nova", isCurrent: false, cards: ["🂠", "🂠"], revealCards: false },
+        { id: "atlas", name: "Bot Atlas", isCurrent: false, cards: ["🂠", "🂠"], revealCards: false }
+    ];
+
+    let dealerIdx = 0;
+    let handCount = 1;
+
+    function renderBlindsTable() {
+        const n = basePlayers.length;
+        const sbIdx = (dealerIdx + 1) % n;
+        const bbIdx = (dealerIdx + 2) % n;
+        const firstActIdx = (bbIdx + 1) % n;
+
+        const seats = basePlayers.map((p, idx) => {
+            const isDealer = idx === dealerIdx;
+            const isSb = idx === sbIdx;
+            const isBb = idx === bbIdx;
+            const isFirst = idx === firstActIdx;
+
+            let bet = 0;
+            let status = "Waiting to act";
+            let blindRole = "";
+
+            if (isSb) {
+                bet = 10;
+                status = "Posted Small Blind (10)";
+                blindRole = "SB";
+            } else if (isBb) {
+                bet = 20;
+                status = "Posted Big Blind (20)";
+                blindRole = "BB";
+            }
+
+            if (isFirst) {
+                status = isDealer ? "Dealer · First to Act (Needs 20)" : "First to Act (Needs 20)";
+            }
+
+            return {
+                name: p.name,
+                isCurrent: p.isCurrent,
+                isDealer,
+                blindRole,
+                isActiveTurn: isFirst,
+                folded: false,
+                chips: 1000 - bet,
+                bet,
+                status,
+                cards: p.cards,
+                revealCards: p.revealCards
+            };
         });
+
+        renderTableSeats(leftSide, rightSide, seats);
+        renderGameplayCards(commCards, ["🂠", "🂠", "🂠", "🂠", "🂠"], true);
+
+        const dealerName = basePlayers[dealerIdx].name;
+        const sbName = basePlayers[sbIdx].name;
+        const bbName = basePlayers[bbIdx].name;
+        const firstName = basePlayers[firstActIdx].name;
+
+        if (potEl) potEl.textContent = "30";
+        if (firstActorEl) firstActorEl.textContent = firstName;
+        if (summaryEl) {
+            summaryEl.textContent = `Hand #${handCount}: ${dealerName} is Dealer (D), ${sbName} posts Small Blind (10), and ${bbName} posts Big Blind (20). ${firstName} acts first Pre-Flop!`;
+        }
     }
+
+    rotateBtn?.addEventListener("click", () => {
+        dealerIdx = (dealerIdx + 1) % basePlayers.length;
+        handCount += 1;
+        renderBlindsTable();
+    });
+
+    renderBlindsTable();
 }
 
 // ============================================================================
@@ -387,7 +557,7 @@ function initMuckingPreview() {
 
     function updatePreview() {
         const isMuckOn = Boolean(toggle?.checked);
-        renderCardRow(cardsBox, sampleLosingHand, isMuckOn);
+        renderGameplayCards(cardsBox, sampleLosingHand, isMuckOn);
         if (statusEl) {
             statusEl.textContent = isMuckOn
                 ? "Muck ON: Your losing hand stays hidden (🂠 🂠) from opponents at Showdown!"
@@ -402,7 +572,7 @@ function initMuckingPreview() {
 }
 
 // ============================================================================
-// 6. Hard-Coded Guided Walkthrough Hand
+// 6. Hard-Coded Guided Walkthrough Hand (Live Table UI)
 // ============================================================================
 
 const GUIDED_SCENARIO_STEPS = [
@@ -411,35 +581,35 @@ const GUIDED_SCENARIO_STEPS = [
         pot: 30,
         playerChips: 1000,
         playerBet: 0,
-        bot1: { chips: 990, bet: 10, status: "Small Blind ($10)", folded: false, reveal: false },
-        bot2: { chips: 980, bet: 20, status: "Big Blind ($20)", folded: false, reveal: false },
+        bot1: { chips: 990, bet: 10, blindRole: "SB", status: "Small Blind (10)", folded: false, reveal: false },
+        bot2: { chips: 980, bet: 20, blindRole: "BB", status: "Big Blind (20)", folded: false, reveal: false },
         community: ["🂠", "🂠", "🂠", "🂠", "🂠"],
         coachTitle: "Step 1 · Pre-Flop Decision (Blinds Posted)",
-        coachText: "Bot Nova posted the $10 Small Blind and Bot Atlas posted the $20 Big Blind. You hold A♠ K♥ on the Dealer button! Click 'Call $20' to enter the hand.",
-        actions: [{ label: "Call $20", style: "btn-primary" }]
+        coachText: "Bot Nova posted the 10 Small Blind and Bot Atlas posted the 20 Big Blind. You hold A♠ K♥ on the Dealer button! Click 'Call 20' to enter the hand.",
+        actions: [{ label: "Call 20", style: "btn-success" }]
     },
     {
         stage: "Flop",
         pot: 60,
         playerChips: 980,
         playerBet: 0,
-        bot1: { chips: 980, bet: 0, status: "Checked", folded: false, reveal: false },
-        bot2: { chips: 980, bet: 0, status: "Checked", folded: false, reveal: false },
+        bot1: { chips: 980, bet: 0, blindRole: "SB", status: "Checked", folded: false, reveal: false },
+        bot2: { chips: 980, bet: 0, blindRole: "BB", status: "Checked", folded: false, reveal: false },
         community: ["A♦", "8♣", "3♠", "🂠", "🂠"],
         coachTitle: "Step 2 · The Flop (Top Pair, Top Kicker!)",
-        coachText: "Three community cards are dealt: A♦ 8♣ 3♠! You paired your Ace with a King kicker. Both bots checked to you. Click 'Raise to $40' to build the pot.",
-        actions: [{ label: "Raise to $40", style: "btn-success" }]
+        coachText: "Three community cards are dealt: A♦ 8♣ 3♠! You paired your Ace with a King kicker. Both bots checked to you. Click 'Raise to 40' to build the pot.",
+        actions: [{ label: "Raise to 40", style: "btn-primary" }]
     },
     {
         stage: "Turn",
         pot: 140,
         playerChips: 940,
         playerBet: 0,
-        bot1: { chips: 940, bet: 0, status: "Called $40", folded: false, reveal: false },
-        bot2: { chips: 980, bet: 0, status: "Folded (Mucked)", folded: true, reveal: false },
+        bot1: { chips: 940, bet: 0, blindRole: "SB", status: "Called 40", folded: false, reveal: false },
+        bot2: { chips: 980, bet: 0, blindRole: "BB", status: "Folded (Mucked)", folded: true, reveal: false },
         community: ["A♦", "8♣", "3♠", "K♦", "🂠"],
         coachTitle: "Step 3 · The Turn (Two Pair!)",
-        coachText: "Bot Atlas folded (automatically mucking their cards), while Bot Nova called $40. The Turn brings K♦—giving you Two Pair (Aces & Kings)! Click 'Check' to trap Bot Nova.",
+        coachText: "Bot Atlas folded (automatically mucking their cards), while Bot Nova called 40. The Turn brings K♦—giving you Two Pair (Aces & Kings)! Click 'Check' to trap Bot Nova.",
         actions: [{ label: "Check", style: "btn-secondary" }]
     },
     {
@@ -447,22 +617,22 @@ const GUIDED_SCENARIO_STEPS = [
         pot: 140,
         playerChips: 940,
         playerBet: 0,
-        bot1: { chips: 900, bet: 40, status: "Bet $40", folded: false, reveal: false },
-        bot2: { chips: 980, bet: 0, status: "Folded", folded: true, reveal: false },
+        bot1: { chips: 900, bet: 40, blindRole: "SB", status: "Bet 40", folded: false, reveal: false },
+        bot2: { chips: 980, bet: 0, blindRole: "BB", status: "Folded", folded: true, reveal: false },
         community: ["A♦", "8♣", "3♠", "K♦", "5♥"],
-        coachTitle: "Step 4 · The River (Bot Nova Bets $40)",
-        coachText: "The River is 5♥ and Bot Nova bets $40! Your Two Pair (Aces & Kings) is very strong. Click 'Call $40' to go to Showdown.",
-        actions: [{ label: "Call $40", style: "btn-primary" }]
+        coachTitle: "Step 4 · The River (Bot Nova Bets 40)",
+        coachText: "The River is 5♥ and Bot Nova bets 40! Your Two Pair (Aces & Kings) is very strong. Click 'Call 40' to go to Showdown.",
+        actions: [{ label: "Call 40", style: "btn-success" }]
     },
     {
         stage: "Showdown",
         pot: 0,
         playerChips: 1120,
         playerBet: 0,
-        bot1: { chips: 900, bet: 0, status: "Lost (Showed A♣ J♠)", folded: false, reveal: true },
-        bot2: { chips: 980, bet: 0, status: "Folded", folded: true, reveal: false },
+        bot1: { chips: 900, bet: 0, blindRole: "SB", status: "Lost (Showed A♣ J♠)", folded: false, reveal: true },
+        bot2: { chips: 980, bet: 0, blindRole: "BB", status: "Folded", folded: true, reveal: false },
         community: ["A♦", "8♣", "3♠", "K♦", "5♥"],
-        coachTitle: "Showdown Complete · You Won the $220 Pot!",
+        coachTitle: "Showdown Complete · You Won the 220 Pot!",
         coachText: "Your Two Pair (A♠ A♦ K♥ K♦ 8♣) beats Bot Nova's One Pair of Aces (A♣ J♠)! Notice that because Bot Nova had Muck Losing Cards OFF, their cards were revealed—whereas if Bot Nova had Muck ON, their losing hand would have stayed hidden.",
         actions: []
     }
@@ -475,6 +645,7 @@ function initGuidedHand() {
         guidedIdx = 0;
         renderGuidedHandState();
     });
+    document.getElementById("guided-muck-toggle")?.addEventListener("change", renderGuidedHandState);
     renderGuidedHandState();
 }
 
@@ -484,55 +655,70 @@ function renderGuidedHandState() {
 
     document.getElementById("guided-stage").textContent = state.stage;
     document.getElementById("guided-pot").textContent = String(state.pot);
-    document.getElementById("guided-player-chips").textContent = String(state.playerChips);
+    document.getElementById("guided-player-chips").textContent = Number(state.playerChips).toLocaleString();
     document.getElementById("guided-player-bet").textContent = String(state.playerBet);
 
-    renderCardRow(document.getElementById("guided-player-cards"), ["A♠", "K♥"], false);
-    renderCardRow(
-        document.getElementById("guided-community-cards"),
-        state.community.map((c) => (c === "🂠" ? "" : c)),
-        false
+    renderGameplayCards(document.getElementById("guided-player-cards"), ["A♠", "K♥"], false);
+    renderGameplayCards(document.getElementById("guided-community-cards"), state.community, false);
+
+    const seats = [
+        {
+            name: "You",
+            isCurrent: true,
+            isDealer: true,
+            blindRole: "",
+            isActiveTurn: state.stage !== "Showdown",
+            isWinner: state.stage === "Showdown",
+            folded: false,
+            chips: state.playerChips,
+            bet: state.playerBet,
+            status: state.stage === "Showdown" ? "Winner (Two Pair)" : "Active",
+            cards: ["A♠", "K♥"],
+            revealCards: true
+        },
+        {
+            name: "Bot Nova",
+            isCurrent: false,
+            isDealer: false,
+            blindRole: state.bot1.blindRole,
+            isActiveTurn: false,
+            isWinner: false,
+            folded: state.bot1.folded,
+            chips: state.bot1.chips,
+            bet: state.bot1.bet,
+            status: state.stage === "Showdown" && muckOn ? "Lost (Mucked)" : state.bot1.status,
+            cards: ["A♣", "J♠"],
+            revealCards: state.bot1.reveal && !muckOn
+        },
+        {
+            name: "Bot Atlas",
+            isCurrent: false,
+            isDealer: false,
+            blindRole: state.bot2.blindRole,
+            isActiveTurn: false,
+            isWinner: false,
+            folded: state.bot2.folded,
+            chips: state.bot2.chips,
+            bet: state.bot2.bet,
+            status: state.bot2.status,
+            cards: ["9♦", "4♣"],
+            revealCards: false
+        }
+    ];
+
+    renderTableSeats(
+        document.getElementById("guided-left-side"),
+        document.getElementById("guided-right-side"),
+        seats
     );
-    // Render face-down placeholders properly for unrevealed community cards
-    const commContainer = document.getElementById("guided-community-cards");
-    if (commContainer) {
-        commContainer.textContent = "";
-        state.community.forEach((c) => {
-            commContainer.appendChild(createCardElement(c, c === "🂠"));
-        });
-    }
 
-    // Bot 1
-    const bot1Box = document.getElementById("guided-bot-1");
-    bot1Box?.classList.toggle("folded-seat", state.bot1.folded);
-    document.getElementById("guided-bot-1-chips").textContent = `$${state.bot1.chips}`;
-    document.getElementById("guided-bot-1-bet").textContent = `$${state.bot1.bet}`;
-    document.getElementById("guided-bot-1-status").textContent =
-        state.stage === "Showdown" && muckOn ? "Lost (Mucked 🂠 🂠)" : state.bot1.status;
-    renderCardRow(
-        document.getElementById("guided-bot-1-cards"),
-        ["A♣", "J♠"],
-        !(state.bot1.reveal && !muckOn)
-    );
-
-    // Bot 2
-    const bot2Box = document.getElementById("guided-bot-2");
-    bot2Box?.classList.toggle("folded-seat", state.bot2.folded);
-    document.getElementById("guided-bot-2-chips").textContent = `$${state.bot2.chips}`;
-    document.getElementById("guided-bot-2-bet").textContent = `$${state.bot2.bet}`;
-    document.getElementById("guided-bot-2-status").textContent = state.bot2.status;
-    renderCardRow(document.getElementById("guided-bot-2-cards"), ["9♦", "4♣"], true);
-
-    // Winner highlight
-    document.getElementById("guided-player-seat")?.classList.toggle("winner-seat", state.stage === "Showdown");
-
-    // Coach prompt & action buttons
+    document.getElementById("guided-table-status").textContent = state.coachTitle;
     document.getElementById("guided-coach-title").textContent = state.coachTitle;
     document.getElementById("guided-coach-text").textContent = state.coachText;
 
     const btnContainer = document.getElementById("guided-action-buttons");
     if (btnContainer) {
-        btnContainer.textContent = "";
+        btnContainer.innerHTML = "";
         state.actions.forEach((act) => {
             const btn = document.createElement("button");
             btn.type = "button";
@@ -549,29 +735,11 @@ function renderGuidedHandState() {
     }
 }
 
-// TODO: Refactor all logic to use pokerLogic.js and change UI to match actual gameplay.
 // ============================================================================
-// 7. Unlimited Multi-Difficulty Bot Practice Engine (5-of-7 Hand Evaluator)
+// 7. Unlimited Multi-Difficulty Bot Practice Engine (Using pokerLogic.js)
 // ============================================================================
 
-const SUITS = ["♠", "♥", "♦", "♣"];
-const RANKS = [
-    { val: 2, label: "2" },
-    { val: 3, label: "3" },
-    { val: 4, label: "4" },
-    { val: 5, label: "5" },
-    { val: 6, label: "6" },
-    { val: 7, label: "7" },
-    { val: 8, label: "8" },
-    { val: 9, label: "9" },
-    { val: 10, label: "10" },
-    { val: 11, label: "J" },
-    { val: 12, label: "Q" },
-    { val: 13, label: "K" },
-    { val: 14, label: "A" }
-];
-
-const HAND_CATEGORY_NAMES = [
+const CATEGORY_LABELS = [
     "High Card",
     "One Pair",
     "Two Pair",
@@ -580,144 +748,58 @@ const HAND_CATEGORY_NAMES = [
     "Flush",
     "Full House",
     "Four of a Kind",
-    "Straight Flush"
+    "Straight Flush",
+    "Royal Flush"
 ];
 
-function buildShuffledDeck() {
-    const deck = [];
-    for (const s of SUITS) {
-        for (const r of RANKS) {
-            deck.push({ rank: r.val, suit: s, text: `${r.label}${s}` });
-        }
-    }
-    for (let i = deck.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [deck[i], deck[j]] = [deck[j], deck[i]];
-    }
-    return deck;
-}
+/**
+ * Evaluates a player's current cards using Deck from pokerLogic.js.
+ * Returns { score, category, name } compatible with Deck.bestHand().
+ */
+function evaluatePracticeCardsWithPokerLogic(holeCards, communityCards) {
+    const available = [...holeCards, ...communityCards];
+    if (available.length < 5) {
+        const parsed = holeCards.map((c) => ({
+            rank: (c - 1) % 13,
+            text: Deck.cardToText(c)
+        })).sort((a, b) => b.rank - a.rank);
 
-function evaluateFiveCards(cards) {
-    const sorted = [...cards].sort((a, b) => b.rank - a.rank);
-    const ranks = sorted.map((c) => c.rank);
-    const isFlush = sorted.every((c) => c.suit === sorted[0].suit);
-
-    let isStraight = false;
-    let straightHigh = 0;
-    const uniqueRanks = [...new Set(ranks)];
-    if (uniqueRanks.length === 5) {
-        if (uniqueRanks[0] - uniqueRanks[4] === 4) {
-            isStraight = true;
-            straightHigh = uniqueRanks[0];
-        } else if (
-            uniqueRanks[0] === 14 &&
-            uniqueRanks[1] === 5 &&
-            uniqueRanks[2] === 4 &&
-            uniqueRanks[3] === 3 &&
-            uniqueRanks[4] === 2
-        ) {
-            isStraight = true;
-            straightHigh = 5;
-        }
-    }
-
-    const counts = new Map();
-    for (const r of ranks) {
-        counts.set(r, (counts.get(r) || 0) + 1);
-    }
-    const groups = Array.from(counts.entries()).sort((a, b) => b[1] - a[1] || b[0] - a[0]);
-
-    let category = 0;
-    let tieRanks = [];
-
-    if (isStraight && isFlush) {
-        category = 8;
-        tieRanks = [straightHigh];
-    } else if (groups[0][1] === 4) {
-        category = 7;
-        tieRanks = [groups[0][0], groups[1][0]];
-    } else if (groups[0][1] === 3 && groups[1][1] === 2) {
-        category = 6;
-        tieRanks = [groups[0][0], groups[1][0]];
-    } else if (isFlush) {
-        category = 5;
-        tieRanks = ranks;
-    } else if (isStraight) {
-        category = 4;
-        tieRanks = [straightHigh];
-    } else if (groups[0][1] === 3) {
-        category = 3;
-        tieRanks = [groups[0][0], groups[1][0], groups[2][0]];
-    } else if (groups[0][1] === 2 && groups[1][1] === 2) {
-        category = 2;
-        tieRanks = [groups[0][0], groups[1][0], groups[2][0]];
-    } else if (groups[0][1] === 2) {
-        category = 1;
-        tieRanks = [groups[0][0], groups[1][0], groups[2][0], groups[3][0]];
-    } else {
-        category = 0;
-        tieRanks = ranks;
-    }
-
-    let score = category * 1e10;
-    tieRanks.forEach((r, idx) => {
-        score += r * Math.pow(15, 4 - idx);
-    });
-
-    return {
-        score,
-        category,
-        name: category === 8 && straightHigh === 14 ? "Royal Flush" : HAND_CATEGORY_NAMES[category]
-    };
-}
-
-function evaluateBestHand(cards) {
-    if (cards.length < 5) {
-        const sorted = [...cards].sort((a, b) => b.rank - a.rank);
-        const isPair = sorted.length >= 2 && sorted[0].rank === sorted[1].rank;
+        const isPocketPair = parsed.length === 2 && parsed[0].rank === parsed[1].rank;
         return {
-            score: (isPair ? 1 : 0) * 1e10 + (sorted[0]?.rank || 0) * 1e5,
-            category: isPair ? 1 : 0,
-            name: isPair ? "Pocket Pair" : `High Card (${sorted[0]?.text || ""})`
+            score: (isPocketPair ? 1 : 0) * Math.pow(13, 5) + (parsed[0]?.rank || 0) * Math.pow(13, 4),
+            category: isPocketPair ? 1 : 0,
+            name: isPocketPair ? "Pocket Pair" : `High Card (${parsed[0]?.text || ""})`
         };
     }
 
-    let best = null;
-    const n = cards.length;
-    for (let i = 0; i < n - 4; i++) {
-        for (let j = i + 1; j < n - 3; j++) {
-            for (let k = j + 1; k < n - 2; k++) {
-                for (let l = k + 1; l < n - 1; l++) {
-                    for (let m = l + 1; m < n; m++) {
-                        const evalRes = evaluateFiveCards([cards[i], cards[j], cards[k], cards[l], cards[m]]);
-                        if (!best || evalRes.score > best.score) {
-                            best = evalRes;
-                        }
-                    }
-                }
-            }
-        }
-    }
-    return best;
+    const score = Deck.bestHand(holeCards, communityCards);
+    const category = Math.min(9, Math.floor(score / Math.pow(13, 5)));
+    return {
+        score,
+        category,
+        name: CATEGORY_LABELS[category] || "High Card"
+    };
 }
 
 const practiceState = {
     handNumber: 0,
-    dealerIndex: 0, // 0 = You, 1 = Bot 0, 2 = Bot 1
+    dealerIndex: 0, // 0 = You, 1 = Bot Alpha, 2 = Bot Bravo
     inHand: false,
     round: "Pre-Flop",
-    deck: [],
+    deck: null,
     community: [],
     pot: 0,
     highestBet: 0,
+    lastRaiseSize: 20,
     smallBlind: 10,
     bigBlind: 20,
     seats: [
-        { id: "player", name: "You", chips: 1000, bet: 0, folded: false, acted: false, cards: [], isBot: false, status: "Ready", reveal: true },
-        { id: "bot0", name: "Bot Alpha", chips: 1000, bet: 0, folded: false, acted: false, cards: [], isBot: true, status: "Ready", reveal: false },
-        { id: "bot1", name: "Bot Bravo", chips: 1000, bet: 0, folded: false, acted: false, cards: [], isBot: true, status: "Ready", reveal: false }
+        { id: "player", name: "You", chips: 1000, bet: 0, folded: false, acted: false, cards: [], isBot: false, status: "Ready", reveal: true, blindRole: "" },
+        { id: "bot0", name: "Bot Alpha", chips: 1000, bet: 0, folded: false, acted: false, cards: [], isBot: true, status: "Ready", reveal: false, blindRole: "" },
+        { id: "bot1", name: "Bot Bravo", chips: 1000, bet: 0, folded: false, acted: false, cards: [], isBot: true, status: "Ready", reveal: false, blindRole: "" }
     ],
     turnIndex: 0,
+    winnerIds: new Set(),
     statusMessage: "Select a bot difficulty and click 'Deal New Hand' to begin!"
 };
 
@@ -734,24 +816,30 @@ function initBotPracticeEngine() {
     if (!dealBtn) return;
 
     dealBtn.addEventListener("click", startPracticeHand);
+
     resetBtn?.addEventListener("click", () => {
         practiceState.seats.forEach((s) => {
             s.chips = 1000;
             s.bet = 0;
             s.folded = false;
+            s.acted = false;
             s.cards = [];
             s.status = "Ready";
+            s.blindRole = "";
         });
         practiceState.inHand = false;
         practiceState.pot = 0;
+        practiceState.highestBet = 0;
         practiceState.community = [];
-        practiceState.statusMessage = "Chips reset to $1,000 for everyone. Click 'Deal New Hand'!";
-        renderPracticeTable();
+        practiceState.winnerIds = new Set();
+        practiceState.statusMessage = "Chips reset to 1,000 for everyone. Click 'Deal New Hand'!";
+        renderPracticeTable(true);
     });
 
     betScale?.addEventListener("input", () => {
         if (raiseInput) raiseInput.value = betScale.value;
     });
+
     raiseInput?.addEventListener("input", () => {
         if (betScale) betScale.value = raiseInput.value;
     });
@@ -764,11 +852,13 @@ function initBotPracticeEngine() {
         handleHumanPracticeAction("Raise", amt);
     });
 
-    renderPracticeTable();
+    renderPracticeTable(true);
 }
 
 function startPracticeHand() {
-    // Auto-rebuy anyone at $0 so unlimited rounds can continue seamlessly
+    const totalPlayers = practiceState.seats.length;
+
+    // Auto-rebuy any seat below Big Blind so practice play is uninterrupted
     practiceState.seats.forEach((s) => {
         if (s.chips < practiceState.bigBlind) {
             s.chips = 1000;
@@ -778,44 +868,48 @@ function startPracticeHand() {
         s.acted = false;
         s.reveal = !s.isBot;
         s.status = "Active";
+        s.blindRole = "";
     });
 
     practiceState.handNumber += 1;
-    practiceState.dealerIndex = (practiceState.handNumber - 1) % 3;
-    practiceState.deck = buildShuffledDeck();
+    practiceState.dealerIndex = (practiceState.handNumber - 1) % totalPlayers;
+    practiceState.deck = new Deck();
     practiceState.community = [];
     practiceState.pot = 0;
     practiceState.highestBet = 0;
+    practiceState.lastRaiseSize = practiceState.bigBlind;
     practiceState.round = "Pre-Flop";
     practiceState.inHand = true;
+    practiceState.winnerIds = new Set();
 
-    // Deal 2 cards to each seat
-    practiceState.seats.forEach((s) => {
-        s.cards = [practiceState.deck.pop(), practiceState.deck.pop()];
+    // Deal 2 hole cards per player using Deck.hand(playerIndex, totalPlayers)
+    practiceState.seats.forEach((s, idx) => {
+        s.cards = practiceState.deck.hand(idx, totalPlayers);
     });
 
     // Post Small Blind and Big Blind
-    const sbIdx = (practiceState.dealerIndex + 1) % 3;
-    const bbIdx = (practiceState.dealerIndex + 2) % 3;
+    const sbIdx = (practiceState.dealerIndex + 1) % totalPlayers;
+    const bbIdx = (practiceState.dealerIndex + 2) % totalPlayers;
 
-    postPracticeBlind(sbIdx, practiceState.smallBlind, "Small Blind");
-    postPracticeBlind(bbIdx, practiceState.bigBlind, "Big Blind");
+    postPracticeBlind(sbIdx, practiceState.smallBlind, "SB");
+    postPracticeBlind(bbIdx, practiceState.bigBlind, "BB");
 
     practiceState.highestBet = practiceState.bigBlind;
-    practiceState.turnIndex = (bbIdx + 1) % 3;
-    practiceState.statusMessage = `Hand #${practiceState.handNumber} dealt! Blinds posted ($${practiceState.smallBlind}/$${practiceState.bigBlind}).`;
+    practiceState.turnIndex = (bbIdx + 1) % totalPlayers;
+    practiceState.statusMessage = `Hand #${practiceState.handNumber} dealt! Blinds posted (${practiceState.smallBlind}/${practiceState.bigBlind}).`;
 
-    renderPracticeTable();
+    renderPracticeTable(true);
     advancePracticeTurnIfBot();
 }
 
-function postPracticeBlind(seatIdx, blindAmt, label) {
+function postPracticeBlind(seatIdx, blindAmt, role) {
     const seat = practiceState.seats[seatIdx];
     const actual = Math.min(seat.chips, blindAmt);
     seat.chips -= actual;
     seat.bet += actual;
     practiceState.pot += actual;
-    seat.status = `${label} ($${actual})`;
+    seat.blindRole = role;
+    seat.status = `${role === "SB" ? "Small Blind" : "Big Blind"} (${actual})`;
 }
 
 function handleHumanPracticeAction(action, raiseTarget = 0) {
@@ -825,37 +919,47 @@ function handleHumanPracticeAction(action, raiseTarget = 0) {
     if (action === "Fold") {
         player.folded = true;
         player.acted = true;
-        player.status = "Folded (Mucked)";
+        player.status = "Folded";
     } else if (action === "Check") {
         if (player.bet < practiceState.highestBet) return;
         player.acted = true;
-        player.status = "Checked";
+        player.status = "Acted";
     } else if (action === "Call") {
         const toCall = Math.min(player.chips, practiceState.highestBet - player.bet);
         player.chips -= toCall;
         player.bet += toCall;
         practiceState.pot += toCall;
         player.acted = true;
-        player.status = player.chips === 0 ? "All-In" : `Called $${player.bet}`;
+        player.status = player.chips === 0 ? "All-In" : "Acted";
     } else if (action === "Raise") {
-        const minRaise = practiceState.highestBet + practiceState.bigBlind;
+        const minRaise = practiceState.highestBet === 0
+            ? practiceState.bigBlind
+            : practiceState.highestBet + practiceState.lastRaiseSize;
         const maxRaise = player.bet + player.chips;
         const validTarget = Math.max(minRaise, Math.min(raiseTarget, maxRaise));
         const added = Math.min(player.chips, validTarget - player.bet);
         if (added <= 0) return;
 
+        const previousHighest = practiceState.highestBet;
         player.chips -= added;
         player.bet += added;
         practiceState.pot += added;
-        practiceState.highestBet = player.bet;
-        player.acted = true;
-        player.status = player.chips === 0 ? "All-In" : `Raised to $${player.bet}`;
 
-        practiceState.seats.forEach((s, idx) => {
-            if (idx !== 0 && !s.folded && s.chips > 0) {
-                s.acted = false;
+        if (player.bet > previousHighest) {
+            const raiseDelta = player.bet - previousHighest;
+            practiceState.highestBet = player.bet;
+            if (raiseDelta >= practiceState.lastRaiseSize) {
+                practiceState.lastRaiseSize = raiseDelta;
+                practiceState.seats.forEach((s, idx) => {
+                    if (idx !== 0 && !s.folded && s.chips > 0) {
+                        s.acted = false;
+                    }
+                });
             }
-        });
+        }
+
+        player.acted = true;
+        player.status = player.chips === 0 ? "All-In" : `Raised (${player.bet})`;
     }
 
     progressPracticeRound();
@@ -864,7 +968,7 @@ function handleHumanPracticeAction(action, raiseTarget = 0) {
 function advancePracticeTurnIfBot() {
     if (!practiceState.inHand) return;
     if (practiceState.turnIndex === 0) {
-        renderPracticeTable();
+        renderPracticeTable(true);
         return;
     }
 
@@ -880,25 +984,24 @@ function executeBotDecision(seatIdx) {
     const difficulty = document.getElementById("botDifficultySelect")?.value || "medium";
     const toCall = practiceState.highestBet - bot.bet;
 
-    const availableCards = [...bot.cards, ...practiceState.community];
-    const handEval = evaluateBestHand(availableCards);
-    const highCardRank = Math.max(bot.cards[0].rank, bot.cards[1].rank);
-    const isPocketPair = bot.cards[0].rank === bot.cards[1].rank;
+    const handEval = evaluatePracticeCardsWithPokerLogic(bot.cards, practiceState.community);
+    const rank0 = (bot.cards[0] - 1) % 13;
+    const rank1 = (bot.cards[1] - 1) % 13;
+    const highCardRank = Math.max(rank0, rank1);
+    const isPocketPair = rank0 === rank1;
 
     let decision = "Check";
 
     if (difficulty === "easy") {
-        // Easy bot: passive calling station, rarely raises, only folds weak hands to large bets
         if (toCall === 0) {
             decision = "Check";
-        } else if (toCall > 100 && handEval.category === 0 && highCardRank < 11) {
+        } else if (toCall > 100 && handEval.category === 0 && highCardRank < 9) {
             decision = "Fold";
         } else {
             decision = "Call";
         }
     } else if (difficulty === "medium") {
-        // Medium bot: raises strong pairs/made hands, folds junk to raises
-        const strong = isPocketPair || handEval.category >= 1 || highCardRank >= 13;
+        const strong = isPocketPair || handEval.category >= 1 || highCardRank >= 11;
         if (toCall === 0) {
             decision = strong && Math.random() < 0.45 && bot.chips >= practiceState.bigBlind * 2 ? "Raise" : "Check";
         } else if (strong || toCall <= practiceState.bigBlind) {
@@ -907,8 +1010,7 @@ function executeBotDecision(seatIdx) {
             decision = "Fold";
         }
     } else {
-        // Hard bot: aggressive with strong equity, applies pressure & respects pot odds
-        const premium = isPocketPair || handEval.category >= 1 || (bot.cards[0].rank >= 11 && bot.cards[1].rank >= 11);
+        const premium = isPocketPair || handEval.category >= 1 || (rank0 >= 9 && rank1 >= 9);
         const potOdds = toCall > 0 ? toCall / (practiceState.pot + toCall) : 0;
 
         if (toCall === 0) {
@@ -925,50 +1027,61 @@ function executeBotDecision(seatIdx) {
     if (decision === "Fold") {
         bot.folded = true;
         bot.acted = true;
-        bot.status = "Folded (Mucked)";
+        bot.status = "Folded";
     } else if (decision === "Check") {
         bot.acted = true;
-        bot.status = "Checked";
+        bot.status = "Acted";
     } else if (decision === "Call") {
         const pay = Math.min(bot.chips, toCall);
         bot.chips -= pay;
         bot.bet += pay;
         practiceState.pot += pay;
         bot.acted = true;
-        bot.status = bot.chips === 0 ? "All-In" : `Called $${bot.bet}`;
+        bot.status = bot.chips === 0 ? "All-In" : "Acted";
     } else if (decision === "Raise") {
-        const raiseTo = Math.min(bot.bet + bot.chips, Math.max(practiceState.highestBet + practiceState.bigBlind, practiceState.highestBet * 2));
+        const minRaise = practiceState.highestBet === 0
+            ? practiceState.bigBlind
+            : practiceState.highestBet + practiceState.lastRaiseSize;
+        const raiseTo = Math.min(bot.bet + bot.chips, Math.max(minRaise, practiceState.highestBet * 2));
         const pay = Math.min(bot.chips, raiseTo - bot.bet);
+        const previousHighest = practiceState.highestBet;
+
         bot.chips -= pay;
         bot.bet += pay;
         practiceState.pot += pay;
-        practiceState.highestBet = bot.bet;
         bot.acted = true;
-        bot.status = bot.chips === 0 ? "All-In" : `Raised to $${bot.bet}`;
+        bot.status = bot.chips === 0 ? "All-In" : `Raised (${bot.bet})`;
 
-        practiceState.seats.forEach((s, idx) => {
-            if (idx !== seatIdx && !s.folded && s.chips > 0) {
-                s.acted = false;
+        if (bot.bet > previousHighest) {
+            const raiseDelta = bot.bet - previousHighest;
+            practiceState.highestBet = bot.bet;
+            if (raiseDelta >= practiceState.lastRaiseSize) {
+                practiceState.lastRaiseSize = raiseDelta;
+                practiceState.seats.forEach((s, idx) => {
+                    if (idx !== seatIdx && !s.folded && s.chips > 0) {
+                        s.acted = false;
+                    }
+                });
             }
-        });
+        }
     }
 }
 
 function progressPracticeRound() {
     const activeSeats = practiceState.seats.filter((s) => !s.folded);
+    const totalPlayers = practiceState.seats.length;
 
-    // Everyone else folded -> last remaining player wins immediately
     if (activeSeats.length === 1) {
         const winner = activeSeats[0];
         winner.chips += practiceState.pot;
-        practiceState.statusMessage = `${winner.name} wins $${practiceState.pot} (all opponents folded)! Click 'Deal New Hand' to play again.`;
+        practiceState.winnerIds = new Set([winner.id]);
+        practiceState.statusMessage = `${winner.name} wins ${practiceState.pot} (all opponents folded)! Click 'Deal New Hand' to play again.`;
         practiceState.pot = 0;
         practiceState.inHand = false;
-        renderPracticeTable();
+        renderPracticeTable(true);
         return;
     }
 
-    // Check if betting round is complete
     const allMatched = activeSeats.every((s) => s.chips === 0 || (s.acted && s.bet === practiceState.highestBet));
 
     if (allMatched) {
@@ -977,37 +1090,36 @@ function progressPracticeRound() {
             return;
         }
 
-        // Advance community cards
         practiceState.seats.forEach((s) => {
             s.bet = 0;
             s.acted = false;
             if (!s.folded && s.chips > 0) s.status = "Active";
         });
         practiceState.highestBet = 0;
+        practiceState.lastRaiseSize = practiceState.bigBlind;
 
+        // Deal community cards via Deck methods from pokerLogic.js
         if (practiceState.round === "Pre-Flop") {
             practiceState.round = "Flop";
-            practiceState.community.push(practiceState.deck.pop(), practiceState.deck.pop(), practiceState.deck.pop());
+            practiceState.community = practiceState.deck.showFlop(totalPlayers);
         } else if (practiceState.round === "Flop") {
             practiceState.round = "Turn";
-            practiceState.community.push(practiceState.deck.pop());
+            practiceState.community.push(practiceState.deck.showTurn(totalPlayers));
         } else if (practiceState.round === "Turn") {
             practiceState.round = "River";
-            practiceState.community.push(practiceState.deck.pop());
+            practiceState.community.push(practiceState.deck.showRiver(totalPlayers));
         }
 
-        // First active player left of dealer starts post-flop action
-        let nextIdx = (practiceState.dealerIndex + 1) % 3;
+        let nextIdx = (practiceState.dealerIndex + 1) % totalPlayers;
         let guard = 0;
-        while ((practiceState.seats[nextIdx].folded || practiceState.seats[nextIdx].chips === 0) && guard < 3) {
-            nextIdx = (nextIdx + 1) % 3;
+        while ((practiceState.seats[nextIdx].folded || practiceState.seats[nextIdx].chips === 0) && guard < totalPlayers) {
+            nextIdx = (nextIdx + 1) % totalPlayers;
             guard++;
         }
         practiceState.turnIndex = nextIdx;
         practiceState.statusMessage = `${practiceState.round} dealt!`;
-        renderPracticeTable();
+        renderPracticeTable(true);
 
-        // If all active players are all-in, fast-forward remaining streets
         if (activeSeats.every((s) => s.chips === 0)) {
             setTimeout(progressPracticeRound, 650);
             return;
@@ -1017,15 +1129,14 @@ function progressPracticeRound() {
         return;
     }
 
-    // Advance turn to next active player with chips
-    let nextIdx = (practiceState.turnIndex + 1) % 3;
+    let nextIdx = (practiceState.turnIndex + 1) % totalPlayers;
     let guard = 0;
-    while ((practiceState.seats[nextIdx].folded || practiceState.seats[nextIdx].chips === 0) && guard < 3) {
-        nextIdx = (nextIdx + 1) % 3;
+    while ((practiceState.seats[nextIdx].folded || practiceState.seats[nextIdx].chips === 0) && guard < totalPlayers) {
+        nextIdx = (nextIdx + 1) % totalPlayers;
         guard++;
     }
     practiceState.turnIndex = nextIdx;
-    renderPracticeTable();
+    renderPracticeTable(false);
     advancePracticeTurnIfBot();
 }
 
@@ -1035,7 +1146,7 @@ function resolvePracticeShowdown(activeSeats) {
     let winningHandName = "";
 
     activeSeats.forEach((seat) => {
-        const evalRes = evaluateBestHand([...seat.cards, ...practiceState.community]);
+        const evalRes = evaluatePracticeCardsWithPokerLogic(seat.cards, practiceState.community);
         seat.evalResult = evalRes;
         if (evalRes.score > bestScore) {
             bestScore = evalRes.score;
@@ -1053,6 +1164,7 @@ function resolvePracticeShowdown(activeSeats) {
     });
 
     const winnerIds = new Set(winners.map((w) => w.id));
+    practiceState.winnerIds = winnerIds;
     const humanMuck = Boolean(document.getElementById("prac-muck-toggle")?.checked);
     const difficulty = document.getElementById("botDifficultySelect")?.value || "medium";
 
@@ -1063,23 +1175,22 @@ function resolvePracticeShowdown(activeSeats) {
             seat.status = `Winner (${seat.evalResult.name})`;
         } else if (seat.id === "player") {
             seat.reveal = !humanMuck;
-            seat.status = humanMuck ? "Lost (Mucked 🂠 🂠)" : `Lost (${seat.evalResult.name})`;
+            seat.status = humanMuck ? "Lost (Mucked)" : `Lost (${seat.evalResult.name})`;
         } else {
-            // Hard bots muck losing hands; Easy/Medium bots show them
             const botMucks = difficulty === "hard";
             seat.reveal = !botMucks;
-            seat.status = botMucks ? "Lost (Mucked 🂠 🂠)" : `Lost (${seat.evalResult.name})`;
+            seat.status = botMucks ? "Lost (Mucked)" : `Lost (${seat.evalResult.name})`;
         }
     });
 
     const winnerNames = winners.map((w) => w.name).join(" & ");
-    practiceState.statusMessage = `Showdown! ${winnerNames} won $${practiceState.pot} with ${winningHandName}! Click 'Deal New Hand' for another round.`;
+    practiceState.statusMessage = `Showdown! ${winnerNames} won ${practiceState.pot} with ${winningHandName}! Click 'Deal New Hand' for another round.`;
     practiceState.pot = 0;
     practiceState.inHand = false;
-    renderPracticeTable(winnerIds);
+    renderPracticeTable(true);
 }
 
-function renderPracticeTable(winnerIds = new Set()) {
+function renderPracticeTable(syncRaiseInputs = false) {
     const difficulty = document.getElementById("botDifficultySelect")?.value || "medium";
     const diffLabel = difficulty.charAt(0).toUpperCase() + difficulty.slice(1);
 
@@ -1088,70 +1199,66 @@ function renderPracticeTable(winnerIds = new Set()) {
     document.getElementById("prac-hand-num").textContent = String(practiceState.handNumber);
     document.getElementById("prac-table-status").textContent = practiceState.statusMessage;
 
-    // Community cards (5 slots)
+    const currentTurnSeat = practiceState.inHand ? practiceState.seats[practiceState.turnIndex] : null;
+    document.getElementById("prac-current-turn").textContent = currentTurnSeat ? currentTurnSeat.name : "None";
+
+    // Render 5 community card slots using gameplay .card styling
     const commEl = document.getElementById("prac-community-cards");
     if (commEl) {
-        commEl.textContent = "";
+        commEl.innerHTML = "";
         for (let i = 0; i < 5; i++) {
-            const card = practiceState.community[i];
-            commEl.appendChild(createCardElement(card ? card.text : "🂠", !card));
+            const cardNum = practiceState.community[i];
+            commEl.appendChild(createGameplayCardElement(cardNum, cardNum === undefined));
         }
     }
 
-    // Bots (seats 1 & 2)
-    [1, 2].forEach((seatIdx, botUiIdx) => {
-        const seat = practiceState.seats[seatIdx];
-        const box = document.getElementById(`prac-bot-${botUiIdx}`);
-        const dealerTag = practiceState.inHand && practiceState.dealerIndex === seatIdx ? " (D)" : "";
+    // Render all seats on the live poker table layout
+    const tableSeats = practiceState.seats.map((s, idx) => ({
+        name: s.isBot ? `${s.name} [${diffLabel}]` : s.name,
+        isCurrent: !s.isBot,
+        isDealer: practiceState.inHand && practiceState.dealerIndex === idx,
+        blindRole: practiceState.inHand ? s.blindRole : "",
+        isActiveTurn: practiceState.inHand && practiceState.turnIndex === idx,
+        isWinner: practiceState.winnerIds.has(s.id),
+        folded: s.folded,
+        chips: s.chips,
+        bet: s.bet,
+        status: s.status,
+        cards: s.isBot ? s.cards : [],
+        revealCards: s.reveal
+    }));
 
-        document.getElementById(`prac-bot-${botUiIdx}-name`).textContent = `${seat.name} [${diffLabel}]${dealerTag}`;
-        document.getElementById(`prac-bot-${botUiIdx}-status`).textContent = seat.status;
-        document.getElementById(`prac-bot-${botUiIdx}-chips`).textContent = String(seat.chips);
-        document.getElementById(`prac-bot-${botUiIdx}-bet`).textContent = String(seat.bet);
+    renderTableSeats(
+        document.getElementById("prac-left-side"),
+        document.getElementById("prac-right-side"),
+        tableSeats
+    );
 
-        if (box) {
-            box.classList.toggle("active-turn", practiceState.inHand && practiceState.turnIndex === seatIdx);
-            box.classList.toggle("folded-seat", seat.folded);
-            box.classList.toggle("winner-seat", winnerIds.has(seat.id));
-        }
-
-        const cardsBox = document.getElementById(`prac-bot-${botUiIdx}-cards`);
-        if (seat.cards.length === 2) {
-            renderCardRow(cardsBox, seat.cards.map((c) => c.text), !seat.reveal);
-        } else if (cardsBox) {
-            cardsBox.textContent = "";
-        }
-    });
-
-    // Human seat (seat 0)
+    // Update "Your Hand" & "Your Turn" panels matching tableDisplay.js
     const human = practiceState.seats[0];
-    const humanDealerTag = practiceState.inHand && practiceState.dealerIndex === 0 ? " · Dealer (D)" : "";
-    document.getElementById("prac-player-label").textContent = `You${humanDealerTag}`;
-    document.getElementById("prac-player-chips").textContent = String(human.chips);
+    document.getElementById("prac-player-label").textContent = "Your Hand (You)";
+    document.getElementById("prac-player-chips").textContent = Number(human.chips).toLocaleString();
+    document.getElementById("prac-available-chips").textContent = Number(human.chips).toLocaleString();
     document.getElementById("prac-player-bet").textContent = String(human.bet);
-
-    const humanBox = document.getElementById("prac-player-seat");
-    if (humanBox) {
-        humanBox.classList.toggle("active-turn", practiceState.inHand && practiceState.turnIndex === 0);
-        humanBox.classList.toggle("folded-seat", human.folded);
-        humanBox.classList.toggle("winner-seat", winnerIds.has("player"));
-    }
+    document.getElementById("prac-current-bet").textContent = String(practiceState.highestBet);
 
     const humanCardsBox = document.getElementById("prac-player-cards");
     if (human.cards.length === 2) {
-        renderCardRow(humanCardsBox, human.cards.map((c) => c.text), false);
-        const evalRes = evaluateBestHand([...human.cards, ...practiceState.community]);
-        document.getElementById("prac-hand-eval").textContent = `Current Hand: ${evalRes.name}`;
+        renderGameplayCards(humanCardsBox, human.cards, false);
+        const evalRes = evaluatePracticeCardsWithPokerLogic(human.cards, practiceState.community);
+        document.getElementById("prac-hand-eval").textContent = evalRes.name;
     } else {
-        if (humanCardsBox) humanCardsBox.textContent = "";
-        document.getElementById("prac-hand-eval").textContent = "Current Hand: --";
+        if (humanCardsBox) humanCardsBox.innerHTML = "";
+        document.getElementById("prac-hand-eval").textContent = "--";
     }
 
-    // Update human betting controls
     const isHumanTurn = practiceState.inHand && practiceState.turnIndex === 0 && !human.folded;
     const toCall = Math.max(0, practiceState.highestBet - human.bet);
-    const minRaise = practiceState.highestBet + practiceState.bigBlind;
+    const minRaise = practiceState.highestBet === 0
+        ? practiceState.bigBlind
+        : practiceState.highestBet + practiceState.lastRaiseSize;
     const maxRaise = human.bet + human.chips;
+    const canRaise = isHumanTurn && maxRaise >= minRaise;
 
     const foldBtn = document.getElementById("prac-btn-fold");
     const checkBtn = document.getElementById("prac-btn-check");
@@ -1164,21 +1271,330 @@ function renderPracticeTable(winnerIds = new Set()) {
     if (checkBtn) checkBtn.disabled = !isHumanTurn || toCall > 0;
     if (callBtn) {
         callBtn.disabled = !isHumanTurn || toCall === 0;
-        callBtn.textContent = toCall > 0 ? `Call ($${Math.min(human.chips, toCall)})` : "Call";
+        callBtn.textContent = toCall > 0 ? `Call (${Math.min(human.chips, toCall)})` : "Call";
     }
-    if (raiseBtn) {
-        raiseBtn.disabled = !isHumanTurn || maxRaise < minRaise;
-    }
+    if (raiseBtn) raiseBtn.disabled = !canRaise;
+
     if (raiseInput && betScale) {
         raiseInput.min = String(minRaise);
         raiseInput.max = String(Math.max(minRaise, maxRaise));
         betScale.min = String(minRaise);
         betScale.max = String(Math.max(minRaise, maxRaise));
+        raiseInput.disabled = !canRaise;
+        betScale.disabled = !canRaise;
 
-        const clamped = Math.max(minRaise, Math.min(Number(raiseInput.value) || minRaise, maxRaise));
-        raiseInput.value = String(clamped);
-        betScale.value = String(clamped);
-        raiseInput.disabled = !isHumanTurn || maxRaise < minRaise;
-        betScale.disabled = !isHumanTurn || maxRaise < minRaise;
+        document.getElementById("prac-raise-min-label").textContent = String(minRaise);
+        document.getElementById("prac-raise-max-label").textContent = String(maxRaise);
+
+        if (syncRaiseInputs) {
+            const amount = canRaise
+                ? Math.max(minRaise, Math.min(Number(raiseInput.value) || minRaise, maxRaise))
+                : 0;
+            raiseInput.value = String(amount);
+            betScale.value = String(amount);
+        }
     }
+}
+
+class Deck {
+  constructor() {
+    this.deck = Array.from({ length: 52 }, (_, i) => i + 1);
+    this.shuffleCards();
+  }
+
+  /**
+   * Performs a randomized Fisher-Yates shuffle using the deterministic PRNG.
+   */
+  shuffleCards() {
+    this.deck.sort((a, b) => a - b);
+    for (let i = this.deck.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [this.deck[i], this.deck[j]] = [this.deck[j], this.deck[i]];
+    }
+  }
+
+  /**
+   * Deals two hole cards to a specific player given the total player count.
+   * @param {number} playerIndex Zero-based index of the player.
+   * @param {number} totalPlayers Total number of players at the table.
+   * @returns {number[]} Array containing the two hole cards.
+   */
+  hand(playerIndex, totalPlayers) {
+    const card1 = this.deck[playerIndex];
+    const card2 = this.deck[playerIndex + totalPlayers];
+    return [card1, card2];
+  }
+
+  /**
+   * Deals the three community cards (flop) after burning a card.
+   * @param {number} totalPlayers Total number of players at the table.
+   * @returns {number[]} Array of three flop cards.
+   */
+  showFlop(totalPlayers) {
+    const burnIndex = 2 * totalPlayers;
+    const flopStart = burnIndex + 1;
+    return this.deck.slice(flopStart, flopStart + 3);
+  }
+
+  /**
+   * Deals the fourth community card (turn) after burning a card.
+   * @param {number} totalPlayers Total number of players at the table.
+   * @returns {number} The turn card.
+   */
+  showTurn(totalPlayers) {
+    const turnIndex = 2 * totalPlayers + 5;
+    return this.deck[turnIndex];
+  }
+
+  /**
+   * Deals the fifth community card (river) after burning a card.
+   * @param {number} totalPlayers Total number of players at the table.
+   * @returns {number} The river card.
+   */
+  showRiver(totalPlayers) {
+    const riverIndex = 2 * totalPlayers + 7;
+    return this.deck[riverIndex];
+  }
+
+  /**
+   * Retrieves all five community cards in order (flop, turn, river).
+   * @param {number} totalPlayers Total number of players at the table.
+   * @returns {number[]} Array of all five community cards.
+   */
+  commonCards(totalPlayers) {
+    const flop = this.showFlop(totalPlayers);
+    const turn = this.showTurn(totalPlayers);
+    const river = this.showRiver(totalPlayers);
+    return [...flop, turn, river];
+  }
+
+  // --- Internal Helper Methods for Hand Evaluation ---
+  
+  static #parseCard(card) {
+    return {
+      rank: (card - 1) % 13,
+      suit: Math.floor((card - 1) / 13)
+    };
+  }
+
+  static #getParsedCards(hand, commonCards) {
+    const allCards = [...hand, ...commonCards];
+    return allCards.map(c => Deck.#parseCard(c));
+  }
+
+  static #getRankCounts(parsedCards) {
+    const counts = {};
+    for (const card of parsedCards) {
+      counts[card.rank] = (counts[card.rank] || 0) + 1;
+    }
+    return counts;
+  }
+
+  static #getCombinations(arr, k) {
+    if (k === 0) return [[]];
+    if (arr.length === 0) return [];
+    const [head, ...tail] = arr;
+    const withHead = Deck.#getCombinations(tail, k - 1).map(c => [head, ...c]);
+    const withoutHead = Deck.#getCombinations(tail, k);
+    return [...withHead, ...withoutHead];
+  }
+
+  static #getStraightRanks(combo) {
+    const ranks = combo.map(c => (c - 1) % 13).sort((a, b) => b - a);
+    const uniqueRanks = [...new Set(ranks)];
+    
+    if ([12, 0, 1, 2, 3].every(rank => ranks.includes(rank))) {
+      return [3, 2, 1, 0, 0];
+    } 
+    
+    return uniqueRanks.slice(0, 5);
+  }
+
+  static #getGroupRanks(combo, pattern) {
+    const counts = Deck.#getRankCounts(Deck.#getParsedCards(combo, []));
+    const sortedEntries = Object.entries(counts)
+      .map(([rank, count]) => ({ rank: Number(rank), count }))
+      .sort((a, b) => b.count - a.count || b.rank - a.rank);
+
+    let resultRanks = [];
+    for (const group of sortedEntries) {
+      for (let i = 0; i < group.count; i++) {
+        resultRanks.push(group.rank);
+      }
+    }
+    return resultRanks.slice(0, 5);
+  }
+
+  static #evaluate5CardHand(combo) {
+    let category = 0;
+    let sortedRanks = combo.map(c => (c - 1) % 13).sort((a, b) => b - a);
+
+    if (Deck.checkRoyalFlush(combo, [])) {
+      category = 9;
+      sortedRanks = [12, 11, 10, 9, 8];
+    } else if (Deck.checkStraightFlush(combo, [])) {
+      category = 8;
+      sortedRanks = Deck.#getStraightRanks(combo);
+    } else if (Deck.check4Kind(combo, [])) {
+      category = 7;
+      sortedRanks = Deck.#getGroupRanks(combo, [4, 1]);
+    } else if (Deck.checkFullHouse(combo, [])) {
+      category = 6;
+      sortedRanks = Deck.#getGroupRanks(combo, [3, 2]);
+    } else if (Deck.checkFlush(combo, [])) {
+      category = 5;
+      sortedRanks = combo.map(c => (c - 1) % 13).sort((a, b) => b - a);
+    } else if (Deck.checkStraight(combo, [])) {
+      category = 4;
+      sortedRanks = Deck.#getStraightRanks(combo);
+    } else if (Deck.check3Kind(combo, [])) {
+      category = 3;
+      sortedRanks = Deck.#getGroupRanks(combo, [3, 1, 1]);
+    } else if (Deck.checkTwoPair(combo, [])) {
+      category = 2;
+      sortedRanks = Deck.#getGroupRanks(combo, [2, 2, 1]);
+    } else if (Deck.checkPair(combo, [])) {
+      category = 1;
+      sortedRanks = Deck.#getGroupRanks(combo, [2, 1, 1, 1]);
+    } else {
+      category = 0;
+      sortedRanks = combo.map(c => (c - 1) % 13).sort((a, b) => b - a);
+    }
+
+    let score = category * Math.pow(13, 5);
+    for (let i = 0; i < 5; i++) {
+      score += sortedRanks[i] * Math.pow(13, 4 - i);
+    }
+    return score;
+  }
+
+  static cardToText(cardNumber) {
+    const suits = ["♥", "♦", "♣", "♠"];
+    const ranks = ["2", "3", "4", "5", "6", "7",
+                  "8", "9", "10", "J", "Q", "K", "A"];
+    const suitIndex = Math.floor((cardNumber - 1) / 13); 
+    const rankIndex = (cardNumber - 1) % 13;
+
+    return ranks[rankIndex] + suits[suitIndex];
+  }
+
+  static bestHand(hand, commonCards) {
+    const allCards = [...hand, ...commonCards];
+    const combinations = Deck.#getCombinations(allCards, 5);
+    let maxScore = -1;
+
+    for (const combo of combinations) {
+      const score = Deck.#evaluate5CardHand(combo);
+      if (score > maxScore) {
+        maxScore = score;
+      }
+    }
+    return maxScore;
+  }
+
+  static checkFlush(hand, commonCards) {
+    const cards = Deck.#getParsedCards(hand, commonCards);
+    const suitCounts = [0, 0, 0, 0];
+    for (const card of cards) {
+      suitCounts[card.suit]++;
+    }
+    const flushSuit = suitCounts.findIndex(count => count >= 5);
+    if (flushSuit === -1) return false;
+
+    return cards
+      .filter(c => c.suit === flushSuit)
+      .map(c => c.rank)
+      .sort((a, b) => b - a);
+  }
+
+  static checkStraight(hand, commonCards) {
+    const cards = Deck.#getParsedCards(hand, commonCards);
+    const uniqueRanks = [...new Set(cards.map(c => c.rank))].sort((a, b) => b - a);
+
+    if ([12, 0, 1, 2, 3].every(rank => uniqueRanks.includes(rank))) {
+      return true;
+    }
+
+    uniqueRanks.sort((a, b) => b - a);
+    const checkRanks = [...uniqueRanks];
+
+    let consecutive = 1;
+    for (let i = 0; i < checkRanks.length - 1; i++) {
+      if (checkRanks[i] - 1 === checkRanks[i + 1]) {
+        consecutive++;
+        if (consecutive >= 5) {
+          return true;
+        }
+      } else if (checkRanks[i] !== checkRanks[i + 1]) {
+        consecutive = 1;
+      }
+    }
+    return false;
+  }
+
+  static checkStraightFlush(hand, commonCards) {
+    const cards = Deck.#getParsedCards(hand, commonCards);
+    for (let suit = 0; suit < 4; suit++) {
+      const suitCards = cards.filter(c => c.suit === suit);
+      if (suitCards.length >= 5) {
+        if (Deck.checkStraight([], suitCards.map(c => (c.suit * 13) + c.rank + 1))) {
+          return true;
+        }
+      }
+    }
+    return false;
+  }
+
+  static checkRoyalFlush(hand, commonCards) {
+    const cards = Deck.#getParsedCards(hand, commonCards);
+    for (let suit = 0; suit < 4; suit++) {
+      const suitRanks = new Set(cards.filter(c => c.suit === suit).map(c => c.rank));
+      if (
+        suitRanks.has(8) &&
+        suitRanks.has(9) &&
+        suitRanks.has(10) &&
+        suitRanks.has(11) &&
+        suitRanks.has(12)
+      ) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  static check4Kind(hand, commonCards) {
+    const cards = Deck.#getParsedCards(hand, commonCards);
+    const counts = Deck.#getRankCounts(cards);
+    return Object.values(counts).includes(4);
+  }
+
+  static checkFullHouse(hand, commonCards) {
+    const cards = Deck.#getParsedCards(hand, commonCards);
+    const counts = Deck.#getRankCounts(cards);
+    const values = Object.values(counts);
+    const hasThree = values.includes(3);
+    const hasPair = values.filter(v => v >= 2).length >= 2;
+    return hasThree && hasPair;
+  }
+
+  static check3Kind(hand, commonCards) {
+    const cards = Deck.#getParsedCards(hand, commonCards);
+    const counts = Deck.#getRankCounts(cards);
+    return Object.values(counts).includes(3) && !Deck.checkFullHouse(hand, commonCards);
+  }
+
+  static checkTwoPair(hand, commonCards) {
+    const cards = Deck.#getParsedCards(hand, commonCards);
+    const counts = Deck.#getRankCounts(cards);
+    const pairs = Object.values(counts).filter(v => v >= 2);
+    return pairs.length >= 2;
+  }
+
+  static checkPair(hand, commonCards) {
+    const cards = Deck.#getParsedCards(hand, commonCards);
+    const counts = Deck.#getRankCounts(cards);
+    const pairs = Object.values(counts).filter(v => v === 2);
+    const threes = Object.values(counts).filter(v => v === 3);
+    return pairs.length === 1 && threes.length === 0 && !Deck.checkTwoPair(hand, commonCards);
+  }
 }
