@@ -9,6 +9,16 @@ let socket = null;
 let lastRenderedChatCount = 0;
 let allowNavigation = false;
 
+// Poker avatar icons
+const tableAvatarIcons = {
+    default: "bi-person-fill",
+    ace: "bi-suit-spade-fill",
+    queen: "bi-suit-heart-fill",
+    king: "bi-suit-diamond-fill",
+    jack: "bi-suit-club-fill",
+    joker: "bi-dice-5-fill"
+};
+
 // Get the selected table from the URL
 const urlParams = new URLSearchParams(window.location.search);
 const currentTableId = urlParams.get("tableId")?.trim();
@@ -467,10 +477,21 @@ function renderActivePlayers(status) {
         seat.className = `player-seat ${playerStatusClass} ${p.isCurrent ? "current-player" : ""}`;
         seat.id = `seat-${p.id}`;
 
+        // Avatar icon
+        const avatarCircle = document.createElement("div");
+        avatarCircle.className = "table-player-avatar";
+
+        const avatarIcon = document.createElement("i");
+        avatarIcon.className = `bi ${tableAvatarIcons[p.avatar] || tableAvatarIcons.default}`;
+
+        avatarCircle.appendChild(avatarIcon);
+
+        // Username
         const nameSpan = document.createElement("span");
         nameSpan.className = "player-name";
         nameSpan.textContent = p.id + (p.isCurrent ? " (You)" : "");
 
+        // Dealer badge
         if (p.isDealer) {
             const dealerBadge = document.createElement("span");
             dealerBadge.className = "dealer-badge";
@@ -478,15 +499,23 @@ function renderActivePlayers(status) {
             nameSpan.appendChild(dealerBadge);
         }
 
+        //status
         const statusSpan = document.createElement("span");
         statusSpan.className = "player-status";
         statusSpan.textContent = p.status;
 
+        //chips
         const chipsSpan = document.createElement("span");
         chipsSpan.className = "player-chips";
         chipsSpan.textContent = `${p.chips.toLocaleString()} chips`;
 
-        seat.append(nameSpan, statusSpan, chipsSpan);
+        //info
+        const seatInfo = document.createElement("div");
+        seatInfo.className = "player-seat-info";
+        seatInfo.append(nameSpan, statusSpan, chipsSpan);
+
+        //add to seat
+        seat.append(avatarCircle, seatInfo);
 
         if (index < half) {
             leftSideContainer.appendChild(seat);
@@ -524,6 +553,41 @@ function renderActivePlayers(status) {
 
     updateRaiseControls(status);
 
+    // Save muck preference whenever the checkbox changes
+    const muckToggle = document.getElementById("muck-toggle");
+
+    if (muckToggle) {
+        muckToggle.addEventListener("change", async () => {
+            const preference = muckToggle.checked;
+
+            try {
+                const response = await fetch("/api/table/muck", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json"
+                    },
+                    body: JSON.stringify({
+                        tableId: currentTableId,
+                        playerId: currentPlayerId,
+                        muckPreference: preference
+                    })
+                });
+
+                if (!response.ok) {
+                    throw new Error("Failed to save muck preference.");
+                }
+
+                console.log(
+                    "Muck preference saved:",
+                    preference
+                );
+
+            } catch (error) {
+                console.error(error);
+            }
+        });
+    }
+    
     // Gate all action buttons properly based on status.buttonsBlocked and applicability
     actionButtons.forEach(btn => {
         const action = btn.dataset.action;

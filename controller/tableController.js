@@ -187,6 +187,7 @@ function getTableStatus(req, res) {
         const isDealer = id === dealerPlayerId;
         return {
             id,
+            avatar: p?.avatar || "default",
             chips: p ? p.chips : 1000,
             status: p && p.folded ? "Folded" : (p && p.chips === 0 ? "All-In" : (p && p.hasActed ? "Acted" : "Active")),
             isCurrent: id === playerId,
@@ -396,24 +397,48 @@ async function joinTable(req, res) {
         });
     }
 
-    // Start guests at 1000 chips; for account users, load their saved points from UserDao[cite: 5, 7]
-    let startingChips = 1000;
-    if (!id.startsWith("Guest_")) {
-        try {
-            const dbUser = await UserDao.findOne({
-                $or: [{ username: id }, { email: id }]
-            });
-            if (dbUser && typeof dbUser.points === "number") {
-                startingChips = Math.max(0, Math.floor(dbUser.points));
-            }
-        } catch (err) {
-            console.error("Failed to fetch user points on table join:", err);
-        }
-    }
+    
+// Default values for guest players
+let startingChips = 1000;
+let playerAvatar = "default";
 
-    if (!table.addPlayer(id, startingChips)) {
-        return res.status(409).json({ error: "Could not add player to table." });
+// Load registered user's saved points and avatar
+if (!id.startsWith("Guest_")) {
+    try {
+        const dbUser = await UserDao.findOne({
+            $or: [{ username: id }, { email: id }]
+        });
+
+        if (dbUser) {
+            if (typeof dbUser.points === "number") {
+                startingChips = Math.max(
+                    0,
+                    Math.floor(dbUser.points)
+                );
+            }
+
+            playerAvatar = dbUser.avatar || "default";
+        }
+
+    } catch (err) {
+        console.error("Failed to fetch user profile on table join:", err);
     }
+}
+
+// Add player to table
+if (!table.addPlayer(id, startingChips)) {
+    return res.status(409).json({
+        error: "Could not add player to table."
+    });
+}
+
+// Attach avatar to the player's in-memory object
+const player = table.playerManager.getPlayer(id);
+
+if (player) {
+    player.avatar = playerAvatar;
+}
+
 
     const isPlayer = table.players.includes(id);
 
@@ -602,6 +627,41 @@ function finishGame(req, res) {
     });
 }
 
+function updateMuckPreference(req, res) {
+    const table = getRequestedTable(req);
+
+    if (!table) {
+        return res.status(404).json({
+            error: "Table not found."
+        });
+    }
+
+    const { playerId, muckPreference } = req.body;
+
+    if (typeof playerId !== "string" ||
+        typeof muckPreference !== "boolean") {
+        return res.status(400).json({
+            error: "Invalid muck preference."
+        });
+    }
+
+    const player = table.playerManager.getPlayer(playerId);
+
+    if (!player || !table.players.includes(playerId)) {
+        return res.status(404).json({
+            error: "Player not found at table."
+        });
+    }
+
+    player.muckPreference = muckPreference;
+
+    return res.status(200).json({
+        success: true,
+        muckPreference: player.muckPreference
+    });
+}
+
+
 module.exports = {
     createTable,
     joinTable,
@@ -612,6 +672,7 @@ module.exports = {
     nextRound,
     getTableStatus,
     postChatMessage,
+    updateMuckPreference,
     tableManager,
     mainTable
 };

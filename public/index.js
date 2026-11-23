@@ -19,7 +19,7 @@ let currentAvatar = "default";
 let selectedAvatar = "default";
 let availableAvatars = [];
 
-// Temporary Bootstrap icons until artwork is added
+// Poker avatar icons
 const avatarIcons = {
     default: "bi-person-fill",
     ace: "bi-suit-spade-fill",
@@ -1108,8 +1108,7 @@ function setupFriendChatHandlers() {
 // Display the selected avatar on the dashboard
 function updateDashboardAvatar() {
     const avatarDisplay = document.getElementById("dashboardAvatar");
-    const avatarName = document.getElementById("dashboardAvatarName");
-
+    
     if (!avatarDisplay) return;
 
     const iconClass = avatarIcons[currentAvatar] || avatarIcons.default;
@@ -1120,14 +1119,6 @@ function updateDashboardAvatar() {
     icon.className = `bi ${iconClass}`;
 
     avatarDisplay.appendChild(icon);
-
-    const preset = availableAvatars.find(
-        avatar => avatar.id === currentAvatar
-    );
-
-    if (avatarName) {
-        avatarName.textContent = preset ? preset.name : "Default";
-    }
 }
 
 
