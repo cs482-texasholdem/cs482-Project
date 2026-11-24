@@ -1,251 +1,331 @@
 /**
- * ============================================================================
- * File Name: sponsorDashboard.js
- * Purpose: Client-side controller for sponsorDashboard.html. Verifies sponsor
- *          session access (permission === 3), updates the live banner preview,
- *          validates destination URLs and rotation duration (5-30s), and submits
- *          banners for admin moderation.
- * ============================================================================
+ * Interactive Sponsor Dashboard controller for sponsorDashboard.html.
+ * Handles live banner previewing, form submission states, status feedback,
+ * and submitted banner list updates.
  */
 
-document.addEventListener("DOMContentLoaded", () => {
-    const sponsorNameEl = document.getElementById("sponsor-name");
-    const sponsorCodeEl = document.getElementById("sponsor-code");
+const SPONSOR_BANNERS_API = "/api/sponsors/banners"; // Adjust if your backend route path differs
+const SPONSOR_SESSION_API = "/loggeduser";        // Adjust if your session endpoint differs
 
+document.addEventListener("DOMContentLoaded", () => {
     const form = document.getElementById("sponsor-banner-form");
+    const submitBtn = form?.querySelector('button[type="submit"]');
+    const feedbackEl = document.getElementById("sponsor-form-feedback");
+    const statusPillEl = document.getElementById("banner-approval-status");
+    const bannerListEl = document.getElementById("sponsor-banner-list");
+
     const headlineInput = document.getElementById("banner-headline");
     const subtextInput = document.getElementById("banner-subtext");
     const urlInput = document.getElementById("banner-url");
     const themeSelect = document.getElementById("banner-theme");
     const durationInput = document.getElementById("banner-duration");
     const activeCheckbox = document.getElementById("banner-active");
-    const feedbackEl = document.getElementById("sponsor-form-feedback");
 
     const previewBox = document.getElementById("banner-preview");
     const previewHeadline = document.getElementById("preview-headline");
     const previewSubtext = document.getElementById("preview-subtext");
     const previewLink = document.getElementById("preview-link");
-    const approvalStatusEl = document.getElementById("banner-approval-status");
-    const bannerListEl = document.getElementById("sponsor-banner-list");
+
+    const sponsorNameEl = document.getElementById("sponsor-name");
+    const sponsorCodeEl = document.getElementById("sponsor-code");
 
     let submittedBanners = [];
+    let currentSponsor = { sponsorName: "Sponsor Account", sponsorCode: "--" };
 
-    function sanitizeHttpUrl(rawUrl) {
-        const trimmed = typeof rawUrl === "string" ? rawUrl.trim() : "";
+    function escapeHtml(value) {
+        return String(value ?? "")
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;")
+            .replace(/'/g, "&#39;");
+    }
+
+    function setFeedback(message, type = "info") {
+        if (!feedbackEl) return;
+        const colorMap = {
+            info: "var(--secondary-text)",
+            success: "#2ecc71",
+            error: "#ff6b6b",
+            warning: "#f1c40f"
+        };
+        feedbackEl.style.color = colorMap[type] || colorMap.info;
+        feedbackEl.innerHTML = message;
+    }
+
+    function setStatusPill(text, tone = "pending") {
+        if (!statusPillEl) return;
+        statusPillEl.textContent = text;
+        statusPillEl.dataset.status = tone;
+    }
+
+    function normalizeSafeUrl(rawUrl) {
+        const trimmed = (rawUrl || "").trim();
         if (!trimmed) return "";
         try {
             const parsed = new URL(trimmed);
-            if (parsed.protocol === "http:" || parsed.protocol === "https:") {
+            if (parsed.protocol === "https:" || parsed.protocol === "http:") {
                 return parsed.href;
             }
+            return "";
         } catch {
             return "";
         }
-        return "";
     }
 
-    function clampDuration(rawSeconds) {
-        const num = Number(rawSeconds);
-        if (!Number.isFinite(num)) return 20;
-        return Math.max(5, Math.min(30, Math.round(num)));
+    function applyThemeToPreview(themeValue) {
+        if (!previewBox) return;
+        previewBox.dataset.theme = themeValue || "midnight";
+
+        const themeStyles = {
+            midnight: {
+                background: "linear-gradient(135deg, #0b132b 0%, #1c2541 100%)",
+                borderColor: "#3a506b"
+            },
+            gold: {
+                background: "linear-gradient(135deg, #231903 0%, #4a3508 100%)",
+                borderColor: "#f1c40f"
+            },
+            emerald: {
+                background: "linear-gradient(135deg, #062118 0%, #0e4734 100%)",
+                borderColor: "#2ecc71"
+            }
+        };
+
+        const chosen = themeStyles[themeValue] || themeStyles.midnight;
+        previewBox.style.background = chosen.background;
+        previewBox.style.borderColor = chosen.borderColor;
     }
 
-    function setFeedback(message, isError = false) {
-        if (!feedbackEl) return;
-        feedbackEl.textContent = message;
-        feedbackEl.style.color = isError ? "#ff8a80" : "var(--secondary-text)";
-    }
+    function updateLivePreview() {
+        const headlineText = (headlineInput?.value || "").trim();
+        const subtextText = (subtextInput?.value || "").trim();
+        const safeUrl = normalizeSafeUrl(urlInput?.value || "");
+        const themeValue = themeSelect?.value || "midnight";
 
-    function updatePreview() {
-        const headline = (headlineInput?.value || "").trim() || "Your banner headline appears here";
-        const subtext = (subtextInput?.value || "").trim() || "Add a short message or link for players.";
-        const safeUrl = sanitizeHttpUrl(urlInput?.value || "");
-        const theme = themeSelect?.value || "midnight";
-
-        if (previewHeadline) previewHeadline.textContent = headline;
-        if (previewSubtext) previewSubtext.textContent = subtext;
-
-        if (previewBox) {
-            previewBox.classList.remove("theme-gold", "theme-emerald");
-            if (theme === "gold") previewBox.classList.add("theme-gold");
-            if (theme === "emerald") previewBox.classList.add("theme-emerald");
+        if (previewHeadline) {
+            previewHeadline.textContent = headlineText || "Your banner headline appears here";
         }
-
+        if (previewSubtext) {
+            previewSubtext.textContent = subtextText || "Add a short message or link for players.";
+        }
         if (previewLink) {
             if (safeUrl) {
                 previewLink.href = safeUrl;
                 previewLink.style.display = "inline-block";
             } else {
-                previewLink.removeAttribute("href");
+                previewLink.href = "#";
                 previewLink.style.display = "none";
             }
         }
+        applyThemeToPreview(themeValue);
     }
 
-    function renderSubmittedBanners(banners) {
+    function loadBannerIntoForm(banner) {
+        if (!banner) return;
+        if (headlineInput) headlineInput.value = banner.headline || "";
+        if (subtextInput) subtextInput.value = banner.subtext || "";
+        if (urlInput) urlInput.value = banner.linkUrl || "";
+        if (themeSelect) themeSelect.value = banner.theme || "midnight";
+        if (durationInput) durationInput.value = Number(banner.durationSec) || 20;
+        if (activeCheckbox) activeCheckbox.checked = banner.isActive !== false;
+
+        updateLivePreview();
+        const statusUpper = String(banner.status || "pending").toUpperCase();
+        setStatusPill(statusUpper, statusUpper.toLowerCase());
+        setFeedback(`Loaded "<strong>${escapeHtml(banner.headline)}</strong>" into preview &amp; editor.`, "info");
+    }
+
+    function renderSubmittedBanners() {
         if (!bannerListEl) return;
-        if (!Array.isArray(banners) || banners.length === 0) {
-            bannerListEl.textContent = "No banners submitted yet in this session.";
+
+        if (!Array.isArray(submittedBanners) || submittedBanners.length === 0) {
+            bannerListEl.innerHTML = `<p style="margin: 0;">No banners submitted yet in this session.</p>`;
             return;
         }
 
         bannerListEl.innerHTML = "";
-        banners.forEach((item) => {
-            const card = document.createElement("div");
-            card.style.padding = "10px 12px";
-            card.style.marginBottom = "10px";
-            card.style.borderRadius = "8px";
-            card.style.border = "1px solid var(--border-blue)";
-            card.style.background = "var(--page-background)";
+        submittedBanners.forEach((banner, idx) => {
+            const item = document.createElement("div");
+            item.className = "sponsor-submitted-item";
+            item.style.cssText = [
+                "padding: 10px 12px",
+                "border-radius: 8px",
+                "border: 1px solid rgba(255,255,255,0.14)",
+                "background: rgba(255,255,255,0.03)",
+                "margin-bottom: 10px",
+                "display: flex",
+                "justify-content: space-between",
+                "align-items: center",
+                "gap: 10px",
+                "cursor: pointer"
+            ].join("; ");
 
-            const title = document.createElement("div");
-            title.style.fontWeight = "700";
-            title.style.color = "var(--main-text)";
-            title.textContent = item.headline;
+            const statusLabel = String(banner.status || "pending").toUpperCase();
+            const durationSec = Number(banner.durationSec) || 20;
 
-            const meta = document.createElement("div");
-            meta.style.fontSize = "11px";
-            meta.style.marginTop = "4px";
-            meta.style.color = "var(--secondary-text)";
-            const statusLabel = (item.status || "pending").toUpperCase();
-            const dur = clampDuration(item.durationSec);
-            const activeLabel = item.isActive !== false ? "Active" : "Paused";
-            meta.textContent = `Status: ${statusLabel} · ${dur}s · ${activeLabel}`;
+            item.innerHTML = `
+                <div style="min-width: 0;">
+                    <div style="font-weight: 700; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                        ${escapeHtml(banner.headline || "Untitled Banner")}
+                    </div>
+                    <div style="font-size: 11px; color: var(--secondary-text);">
+                        Status: <strong>${escapeHtml(statusLabel)}</strong> &bull; ${durationSec}s &bull; ${escapeHtml(banner.theme || "midnight")}
+                    </div>
+                </div>
+                <button type="button" class="sponsor-preview-btn" data-index="${idx}" style="padding: 4px 10px; font-size: 12px; cursor: pointer;">
+                    Preview
+                </button>
+            `;
 
-            card.appendChild(title);
-            card.appendChild(meta);
-
-            if (item.moderationNote) {
-                const note = document.createElement("div");
-                note.style.fontSize = "11px";
-                note.style.marginTop = "4px";
-                note.style.color = "#f1c40f";
-                note.textContent = `Admin Note: ${item.moderationNote}`;
-                card.appendChild(note);
-            }
-
-            bannerListEl.appendChild(card);
+            item.addEventListener("click", () => loadBannerIntoForm(banner));
+            bannerListEl.appendChild(item);
         });
     }
 
-    async function loadSponsorSessionAndBanners() {
+    async function hydrateSponsorIdentity() {
         try {
-            const res = await fetch("/loggedUser", { credentials: "same-origin" });
-            const user = res.ok ? await res.json() : null;
+            const res = await fetch(SPONSOR_SESSION_API, { cache: "no-store" });
+            if (!res.ok) return;
+            const user = await res.json();
+            if (!user) return;
 
-            if (!user) {
-                window.location.href = "/login.html";
-                return;
-            }
+            currentSponsor = {
+                sponsorName: user.sponsorName || user.username || "Sponsor",
+                sponsorCode: user.sponsorCode || "--"
+            };
 
-            if (Number(user.permission) !== 3) {
-                window.location.href = Number(user.permission) === 1 ? "/admin.html" : "/index.html";
-                return;
-            }
-
-            if (sponsorNameEl) {
-                sponsorNameEl.textContent = user.sponsorName || user.username || "Sponsor";
-            }
-            if (sponsorCodeEl) {
-                sponsorCodeEl.textContent = user.sponsorCode || "--";
-            }
+            if (sponsorNameEl) sponsorNameEl.textContent = currentSponsor.sponsorName;
+            if (sponsorCodeEl) sponsorCodeEl.textContent = currentSponsor.sponsorCode;
         } catch (err) {
-            console.error("Failed to verify sponsor session:", err);
-            setFeedback("Could not verify sponsor session.", true);
-        }
-
-        try {
-            const listRes = await fetch("/api/sponsors/my-banners", { credentials: "same-origin" });
-            if (listRes.ok) {
-                const data = await listRes.json();
-                submittedBanners = Array.isArray(data.banners) ? data.banners : [];
-                renderSubmittedBanners(submittedBanners);
-            }
-        } catch {
-            // Backend endpoint can be added in the next step
+            console.warn("Could not hydrate sponsor session details:", err);
         }
     }
 
+    async function fetchExistingBanners() {
+    try {
+        const res = await fetch('/api/sponsors/my-banners', { cache: 'no-store' }); // Matches SponsorBannerController.getMyBanners[cite: 5]
+        if (!res.ok) return;
+        const data = await res.json();
+        const list = Array.isArray(data) ? data : (data.banners || []);
+        if (list.length > 0) {
+            submittedBanners = list;
+            renderSubmittedBanners();
+        }
+    } catch (err) {
+        console.warn('Could not load existing sponsor banners:', err);
+    }
+}
+
+    // Bind live preview listeners
     [headlineInput, subtextInput, urlInput, themeSelect].forEach((el) => {
-        if (el) {
-            el.addEventListener("input", updatePreview);
-            el.addEventListener("change", updatePreview);
+        el?.addEventListener("input", updateLivePreview);
+        el?.addEventListener("change", updateLivePreview);
+    });
+
+    // Bind form submission with clear interactive feedback
+    form?.addEventListener("submit", async (event) => {
+        event.preventDefault();
+
+        const headline = (headlineInput?.value || "").trim();
+        const subtext = (subtextInput?.value || "").trim();
+        const rawUrl = (urlInput?.value || "").trim();
+        const safeUrl = normalizeSafeUrl(rawUrl);
+        const theme = themeSelect?.value || "midnight";
+        const durationSec = Math.min(30, Math.max(5, Number(durationInput?.value) || 20));
+        const isActive = Boolean(activeCheckbox?.checked);
+
+        if (!headline) {
+            setFeedback('<i class="bi bi-exclamation-triangle-fill"></i> Please enter a banner headline.', "warning");
+            headlineInput?.focus();
+            return;
+        }
+
+        if (rawUrl && !safeUrl) {
+            setFeedback('<i class="bi bi-exclamation-triangle-fill"></i> Destination link must start with https:// or http://.', "warning");
+            urlInput?.focus();
+            return;
+        }
+
+        const payload = {
+            headline,
+            subtext,
+            linkUrl: safeUrl,
+            theme,
+            durationSec,
+            isActive,
+            sponsorName: currentSponsor.sponsorName,
+            sponsorCode: currentSponsor.sponsorCode !== "--" ? currentSponsor.sponsorCode : undefined
+        };
+
+        if (submitBtn) {
+            submitBtn.disabled = true;
+            submitBtn.dataset.originalHtml = submitBtn.innerHTML;
+            submitBtn.innerHTML = '<i class="bi bi-hourglass-split"></i> Submitting...';
+        }
+        setStatusPill("Submitting...", "submitting");
+        setFeedback('<i class="bi bi-arrow-repeat"></i> Sending banner to server...', "info");
+
+        try {
+            const response = await fetch(SPONSOR_BANNERS_API, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(payload)
+            });
+
+            const result = await response.json().catch(() => ({}));
+
+            if (!response.ok) {
+                const errMsg = result.error || result.message || `Submission failed (HTTP ${response.status}).`;
+                setStatusPill("Submission Failed", "error");
+                setFeedback(`<i class="bi bi-x-circle-fill"></i> ${escapeHtml(errMsg)}`, "error");
+                return;
+            }
+
+            const savedBanner = result.banner || result._id ? (result.banner || result) : {
+                ...payload,
+                status: result.status || "pending",
+                createdAt: new Date().toISOString()
+            };
+
+            submittedBanners.unshift(savedBanner);
+            renderSubmittedBanners();
+            setStatusPill(String(savedBanner.status || "pending").toUpperCase(), "pending");
+            setFeedback(
+                `<i class="bi bi-check-circle-fill"></i> Submitted "<strong>${escapeHtml(payload.headline)}</strong>" for admin approval!`,
+                "success"
+            );
+
+            form.reset();
+            if (durationInput) durationInput.value = "20";
+            if (activeCheckbox) activeCheckbox.checked = true;
+            updateLivePreview();
+        } catch (error) {
+            console.error("Error submitting sponsor banner:", error);
+            setStatusPill("Network Error", "error");
+            setFeedback(
+                '<i class="bi bi-wifi-off"></i> Could not reach the banner server. Check your connection or route path.',
+                "error"
+            );
+        } finally {
+            if (submitBtn) {
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = submitBtn.dataset.originalHtml || '<i class="bi bi-send-check-fill"></i> Submit Banner for Approval';
+            }
         }
     });
 
-    if (form) {
-        form.addEventListener("submit", async (event) => {
-            event.preventDefault();
-
-            const headline = (headlineInput?.value || "").trim();
-            const subtext = (subtextInput?.value || "").trim();
-            const rawUrl = (urlInput?.value || "").trim();
-            const safeUrl = sanitizeHttpUrl(rawUrl);
-            const theme = themeSelect?.value || "midnight";
-            const durationSec = clampDuration(durationInput?.value);
-            const isActive = Boolean(activeCheckbox?.checked);
-
-            if (!headline) {
-                setFeedback("Please enter a banner headline.", true);
-                return;
-            }
-
-            if (rawUrl && !safeUrl) {
-                setFeedback("Destination link must start with http:// or https://.", true);
-                return;
-            }
-
-            if (durationInput) {
-                durationInput.value = String(durationSec);
-            }
-
-            const payload = {
-                headline,
-                subtext,
-                linkUrl: safeUrl,
-                theme,
-                durationSec,
-                isActive
-            };
-
-            try {
-                const response = await fetch("/api/sponsors/banner", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    credentials: "same-origin",
-                    body: JSON.stringify(payload)
-                });
-
-                if (response.ok) {
-                    const result = await response.json();
-                    const savedBanner = result.banner || { ...payload, status: "pending" };
-                    if (approvalStatusEl) {
-                        approvalStatusEl.textContent = (savedBanner.status || "pending").toUpperCase();
-                    }
-                    submittedBanners = [savedBanner, ...submittedBanners.filter((b) => b._id && b._id !== savedBanner._id)];
-                    renderSubmittedBanners(submittedBanners);
-                    setFeedback("Banner submitted for admin approval.");
-                    return;
-                }
-
-                if (response.status === 404) {
-                    const localDraft = { ...payload, status: "pending", _localId: Date.now() };
-                    submittedBanners = [localDraft, ...submittedBanners];
-                    renderSubmittedBanners(submittedBanners);
-                    if (approvalStatusEl) approvalStatusEl.textContent = "PENDING";
-                    setFeedback("Saved locally in preview (wire /api/sponsors/banner next to persist).");
-                    return;
-                }
-
-                const errData = await response.json().catch(() => ({}));
-                setFeedback(errData.error || "Could not submit banner.", true);
-            } catch (err) {
-                console.error("Error submitting sponsor banner:", err);
-                setFeedback("Network error while submitting banner.", true);
-            }
+    form?.addEventListener("reset", () => {
+        requestAnimationFrame(() => {
+            if (durationInput) durationInput.value = "20";
+            if (activeCheckbox) activeCheckbox.checked = true;
+            setStatusPill("Draft / Pending", "pending");
+            setFeedback("Form cleared.", "info");
+            updateLivePreview();
         });
-    }
+    });
 
-    updatePreview();
-    loadSponsorSessionAndBanners();
+    updateLivePreview();
+    hydrateSponsorIdentity();
+    fetchExistingBanners();
 });

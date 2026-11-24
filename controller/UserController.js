@@ -183,7 +183,9 @@ exports.register = async function(req, res){
             email: userData.email,
             username: userData.username,
             permission: userData.permission,
-            points: userData.points
+            points: userData.points,
+            sponsorName: userData.sponsorName || "",
+            sponsorCode: userData.sponsorCode || ""
         };
 
         // Route sponsors to their dedicated dashboard, standard players to index.html
@@ -195,10 +197,10 @@ exports.register = async function(req, res){
                 if (err) {
                     console.error("Session save error after registration:", err);
                 }
-                res.redirect('/index.html');
+                res.redirect(redirectTarget);
             });
         } else {
-            res.redirect('/index.html');
+            res.redirect(redirectTarget);
         } 
     } catch (error) {
         console.error("Error during user registration:", error);
@@ -223,7 +225,16 @@ exports.login = async function(req, res){
     } else {
         if(passUtil.comparePassword(req.body.txt_pass, user.password)){
             console.log("Login successful");
-            req.session.user = user;
+            req.session.user = {
+                _id: user._id,
+                email: user.email,
+                username: user.username,
+                permission: user.permission,
+                points: user.points,
+                avatar: user.avatar || "default",
+                sponsorCode: user.sponsorCode || "",
+                sponsorName: user.sponsorName || ""
+            };
 
             if(exports.adminCheck(req)){
                 res.redirect('admin.html'); 
