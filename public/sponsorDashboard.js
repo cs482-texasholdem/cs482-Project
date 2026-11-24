@@ -58,6 +58,40 @@ document.addEventListener("DOMContentLoaded", () => {
         feedbackEl.style.color = colorMap[type] || colorMap.info;
         feedbackEl.innerHTML = message;
     }
+    
+    function showSponsorNotification(title, message, type = "success") {
+        const notification = document.createElement("div");
+
+        notification.style.cssText = `
+            position: fixed;
+            top: 90px;
+            right: 20px;
+            z-index: 9999;
+            width: 320px;
+            padding: 16px;
+            border-radius: 10px;
+            background: #1B3260;
+            border: 1px solid ${type === "success" ? "#2ecc71" : "#ff6b6b"};
+            color: #ffffff;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.35);
+        `;
+
+        const heading = document.createElement("div");
+        heading.style.cssText = "font-weight: 700; margin-bottom: 5px;";
+        heading.textContent = title;
+
+        const messageText = document.createElement("div");
+        messageText.style.cssText = "font-size: 13px; color: #dce6f5;";
+        messageText.textContent = message;
+
+        notification.appendChild(heading);
+        notification.appendChild(messageText);
+        document.body.appendChild(notification);
+
+        setTimeout(() => {
+            notification.remove();
+        }, 5000);
+    }
 
     function setStatusPill(text, tone = "pending") {
         if (!statusPillEl) return;
@@ -343,7 +377,7 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     }
 
-    async function fetchExistingBanners() {
+        async function fetchExistingBanners() {
         try {
             const res = await fetch('/api/sponsors/my-banners', {
                 method: 'GET',
@@ -357,8 +391,38 @@ document.addEventListener("DOMContentLoaded", () => {
                 return;
             }
 
-            submittedBanners = data.banners || [];
+            const updatedBanners = data.banners || [];
+
+            // Compare previous banner statuses with the updated statuses.
+            updatedBanners.forEach((updatedBanner) => {
+                const previousBanner = submittedBanners.find(
+                    (banner) => String(banner._id) === String(updatedBanner._id)
+                );
+
+                if (!previousBanner) return;
+
+                const previousStatus = String(previousBanner.status || "pending").toLowerCase();
+                const newStatus = String(updatedBanner.status || "pending").toLowerCase();
+
+                // Only notify when an admin changes a pending banner's status.
+                if (previousStatus === "pending" && newStatus === "approved") {
+                    showSponsorNotification(
+                        "Banner Approved!",
+                        `"${updatedBanner.headline}" has been approved and can appear in the live rotation.`,
+                        "success"
+                    );
+                } else if (previousStatus === "pending" && newStatus === "rejected") {
+                    showSponsorNotification(
+                        "Banner Rejected",
+                        `"${updatedBanner.headline}" was rejected. Please check its status for details.`,
+                        "error"
+                    );
+                }
+            });
+
+            submittedBanners = updatedBanners;
             renderSubmittedBanners();
+
         } catch (err) {
             console.warn('Could not load existing sponsor banners:', err);
         }
