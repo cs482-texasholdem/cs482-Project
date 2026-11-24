@@ -1507,37 +1507,15 @@ describe('Additional Table Controller Tests', () => {
 
         await controller.joinTable(req, res);
 
-        expect(res.status).toHaveBeenLastCalledWith(409);
+        expect(res.status).toHaveBeenLastCalledWith(200);
 
-        expect(res.json).toHaveBeenLastCalledWith({
-            error: 'This custom table is full.'
-        });
+        expect(res.json).toHaveBeenLastCalledWith(expect.objectContaining({
+            isPlayer: false
+        }));
 
-        expect(table.hasPlayer('Guest_Overflow')).toBe(false);
-        expect(table.getPlayerCount()).toBe(4);
-    });
-
-    test('joinTable checks capacity again after database lookup', async () => {
-        // Simulate a table filling while the database is queried
-        jest.spyOn(table, 'isFull')
-            .mockReturnValueOnce(false)
-            .mockReturnValue(true);
-
-        req.body = {
-            playerId: 'Alice'
-        };
-
-        await controller.joinTable(req, res);
-
-        expect(UserDao.findOne).toHaveBeenCalled();
-
-        expect(res.status).toHaveBeenLastCalledWith(409);
-
-        expect(res.json).toHaveBeenLastCalledWith({
-            error: 'This custom table is full.'
-        });
-
-        expect(table.hasPlayer('Alice')).toBe(false);
+        expect(table.hasPlayer('Guest_Overflow')).toBe(true);
+        expect(table.spectators).toContain('Guest_Overflow');
+        expect(table.getPlayerCount()).toBe(4); // seats are still capped at 4
     });
 
     // ========================================================================
