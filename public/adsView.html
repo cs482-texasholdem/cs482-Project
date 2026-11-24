@@ -1,0 +1,64 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Featured Sponsors — Ads View</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body class="ads-page">
+
+    <main class="ads-wrapper" aria-live="polite">
+
+        <div class="ads-header">
+
+            <div class="ads-title-group">
+                <h1 class="ads-title">Sponsor Spotlight</h1>
+                <span class="ads-badge">Live Rotation</span>
+            </div>
+
+            <div class="ads-controls">
+
+                <button id="prevBtn"
+                        class="ads-btn"
+                        type="button"
+                        aria-label="Previous banner">
+                    Prev
+                </button>
+
+                <button id="togglePauseBtn"
+                        class="ads-btn"
+                        type="button"
+                        aria-label="Pause or resume rotation">
+                    Pause
+                </button>
+
+                <button id="nextBtn"
+                        class="ads-btn"
+                        type="button"
+                        aria-label="Next banner">
+                    Next
+                </button>
+
+            </div>
+
+        </div>
+
+        <!-- JavaScript dynamically inserts sponsor banners here -->
+        <div id="bannerContainer"></div>
+
+        <!-- JavaScript dynamically creates navigation dots here -->
+        <div id="dotsContainer"
+             class="ads-dots"
+             aria-label="Banner selector">
+        </div>
+
+    </main>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="adsView.js"></script>
+
+</body>
+</html>

@@ -22,9 +22,6 @@ document.addEventListener("DOMContentLoaded", () => {
     const activeCheckbox = document.getElementById("banner-active");
 
     const previewBox = document.getElementById("banner-preview");
-    const previewHeadline = document.getElementById("preview-headline");
-    const previewSubtext = document.getElementById("preview-subtext");
-    const previewLink = document.getElementById("preview-link");
 
     const sponsorNameEl = document.getElementById("sponsor-name");
     const sponsorCodeEl = document.getElementById("sponsor-code");
@@ -73,52 +70,96 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     }
 
-    function applyThemeToPreview(themeValue) {
-        if (!previewBox) return;
-        previewBox.dataset.theme = themeValue || "midnight";
-
-        const themeStyles = {
-            midnight: {
-                background: "linear-gradient(135deg, #0b132b 0%, #1c2541 100%)",
-                borderColor: "#3a506b"
-            },
-            gold: {
-                background: "linear-gradient(135deg, #231903 0%, #4a3508 100%)",
-                borderColor: "#f1c40f"
-            },
-            emerald: {
-                background: "linear-gradient(135deg, #062118 0%, #0e4734 100%)",
-                borderColor: "#2ecc71"
-            }
-        };
-
-        const chosen = themeStyles[themeValue] || themeStyles.midnight;
-        previewBox.style.background = chosen.background;
-        previewBox.style.borderColor = chosen.borderColor;
-    }
-
     function updateLivePreview() {
+        if (!previewBox) {
+            return;
+        }
+
         const headlineText = (headlineInput?.value || "").trim();
         const subtextText = (subtextInput?.value || "").trim();
         const safeUrl = normalizeSafeUrl(urlInput?.value || "");
-        const themeValue = themeSelect?.value || "midnight";
 
-        if (previewHeadline) {
-            previewHeadline.textContent = headlineText || "Your banner headline appears here";
+        const allowedThemes = ["midnight", "gold", "emerald"];
+        let themeValue = themeSelect?.value || "midnight";
+
+        if (!allowedThemes.includes(themeValue)) {
+            themeValue = "midnight";
         }
-        if (previewSubtext) {
-            previewSubtext.textContent = subtextText || "Add a short message or link for players.";
-        }
-        if (previewLink) {
-            if (safeUrl) {
-                previewLink.href = safeUrl;
-                previewLink.style.display = "inline-block";
-            } else {
-                previewLink.href = "#";
-                previewLink.style.display = "none";
-            }
-        }
-        applyThemeToPreview(themeValue);
+
+        const sponsorName = escapeHtml(
+            currentSponsor.sponsorName || "Our Valued Sponsor"
+        );
+
+        const headline = escapeHtml(
+            headlineText || "Your Next Big Win Starts Here."
+        );
+
+        const subtext = escapeHtml(
+            subtextText || "Add a short message or details for players."
+        );
+
+        previewBox.className =
+            `ads-banner-card sponsor-dashboard-preview theme-${themeValue}`;
+
+        previewBox.innerHTML = `
+            <div class="ads-suit-decoration" aria-hidden="true">
+                ♠ ♥ ♦ ♣
+            </div>
+
+            <div class="ads-banner-content">
+
+                <div class="ads-banner-top">
+                    <div class="ads-sponsor-brand">
+                        <span class="ads-crown-icon">♛</span>
+
+                        <div class="ads-sponsor-info">
+                            <span class="ads-featured-label">
+                                FEATURED SPONSOR
+                            </span>
+
+                            <h3 class="ads-sponsor-name">
+                                ${sponsorName}
+                            </h3>
+                        </div>
+                    </div>
+
+                    <span class="ads-partner-badge">
+                        PARTNER
+                    </span>
+                </div>
+
+                <div class="ads-banner-message">
+                    <h2 class="ads-banner-headline">
+                        ${headline}
+                    </h2>
+
+                    <p class="ads-banner-subtext">
+                        ${subtext}
+                    </p>
+                </div>
+
+                <div class="ads-banner-footer">
+                    ${
+                        safeUrl
+                            ? `<a
+                                class="ads-cta-link"
+                                href="${escapeHtml(safeUrl)}"
+                                target="_blank"
+                                rel="noopener noreferrer">
+                                VISIT SPONSOR ↗
+                            </a>`
+                            : `<span class="ads-cta-link ads-preview-no-link">
+                                VISIT SPONSOR
+                            </span>`
+                    }
+
+                    <span class="ads-powered-by">
+                        POWERED BY OUR PARTNERS
+                    </span>
+                </div>
+
+            </div>
+        `;
     }
 
     function loadBannerIntoForm(banner) {
@@ -173,7 +214,11 @@ document.addEventListener("DOMContentLoaded", () => {
                         Status: <strong>${escapeHtml(statusLabel)}</strong> &bull; ${durationSec}s &bull; ${escapeHtml(banner.theme || "midnight")}
                     </div>
                 </div>
-                <button type="button" class="sponsor-preview-btn" data-index="${idx}" style="padding: 4px 10px; font-size: 12px; cursor: pointer;">
+                <button
+                    type="button"
+                    class="sponsor-preview-btn"
+                    data-index="${idx}">
+                    <i class="bi bi-eye-fill"></i>
                     Preview
                 </button>
             `;
@@ -195,8 +240,15 @@ document.addEventListener("DOMContentLoaded", () => {
                 sponsorCode: user.sponsorCode || "--"
             };
 
-            if (sponsorNameEl) sponsorNameEl.textContent = currentSponsor.sponsorName;
-            if (sponsorCodeEl) sponsorCodeEl.textContent = currentSponsor.sponsorCode;
+            if (sponsorNameEl) {
+                sponsorNameEl.textContent = currentSponsor.sponsorName;
+            }
+
+            if (sponsorCodeEl) {
+                sponsorCodeEl.textContent = currentSponsor.sponsorCode;
+            }
+
+            updateLivePreview();
         } catch (err) {
             console.warn("Could not hydrate sponsor session details:", err);
         }
