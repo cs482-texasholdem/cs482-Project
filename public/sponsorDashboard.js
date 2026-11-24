@@ -344,25 +344,34 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     async function fetchExistingBanners() {
-    try {
-        const res = await fetch('/api/sponsors/my-banners', {
-            method: 'GET',
-            cache: 'no-store'
-        });
+        try {
+            const res = await fetch('/api/sponsors/my-banners', {
+                method: 'GET',
+                cache: 'no-store'
+            });
 
-        const data = await res.json();
+            const data = await res.json();
 
-        if (!res.ok) {
-            console.warn('Could not load existing banners:', data);
-            return;
+            if (!res.ok) {
+                console.warn('Could not load existing banners:', data);
+                return;
+            }
+
+            submittedBanners = data.banners || [];
+            renderSubmittedBanners();
+        } catch (err) {
+            console.warn('Could not load existing sponsor banners:', err);
         }
-
-        submittedBanners = data.banners || [];
-        renderSubmittedBanners();
-    } catch (err) {
-        console.warn('Could not load existing sponsor banners:', err);
     }
-}
+
+    // Connect to Socket.IO for live sponsor banner updates.
+    const socket = io();
+
+    socket.on("SPONSOR_BANNERS_UPDATED", () => {
+        console.log("Sponsor banner update received. Refreshing submitted banners...");
+
+        fetchExistingBanners();
+    });
 
     // Bind live preview listeners
     [headlineInput, subtextInput, urlInput, themeSelect].forEach((el) => {
