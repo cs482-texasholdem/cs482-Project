@@ -7,7 +7,8 @@ const presence = require('./model/PresenceManager');
 const db = require('./model/DbConnection');
 const http = require('http');
 const { Server } = require('socket.io');
-const { mainTable, finishGame } = require('./controller/tableController');
+const { mainTable, finishGame, tableManager } = require('./controller/tableController');
+const registerReactionHandler = require('./controller/reactionHandler');
 const SponsorBanner = require('./model/SponsorBanner');
 
 const PORT = process.env.PORT || 3000;
@@ -38,6 +39,9 @@ async function startServer() {
         };
 
         io.on('connection', (socket) => {
+            // Register player emoji reactions
+            registerReactionHandler(io, socket, tableManager);
+            
             // Get the logged-in user from the Express session
             const sessionUser = socket.request.session?.user;
 

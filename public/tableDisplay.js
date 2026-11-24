@@ -176,6 +176,14 @@ function initializeSocketAndUI() {
     }
 
     socket = io();
+    
+    // Initialize player emoji reactions
+    tableReactions.initialize(
+        socket,
+        currentTableId,
+        currentPlayerId
+    );
+
     socket.on("connect", () => {
         console.log("Connected to server via Socket.io");
         socket.emit("join_table", currentTableId);
@@ -522,6 +530,11 @@ function renderActivePlayers(status) {
         } else {
             rightSideContainer.appendChild(seat);
         }
+
+        // Restore active emoji reactions
+    tableReactions.restoreReactions();
+
+
     });
 
     if (totalPotElem) totalPotElem.textContent = status.pot || 0;
@@ -804,6 +817,9 @@ async function refreshUI() {
     // Update the selected table configuration
     renderTableDetails(status);
 
+    // Allow only seated players to send reactions
+    tableReactions.setPlayerAccess(status.isPlayer);
+
     if (Array.isArray(status.chatMessages)) {
         renderChatHistory(status.chatMessages);
     }
@@ -945,6 +961,169 @@ if (chatForm) {
         }
     });
 }
+// ============================================================================
+// PLAYER EMOJI REACTIONS
+// ============================================================================
+
+const tableReactions = (() => {
+
+    const REACTION_DURATION = 3000;
+    const REACTION_COOLDOWN = 3000;
+
+    const activeReactions = new Map();
+
+    let lastReactionTime = -Infinity;
+    let canReact = false;
+
+    // Initialize reaction controls and socket listener
+    function initialize(socket, tableId, playerId) {
+
+        const toggle = document.getElementById("reaction-toggle");
+        const menu = document.getElementById("reaction-menu");
+
+        if (!toggle || !menu) return;
+
+        // Open or close emoji menu
+        toggle.addEventListener("click", () => {
+
+            if (!canReact) return;
+
+            menu.hidden = !menu.hidden;
+
+            toggle.setAttribute(
+                "aria-expanded",
+                String(!menu.hidden)
+            );
+        });
+
+        // Send selected emoji to server
+        menu.querySelectorAll("[data-emoji]").forEach(button => {
+
+            button.addEventListener("click", () => {
+
+                if (!socket.connected || !canReact) return;
+
+                const now = Date.now();
+
+                // Prevent reaction spam
+                if (now - lastReactionTime < REACTION_COOLDOWN) {
+                    return;
+                }
+
+                lastReactionTime = now;
+
+                socket.emit("SEND_REACTION", {
+                    tableId,
+                    playerId,
+                    emoji: button.dataset.emoji
+                });
+
+                // Close menu after selecting an emoji
+                menu.hidden = true;
+                toggle.setAttribute("aria-expanded", "false");
+            });
+        });
+
+        // Receive reactions from the server
+        socket.on("PLAYER_REACTION", (data) => {
+
+            if (!data || data.tableId !== tableId) return;
+
+            receiveReaction(data.playerId, data.emoji);
+        });
+    }
+
+    // Store and display an incoming reaction
+    function receiveReaction(playerId, emoji) {
+
+        const previousReaction = activeReactions.get(playerId);
+
+        if (previousReaction) {
+            clearTimeout(previousReaction.timeout);
+        }
+
+        // Remove reaction after three seconds
+        const timeout = setTimeout(() => {
+
+            activeReactions.delete(playerId);
+
+            const seat = document.getElementById(`seat-${playerId}`);
+
+            seat?.querySelector(".player-reaction-bubble")?.remove();
+
+        }, REACTION_DURATION);
+
+        activeReactions.set(playerId, {
+            emoji,
+            timeout
+        });
+
+        renderReaction(playerId);
+    }
+
+    // Display reaction above player avatar
+    function renderReaction(playerId) {
+
+        const reaction = activeReactions.get(playerId);
+
+        if (!reaction) return;
+
+        const seat = document.getElementById(`seat-${playerId}`);
+
+        if (!seat) return;
+
+        const avatar = seat.querySelector(".table-player-avatar");
+
+        if (!avatar) return;
+
+        avatar.classList.add("reaction-avatar-anchor");
+
+        let bubble = avatar.querySelector(".player-reaction-bubble");
+
+        if (!bubble) {
+            bubble = document.createElement("span");
+            bubble.className = "player-reaction-bubble";
+
+            avatar.appendChild(bubble);
+        }
+
+        bubble.textContent = reaction.emoji;
+    }
+
+    // Restore reactions after player seats are rebuilt
+    function restoreReactions() {
+
+        activeReactions.forEach((reaction, playerId) => {
+            renderReaction(playerId);
+        });
+    }
+
+    // Only seated players can send reactions
+    function setPlayerAccess(isPlayer) {
+
+        canReact = Boolean(isPlayer);
+
+        const controls = document.getElementById("reaction-controls");
+        const menu = document.getElementById("reaction-menu");
+        const toggle = document.getElementById("reaction-toggle");
+
+        if (controls) {
+            controls.hidden = !canReact;
+        }
+
+        if (!canReact) {
+            if (menu) menu.hidden = true;
+            if (toggle) toggle.setAttribute("aria-expanded", "false");
+        }
+    }
+
+    return {
+        initialize,
+        restoreReactions,
+        setPlayerAccess
+    };
+
+})();
 
 // Initialize after all UI elements and listeners are configured
 initializePlayerIdentity();
