@@ -299,6 +299,15 @@ document.addEventListener("DOMContentLoaded", () => {
                         <i class="bi bi-trash-fill"></i>
                         Delete
                     </button>
+
+                    ${banner.status === "rejected" ? `
+                        <button
+                            type="button"
+                            class="sponsor-rejection-btn">
+                            <i class="bi bi-exclamation-circle-fill"></i>
+                            View Rejection Reason
+                        </button>
+                    ` : ""}
                 </div>
             `;
 
@@ -311,7 +320,6 @@ document.addEventListener("DOMContentLoaded", () => {
             });
 
             const deleteBtn = item.querySelector(".sponsor-delete-btn");
-
             deleteBtn.addEventListener("click", async (event) => {
                 event.stopPropagation();
 
@@ -346,6 +354,19 @@ document.addEventListener("DOMContentLoaded", () => {
                     alert("Network error while deleting banner.");
                 }
             });
+
+            // Show the admin's rejection reason when clicked.
+            const rejectionBtn = item.querySelector(".sponsor-rejection-btn");
+            if (rejectionBtn) {
+                rejectionBtn.addEventListener("click", (event) => {
+                    event.stopPropagation();
+
+                    const reason = banner.moderationNote?.trim()
+                        || "No rejection reason was provided.";
+
+                    alert(`Rejection Reason:\n\n${reason}`);
+                });
+            }
 
             bannerListEl.appendChild(item);
         });

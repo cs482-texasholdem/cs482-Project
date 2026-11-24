@@ -2290,3 +2290,34 @@ body.table-page {
 .sponsor-edit-btn i {
     margin-right: 4px;
 }
+
+.sponsor-rejection-btn {
+    background-color: #8b3030;
+    color: #ffffff;
+    border: 1px solid #c45b5b;
+    padding: 8px 12px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 13px;
+    white-space: nowrap;
+}
+
+.sponsor-rejection-btn:hover {
+    background-color: #a83b3b;
+}
+
+/* Sponsor dashboard layout */
+.sponsor-layout {
+    align-items: start;
+}
+
+/* Reduce unnecessary bottom spacing in the design form */
+.sponsor-layout > .sponsor-card {
+    padding-bottom: 16px;
+}
+
+/* Submitted banners occupy the full width below the dashboard */
+.sponsor-submitted-section {
+    grid-column: 1 / -1;
+    margin-top: 0;
+}
