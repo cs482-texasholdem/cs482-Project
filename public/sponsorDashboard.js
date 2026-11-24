@@ -214,6 +214,7 @@ document.addEventListener("DOMContentLoaded", () => {
                         Status: <strong>${escapeHtml(statusLabel)}</strong> &bull; ${durationSec}s &bull; ${escapeHtml(banner.theme || "midnight")}
                     </div>
                 </div>
+                <div style="display: flex; gap: 6px; flex-shrink: 0;">
                 <button
                     type="button"
                     class="sponsor-preview-btn"
@@ -221,9 +222,56 @@ document.addEventListener("DOMContentLoaded", () => {
                     <i class="bi bi-eye-fill"></i>
                     Preview
                 </button>
+
+                <button
+                    type="button"
+                    class="sponsor-delete-btn"
+                    data-id="${escapeHtml(banner._id)}">
+                    <i class="bi bi-trash-fill"></i>
+                    Delete
+                </button>
+            </div>
             `;
 
             item.addEventListener("click", () => loadBannerIntoForm(banner));
+
+            const deleteBtn = item.querySelector(".sponsor-delete-btn");
+
+            deleteBtn.addEventListener("click", async (event) => {
+                event.stopPropagation();
+
+                const bannerId = deleteBtn.dataset.id;
+
+                if (!confirm("Are you sure you want to delete this banner?")) {
+                    return;
+                }
+
+                try {
+                    const response = await fetch(
+                        `${SPONSOR_BANNERS_API}/${encodeURIComponent(bannerId)}`,
+                        { method: "DELETE" }
+                    );
+
+                    const result = await response.json().catch(() => ({}));
+
+                    if (!response.ok) {
+                        alert(result.error || "Failed to delete banner.");
+                        return;
+                    }
+
+                    submittedBanners = submittedBanners.filter(
+                        (b) => String(b._id) !== String(bannerId)
+                    );
+
+                    renderSubmittedBanners();
+                    setFeedback("Banner deleted successfully.", "success");
+
+                } catch (error) {
+                    console.error("Error deleting sponsor banner:", error);
+                    alert("Network error while deleting banner.");
+                }
+            });
+
             bannerListEl.appendChild(item);
         });
     }

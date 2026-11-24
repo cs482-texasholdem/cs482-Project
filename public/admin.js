@@ -353,16 +353,24 @@ function createBannerModerationCard(banner, isPending) {
         </div>
         ${banner.subtext ? `<p class="small text-white opacity-90 mb-2">${escapeBannerHtml(banner.subtext)}</p>` : ""}
         ${banner.linkUrl ? `<div class="small text-info text-break mb-2">${escapeBannerHtml(banner.linkUrl)}</div>` : ""}
-        ${isPending ? `
-            <div class="d-flex gap-2 mt-2">
-                <button type="button" class="btn btn-sm btn-success fw-bold" onclick="moderateSponsorBanner('${escapeBannerHtml(banner._id)}', 'approved')">
+        <div class="d-flex gap-2 mt-2">
+            ${isPending ? `
+                <button type="button" class="btn btn-sm btn-success fw-bold"
+                    onclick="moderateSponsorBanner('${escapeBannerHtml(banner._id)}', 'approved')">
                     <i class="bi bi-check-lg me-1"></i> Approve
                 </button>
-                <button type="button" class="btn btn-sm btn-outline-danger" onclick="moderateSponsorBanner('${escapeBannerHtml(banner._id)}', 'rejected')">
+
+                <button type="button" class="btn btn-sm btn-outline-danger"
+                    onclick="moderateSponsorBanner('${escapeBannerHtml(banner._id)}', 'rejected')">
                     <i class="bi bi-x-lg me-1"></i> Reject
                 </button>
-            </div>
-        ` : ""}
+            ` : ""}
+
+            <button type="button" class="btn btn-sm btn-danger"
+                onclick="deleteAdminSponsorBanner('${escapeBannerHtml(banner._id)}')">
+                <i class="bi bi-trash-fill me-1"></i> Delete
+            </button>
+        </div>
     `;
 
     return card;
@@ -445,6 +453,36 @@ async function moderateSponsorBanner(bannerId, nextStatus) {
     } catch (error) {
         console.error("Error updating banner moderation status:", error);
         alert("Network error while updating banner status.");
+    }
+}
+
+async function deleteAdminSponsorBanner(bannerId) {
+    if (!bannerId) return;
+
+    if (!confirm("Are you sure you want to permanently delete this banner?")) {
+        return;
+    }
+
+    try {
+        const response = await fetch(
+            `${ADMIN_BANNERS_ENDPOINT}/${encodeURIComponent(bannerId)}`,
+            { method: "DELETE" }
+        );
+
+        const result = await response.json().catch(() => ({}));
+
+        if (!response.ok) {
+            alert(result.error || "Failed to delete banner.");
+            return;
+        }
+
+        alert("Banner deleted successfully.");
+
+        await loadAdminBanners();
+
+    } catch (error) {
+        console.error("Error deleting admin sponsor banner:", error);
+        alert("Network error while deleting banner.");
     }
 }
 
