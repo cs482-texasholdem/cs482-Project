@@ -118,7 +118,9 @@ test('register should create user, set session object, and redirect to index.htm
         email: 'newplayer@mail.com',
         username: 'newplayer',
         permission: 2,
-        points: 1000
+        points: 1000,
+        sponsorCode: '',
+        sponsorName: ''
     });
     expect(res.redirect).toHaveBeenCalledWith('/index.html');
 });
@@ -136,7 +138,7 @@ test('register should catch database errors and redirect to signup.html', async 
     expect(res.redirect).toHaveBeenCalledWith('/signup.html');
 });
 
-test('register should enforce 1000 starting points even if txt_points is submitted', async function(){
+test('register should carry over guest points submitted via txt_points', async function(){
     let req = {
         body: {
             txt_username: 'guestconvert',
@@ -150,19 +152,45 @@ test('register should enforce 1000 starting points even if txt_points is submitt
     };
     let res = { redirect: jest.fn() };
     passUtil.hashPassword.mockReturnValue('hashedPassword');
-    dao.create.mockResolvedValue({ _id: '2', points: 1000 });
+    dao.create.mockResolvedValue({ _id: '2', points: 1850 });
 
     await controller.register(req, res);
 
     expect(dao.create).toHaveBeenCalledWith(expect.objectContaining({
         username: 'guestconvert',
-        points: 1000
+        points: 1850
     }));
-    expect(req.session.user.points).toBe(1000);
+    expect(req.session.user.points).toBe(1850);
     expect(res.redirect).toHaveBeenCalledWith('/index.html');
 });
 
-test('register should enforce 1000 starting points and clear stale req.session.pendingGuestPoints', async function(){
+test('register should carry over guest points submitted via txt_points', async function(){
+    let req = {
+        body: {
+            txt_username: 'guestconvert',
+            txt_email: 'guestconvert@mail.com',
+            txt_pass: 'secure123',
+            txt_points: '1850'
+        },
+        session: {
+            save: jest.fn((cb) => cb && cb())
+        }
+    };
+    let res = { redirect: jest.fn() };
+    passUtil.hashPassword.mockReturnValue('hashedPassword');
+    dao.create.mockResolvedValue({ _id: '2', points: 1850 });
+
+    await controller.register(req, res);
+
+    expect(dao.create).toHaveBeenCalledWith(expect.objectContaining({
+        username: 'guestconvert',
+        points: 1850
+    }));
+    expect(req.session.user.points).toBe(1850);
+    expect(res.redirect).toHaveBeenCalledWith('/index.html');
+});
+
+test('register should use req.session.pendingGuestPoints and then clear it', async function(){
     let req = {
         body: {
             txt_username: 'sessionguest',
@@ -176,15 +204,27 @@ test('register should enforce 1000 starting points and clear stale req.session.p
     };
     let res = { redirect: jest.fn() };
     passUtil.hashPassword.mockReturnValue('hashedPassword');
-    dao.create.mockResolvedValue({ _id: '3', points: 1000 });
+    dao.create.mockResolvedValue({ _id: '3' });
 
     await controller.register(req, res);
 
-    expect(dao.create).toHaveBeenCalledWith(expect.objectContaining({
-        points: 1000
-    }));
+    expect(dao.create).toHaveBeenCalledWith(expect.objectContaining({ points: 2400 }));
     expect(req.session.pendingGuestPoints).toBeUndefined();
     expect(res.redirect).toHaveBeenCalledWith('/index.html');
+});
+
+test('register should clamp negative guest points to 0', async function(){
+    let req = {
+        body: { txt_username: 'broke', txt_email: 'broke@mail.com', txt_pass: 'secure123', txt_points: '-50' },
+        session: {}
+    };
+    let res = { redirect: jest.fn() };
+    passUtil.hashPassword.mockReturnValue('hashedPassword');
+    dao.create.mockResolvedValue({ _id: '4' });
+
+    await controller.register(req, res);
+
+    expect(dao.create).toHaveBeenCalledWith(expect.objectContaining({ points: 0 }));
 });
 
 // ==========================================
@@ -210,7 +250,11 @@ test('login should succeed and redirect admin to admin.html', async function(){
 
     await controller.login(req, res);
 
-    expect(req.session.user).toEqual(adminUser);
+    expect(req.session.user).toEqual(expect.objectContaining({
+        email: 'admin@mail.com',
+        username: 'admin',
+        permission: 1
+    }));
     expect(res.redirect).toHaveBeenCalledWith('admin.html');
 });
 
@@ -224,7 +268,12 @@ test('login should succeed and redirect standard player to index.html', async fu
 
     await controller.login(req, res);
 
-    expect(req.session.user).toEqual(playerUser);
+    expect(req.session.user).toEqual(expect.objectContaining({
+        email: 'player@mail.com',
+        username: 'player',
+        permission: 2
+    }));
+    expect(req.session.user).not.toHaveProperty('password');
     expect(res.redirect).toHaveBeenCalledWith('index.html');
 });
 
