@@ -130,27 +130,37 @@
 
     <main class="page-layout">
 
-        <aside class="panel chat-panel">
-            <h2>Table Chat</h2>
+        <aside class="left-sidebar">
 
-            <div class="chat-messages" id="chat-messages" aria-live="polite">
-                <div class="chat-message">
-                    <strong>Dealer</strong>
-                    Welcome to the table!
+            <!-- Table Chat -->
+            <div class="panel chat-panel">
+                <h2>Table Chat</h2>
+
+                <div class="chat-messages" id="chat-messages" aria-live="polite">
+                    <div class="chat-message">
+                        <strong>Dealer</strong>
+                        Welcome to the table!
+                    </div>
                 </div>
+
+                <form class="chat-form" id="chat-form">
+                    <input
+                        type="text"
+                        id="chat-input"
+                        placeholder="Write a message..."
+                        maxlength="200"
+                        aria-label="Chat message"
+                        autocomplete="off"
+                    >
+                    <button type="submit">Send</button>
+                </form>
             </div>
 
-            <form class="chat-form" id="chat-form">
-                <input
-                    type="text"
-                    id="chat-input"
-                    placeholder="Write a message..."
-                    maxlength="200"
-                    aria-label="Chat message"
-                    autocomplete="off"
-                >
-                <button type="submit">Send</button>
-            </form>
+            <!-- Separate Sponsor Banner Box -->
+            <div class="sponsor-banner table-sponsor-card" style="display: none;">
+                <!-- adsView.js will insert the sponsor banner here -->
+            </div>
+
         </aside>
 
         <section class="game-area">
@@ -295,6 +305,7 @@
     </div>
 
     <script src="/socket.io/socket.io.js"></script>
+    <script src="adsView.js"></script>
     <script src="tableDisplay.js"></script>
 
 </body>

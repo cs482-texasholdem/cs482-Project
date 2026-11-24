@@ -1919,7 +1919,90 @@ body.table-page {
     }
 }
 
-
 /* =========================================
-   Lobby Premium Sponsor Banner
+   Compact Sponsor Banner Under Table Chat
+========================================= */
+
+.table-sponsor-card {
+    width: 100%;
+    min-height: 300px;
+    box-sizing: border-box;
+    padding: 18px;
+    margin: 0;
+    margin-top: 16px;
+    border: 1px solid rgba(212, 177, 92, 0.45);
+    border-radius: 14px;
+    overflow: hidden;
+    background: linear-gradient(155deg, #17243b, #080e1c 75%);
+    color: #f8f5eb;
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.3);
+}
+
+.table-sponsor-card.theme-gold {
+    background: linear-gradient(155deg, #59451f, #21180c 75%);
+}
+
+.table-sponsor-card.theme-emerald {
+    background: linear-gradient(155deg, #145b48, #071e19 75%);
+}
+
+/* Compact the banner content */
+
+.table-sponsor-card .lobby-sponsor-content {
+    min-height: 260px;
+    gap: 18px;
+}
+
+.table-sponsor-card .lobby-sponsor-top {
+    gap: 10px;
+}
+
+.table-sponsor-card .lobby-sponsor-crown {
+    font-size: 25px;
+}
+
+.table-sponsor-card .lobby-sponsor-name {
+    font-size: 16px;
+}
+
+.table-sponsor-card .lobby-partner-badge {
+    font-size: 9px;
+    padding: 4px 10px;
+}
+
+/* Fix excess spacing above the headline */
+
+.table-sponsor-card .lobby-sponsor-message {
+    margin-top: 0;
+}
+
+.table-sponsor-card .lobby-sponsor-message h4 {
+    margin: 0;
+    font-size: 21px;
+    line-height: 1.25;
+}
+
+.table-sponsor-card .lobby-sponsor-message p {
+    margin-top: 10px;
+    font-size: 12px;
+}
+
+/* Footer */
+
+.table-sponsor-card .lobby-sponsor-footer {
+    gap: 12px;
+}
+
+.table-sponsor-card .lobby-sponsor-footer a {
+    padding: 9px 11px;
+    font-size: 10px;
+}
+
+.table-sponsor-card .lobby-sponsor-footer span {
+    font-size: 8px;
+}
+
+.table-sponsor-card .lobby-sponsor-suits {
+    font-size: 22px;
+    bottom: 55px;
 }
