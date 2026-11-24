@@ -100,25 +100,43 @@ exports.submitBanner = async function(req, res) {
 
         let banner;
         if (req.body?.bannerId) {
+            // Find the existing banner and verify sponsor ownership.
+            const existingBanner = await SponsorBanner.findOne({
+                _id: req.body.bannerId,
+                sponsorUsername: username
+            });
+
+            if (!existingBanner) {
+                return res.status(404).json({
+                    error: 'Banner not found for this sponsor.'
+                });
+            }
+
+            // Pending banners keep their original queue position.
+            // Approved and rejected banners re-enter the queue at the back.
+            const updatedFields = {
+                headline,
+                subtext,
+                linkUrl: urlCheck.value,
+                theme,
+                durationSec,
+                isActive,
+                status: 'pending',
+                moderationNote: '',
+                reviewedBy: '',
+                reviewedAt: null
+            };
+
+            if (existingBanner.status !== 'pending') {
+                updatedFields.queuedAt = new Date();
+            }
+
             banner = await SponsorBanner.findOneAndUpdate(
                 { _id: req.body.bannerId, sponsorUsername: username },
-                {
-                    headline,
-                    subtext,
-                    linkUrl: urlCheck.value,
-                    theme,
-                    durationSec,
-                    isActive,
-                    status: 'pending',
-                    moderationNote: '',
-                    reviewedBy: '',
-                    reviewedAt: null
-                },
+                updatedFields,
                 { new: true }
             );
-            if (!banner) {
-                return res.status(404).json({ error: 'Banner not found for this sponsor.' });
-            }
+
         } else {
             banner = await SponsorBanner.create({
                 sponsorUsername: username,
@@ -255,7 +273,7 @@ exports.getModerationQueue = async function(req, res) {
             filter.sponsorCode = req.query.code.trim().toUpperCase();
         }
 
-        const banners = await SponsorBanner.find(filter).sort({ createdAt: -1 });
+        const banners = await SponsorBanner.find(filter).sort({ queuedAt: 1, createdAt: 1 });
         return res.status(200).json({ banners });
     } catch (error) {
         console.error('Error fetching moderation queue:', error);

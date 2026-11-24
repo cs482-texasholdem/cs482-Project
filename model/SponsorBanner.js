@@ -80,6 +80,10 @@ const SponsorBannerSchema = new mongoose.Schema({
     reviewedAt: {
         type: Date,
         default: null
+    },
+    queuedAt: {
+        type: Date,
+        default: Date.now
     }
 }, { timestamps: true });
 
