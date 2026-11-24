@@ -141,64 +141,54 @@ document.addEventListener("DOMContentLoaded", () => {
             subtextText || "Add a short message or details for players."
         );
 
+        // Use the same outer class and theme classes as the lobby banner.
         previewBox.className =
-            `ads-banner-card sponsor-dashboard-preview theme-${themeValue}`;
+            `sponsor-banner lobby-sponsor-card sponsor-dashboard-preview theme-${themeValue}`;
 
         previewBox.innerHTML = `
-            <div class="ads-suit-decoration" aria-hidden="true">
-                ♠ ♥ ♦ ♣
-            </div>
+            <div class="lobby-sponsor-content">
 
-            <div class="ads-banner-content">
+                <div class="lobby-sponsor-top">
+                    <div class="lobby-sponsor-brand">
+                        <span class="lobby-sponsor-crown">♛</span>
 
-                <div class="ads-banner-top">
-                    <div class="ads-sponsor-brand">
-                        <span class="ads-crown-icon">♛</span>
-
-                        <div class="ads-sponsor-info">
-                            <span class="ads-featured-label">
+                        <div>
+                            <span class="lobby-featured-label">
                                 FEATURED SPONSOR
                             </span>
 
-                            <h3 class="ads-sponsor-name">
+                            <h3 class="lobby-sponsor-name">
                                 ${sponsorName}
                             </h3>
                         </div>
                     </div>
 
-                    <span class="ads-partner-badge">
-                        PARTNER
-                    </span>
+                    <span class="lobby-partner-badge">PARTNER</span>
                 </div>
 
-                <div class="ads-banner-message">
-                    <h2 class="ads-banner-headline">
-                        ${headline}
-                    </h2>
-
-                    <p class="ads-banner-subtext">
-                        ${subtext}
-                    </p>
+                <div class="lobby-sponsor-message">
+                    <h4>${headline}</h4>
+                    <p>${subtext}</p>
                 </div>
 
-                <div class="ads-banner-footer">
+                <div class="lobby-sponsor-footer">
                     ${
                         safeUrl
-                            ? `<a
-                                class="ads-cta-link"
-                                href="${escapeHtml(safeUrl)}"
+                            ? `<a href="${escapeHtml(safeUrl)}"
                                 target="_blank"
                                 rel="noopener noreferrer">
                                 VISIT SPONSOR ↗
                             </a>`
-                            : `<span class="ads-cta-link ads-preview-no-link">
-                                VISIT SPONSOR
+                            : `<span class="ads-preview-no-link">
+                                VISIT SPONSOR ↗
                             </span>`
                     }
 
-                    <span class="ads-powered-by">
-                        POWERED BY OUR PARTNERS
-                    </span>
+                    <span>POWERED BY OUR PARTNERS</span>
+                </div>
+
+                <div class="lobby-sponsor-suits" aria-hidden="true">
+                    ♠ ♥ ♦ ♣
                 </div>
 
             </div>

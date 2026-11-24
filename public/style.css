@@ -1612,8 +1612,121 @@ body.table-page {
 
 
 /* ============================================================================
-   Premium Featured Sponsor Banner Design
+   Premium Sponsor Banner Submission Form
    ============================================================================ */
+
+.sponsor-layout .sponsor-card:first-child {
+    background: linear-gradient(145deg, #1B3260, #101C3A);
+    border: 1px solid #527FD1;
+    border-radius: 18px;
+    padding: 30px;
+    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.35);
+}
+
+/* Form title */
+.sponsor-layout .sponsor-card:first-child h2 {
+    color: #F4F7FC;
+    font-size: 23px;
+    font-weight: 800;
+    padding-bottom: 16px;
+    margin-bottom: 25px;
+    border-bottom: 1px solid rgba(169, 199, 245, 0.25);
+}
+
+/* Field labels */
+.sponsor-layout .sponsor-field label {
+    display: block;
+    color: #A9C7F5;
+    font-size: 13px;
+    font-weight: 700;
+    margin-bottom: 9px;
+}
+
+/* Form inputs */
+.sponsor-layout .sponsor-field input,
+.sponsor-layout .sponsor-field select,
+.sponsor-layout .sponsor-field textarea {
+    display: block;
+    width: 100%;
+    box-sizing: border-box;
+    padding: 13px 15px;
+    background: #101C3A !important;
+    color: #F4F7FC !important;
+    border: 1px solid #315CA8 !important;
+    border-radius: 10px;
+    font-size: 14px;
+    transition: all 0.2s ease;
+}
+
+/* Input focus */
+.sponsor-layout .sponsor-field input:focus,
+.sponsor-layout .sponsor-field select:focus,
+.sponsor-layout .sponsor-field textarea:focus {
+    outline: none;
+    border-color: #7198E0 !important;
+    box-shadow: 0 0 0 3px rgba(82, 127, 209, 0.25) !important;
+}
+
+/* Placeholder */
+.sponsor-layout .sponsor-field input::placeholder,
+.sponsor-layout .sponsor-field textarea::placeholder {
+    color: #8199BD;
+}
+
+/* Dropdown */
+.sponsor-layout .sponsor-field select option {
+    background: #101C3A;
+    color: #F4F7FC;
+}
+
+/* Textarea */
+.sponsor-layout .sponsor-field textarea {
+    min-height: 110px;
+    resize: vertical;
+}
+
+/* Spacing between fields */
+.sponsor-layout .sponsor-field {
+    margin-bottom: 22px;
+}
+
+/* Submit button */
+.sponsor-layout .sponsor-submit-btn {
+    width: 100%;
+    padding: 13px 20px;
+    margin-top: 8px;
+    background: linear-gradient(135deg, #315CA8, #527FD1);
+    border: 1px solid #7198E0;
+    border-radius: 10px;
+    color: #FFFFFF;
+    font-size: 14px;
+    font-weight: 800;
+    letter-spacing: 0.5px;
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.25);
+    transition: all 0.2s ease;
+}
+
+.sponsor-layout .sponsor-submit-btn:hover {
+    background: linear-gradient(135deg, #527FD1, #7198E0);
+    border-color: #A9C7F5;
+    box-shadow: 0 5px 18px rgba(82, 127, 209, 0.4);
+    transform: translateY(-2px);
+}
+
+.sponsor-layout .sponsor-submit-btn:active {
+    transform: translateY(0);
+}
+
+/* Mobile layout */
+@media (max-width: 600px) {
+    .sponsor-layout .sponsor-card:first-child {
+        padding: 20px;
+    }
+
+    .sponsor-layout .sponsor-submit-btn {
+        width: 100%;
+    }
+}
 
 .ads-banner-card {
     position: relative;
@@ -2098,16 +2211,25 @@ body.table-page {
     color: #f2d27a;
 }
 
-/* Sponsor Dashboard Preview */
+/* =========================================
+   Sponsor Dashboard Preview
+   Matches the Lobby Sponsor Banner
+========================================= */
+
+/* Sponsor Dashboard Preview - Matches Lobby Banner */
 
 .sponsor-dashboard-preview {
     width: 100%;
-    min-height: 380px;
+    min-height: 430px;
     box-sizing: border-box;
+    margin: 0;
+    padding: 24px 18px;
+    border-radius: 16px;
+    overflow: hidden;
 }
 
-.sponsor-dashboard-preview .ads-banner-content {
-    min-height: 330px;
+.sponsor-dashboard-preview .lobby-sponsor-content {
+    min-height: 380px;
 }
 
 .sponsor-dashboard-preview .ads-preview-no-link {
