@@ -142,3 +142,40 @@ test('findOne should query and return a single matching user document', async fu
     expect(found).not.toBeNull();
     expect(found.email).toBe('target@mail.com');
 });
+
+// ==========================================
+// 8. Additional update & findLogin Branch Tests
+// ==========================================
+test('update should modify a user document when given a query object', async function(){
+    await dao.create({
+        email: 'queryupdate@poker.com',
+        username: 'queryuser',
+        password: 'password123',
+        points: 1000
+    });
+
+    const updated = await dao.update(
+        { email: 'queryupdate@poker.com' },
+        { points: 2500, sponsorCode: 'vip100' }
+    );
+
+    expect(updated).not.toBeNull();
+    expect(updated.points).toBe(2500);
+    expect(updated.sponsorCode).toBe('VIP100');
+});
+
+test('findLogin should match case-insensitively and handle special regex characters', async function(){
+    await dao.create({
+        email: 'player+1.test@poker.com',
+        username: 'regexplayer',
+        password: 'password123',
+        permission: 2
+    });
+
+    const found = await dao.findLogin('  PLAYER+1.TEST@POKER.COM  ');
+    expect(found).not.toBeNull();
+    expect(found.username).toBe('regexplayer');
+
+    const emptyResult = await dao.findLogin('');
+    expect(emptyResult).toBeNull();
+});

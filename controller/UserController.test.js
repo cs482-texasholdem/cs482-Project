@@ -1397,3 +1397,220 @@ test('loggedUser returns fresh avatar alongside points', async function() {
         })
     );
 });
+
+// ==========================================
+// 14. Sponsor Identity & Sponsor Login/Register Tests
+// ==========================================
+test('sponsorCheck should return true only when session user has permission 3', function(){
+    expect(controller.sponsorCheck({ session: { user: { permission: 3 } } })).toBe(true);
+    expect(controller.sponsorCheck({ session: { user: { permission: '3' } } })).toBe(true);
+    expect(controller.sponsorCheck({ session: { user: { permission: 2 } } })).toBe(false);
+    expect(controller.sponsorCheck({ session: {} })).toBe(false);
+});
+
+test('register should reject invalid sponsor code with redirect to signup error query', async function(){
+    const req = {
+        body: {
+            txt_username: 'badsponsor',
+            txt_email: 'bad@sponsor.com',
+            txt_pass: 'secret123',
+            txt_sponsor_code: 'NOPE999'
+        },
+        session: {}
+    };
+    const res = { redirect: jest.fn() };
+
+    await controller.register(req, res);
+
+    expect(dao.create).not.toHaveBeenCalled();
+    expect(res.redirect).toHaveBeenCalledWith('/signup.html?error=invalid_sponsor_code');
+});
+
+test('register should assign permission 3, normalize sponsorCode, use custom sponsorName, and redirect to /sponsorDashboard.html', async function(){
+    const req = {
+        body: {
+            txt_username: 'viphost',
+            txt_email: 'host@vip.com',
+            txt_pass: 'secret123',
+            txt_sponsor_code: '  vip2026  ',
+            txt_sponsor_name: '  Custom VIP Room  '
+        },
+        session: {}
+    };
+    const res = { redirect: jest.fn() };
+    passUtil.hashPassword.mockReturnValue('hashedSponsorPass');
+    dao.create.mockResolvedValue({ _id: 'sp1' });
+
+    await controller.register(req, res);
+
+    expect(dao.create).toHaveBeenCalledWith(expect.objectContaining({
+        permission: 3,
+        sponsorCode: 'VIP2026',
+        sponsorName: 'Custom VIP Room'
+    }));
+    expect(req.session.user).toEqual(expect.objectContaining({
+        permission: 3,
+        sponsorCode: 'VIP2026',
+        sponsorName: 'Custom VIP Room'
+    }));
+    expect(res.redirect).toHaveBeenCalledWith('/sponsorDashboard.html');
+});
+
+test('register should fall back to default sponsorName from VALID_SPONSOR_CODES when txt_sponsor_name is omitted', async function(){
+    const req = {
+        body: {
+            txt_username: 'midnighthost',
+            txt_email: 'host@midnight.com',
+            txt_pass: 'secret123',
+            txt_sponsor_code: 'midnight21'
+        },
+        session: {}
+    };
+    const res = { redirect: jest.fn() };
+    passUtil.hashPassword.mockReturnValue('hashedSponsorPass');
+    dao.create.mockResolvedValue({ _id: 'sp2' });
+
+    await controller.register(req, res);
+
+    expect(dao.create).toHaveBeenCalledWith(expect.objectContaining({
+        permission: 3,
+        sponsorCode: 'MIDNIGHT21',
+        sponsorName: 'Midnight Lounge'
+    }));
+    expect(res.redirect).toHaveBeenCalledWith('/sponsorDashboard.html');
+});
+
+test('login should store sponsorCode and sponsorName in session and redirect sponsor to sponsorDashboard.html', async function(){
+    const req = {
+        body: { txt_email: 'sponsor@ace.com', txt_pass: 'correct' },
+        session: {}
+    };
+    const res = { redirect: jest.fn() };
+    const sponsorUser = {
+        _id: 'sp10',
+        email: 'sponsor@ace.com',
+        username: 'acepartner',
+        password: 'hashed',
+        permission: 3,
+        points: 1000,
+        sponsorCode: 'ACEPARTNER',
+        sponsorName: 'Ace Partner Network'
+    };
+
+    dao.findLogin.mockResolvedValue(sponsorUser);
+    passUtil.comparePassword.mockReturnValue(true);
+
+    await controller.login(req, res);
+
+    expect(req.session.user).toEqual(expect.objectContaining({
+        permission: 3,
+        sponsorCode: 'ACEPARTNER',
+        sponsorName: 'Ace Partner Network'
+    }));
+    expect(res.redirect).toHaveBeenCalledWith('sponsorDashboard.html');
+});
+
+// ==========================================
+// 15. Additional loggedUser, logout & getGuestPoints Tests
+// ==========================================
+test('loggedUser should refresh sponsorCode and sponsorName from freshUser', async function(){
+    const req = {
+        session: {
+            user: {
+                username: 'acepartner',
+                email: 'sponsor@ace.com',
+                points: 1000,
+                sponsorCode: '',
+                sponsorName: ''
+            }
+        }
+    };
+    const res = {
+        status: jest.fn(),
+        send: jest.fn(),
+        end: jest.fn()
+    };
+
+    dao.findOne.mockResolvedValue({
+        username: 'acepartner',
+        email: 'sponsor@ace.com',
+        points: 1500,
+        permission: 3,
+        avatar: 'ace',
+        sponsorCode: 'ACEPARTNER',
+        sponsorName: 'Ace Partner Network'
+    });
+
+    await controller.loggedUser(req, res);
+
+    expect(req.session.user.sponsorCode).toBe('ACEPARTNER');
+    expect(req.session.user.sponsorName).toBe('Ace Partner Network');
+    expect(res.send).toHaveBeenCalledWith(expect.objectContaining({
+        sponsorCode: 'ACEPARTNER',
+        sponsorName: 'Ace Partner Network'
+    }));
+});
+
+test('loggedUser should fall back to session user when dao.findOne throws', async function(){
+    const errorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+    const sessionUser = { username: 'fallbackUser', points: 900 };
+    const req = { session: { user: sessionUser } };
+    const res = {
+        status: jest.fn(),
+        send: jest.fn(),
+        end: jest.fn()
+    };
+
+    dao.findOne.mockRejectedValue(new Error('DB lookup error'));
+
+    await controller.loggedUser(req, res);
+
+    expect(res.status).toHaveBeenCalledWith(200);
+    expect(res.send).toHaveBeenCalledWith(sessionUser);
+    expect(res.end).toHaveBeenCalled();
+
+    errorSpy.mockRestore();
+});
+
+test('logout should disconnect session sockets if io is present and handle destroy error', function(){
+    const errorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+    const disconnectSocketsMock = jest.fn();
+    const inMock = jest.fn(() => ({ disconnectSockets: disconnectSocketsMock }));
+    const req = {
+        sessionID: 'sess-123',
+        session: {
+            user: { username: 'alice' },
+            destroy: jest.fn((cb) => cb(new Error('destroy failed')))
+        },
+        app: {
+            get: jest.fn((key) => (key === 'io' ? { in: inMock } : null))
+        }
+    };
+    const res = {
+        redirect: jest.fn(),
+        clearCookie: jest.fn(),
+        setHeader: jest.fn()
+    };
+
+    controller.logout(req, res);
+
+    expect(inMock).toHaveBeenCalledWith('session:sess-123');
+    expect(disconnectSocketsMock).toHaveBeenCalledWith(true);
+    expect(errorSpy).toHaveBeenCalled();
+    expect(res.clearCookie).toHaveBeenCalledWith('connect.sid', { path: '/' });
+    expect(res.redirect).toHaveBeenCalledWith('/login.html');
+
+    errorSpy.mockRestore();
+});
+
+test('getGuestPoints returns pendingGuestPoints from session or defaults to 1000', function(){
+    const res1 = { status: jest.fn().mockReturnThis(), json: jest.fn() };
+    controller.getGuestPoints({ query: {}, session: { pendingGuestPoints: 777.9 } }, res1);
+    expect(res1.status).toHaveBeenCalledWith(200);
+    expect(res1.json).toHaveBeenCalledWith({ points: 777 });
+
+    const res2 = { status: jest.fn().mockReturnThis(), json: jest.fn() };
+    controller.getGuestPoints({ query: {}, session: {} }, res2);
+    expect(res2.status).toHaveBeenCalledWith(200);
+    expect(res2.json).toHaveBeenCalledWith({ points: 1000 });
+});

@@ -1,7 +1,7 @@
 /**
  * ============================================================================
  * File Name: ReportDao.test.js
- * Author: Bonita Rodrigues
+ * Author: Bonita Rodrigues, Gigi Li
  * Purpose: Unit tests for ReportDao.js using Jest mocks for Mongoose models.
  * ============================================================================
  */
@@ -9,20 +9,19 @@
 const reportDao = require('../model/ReportDao');
 const mongoose = require('mongoose');
 
-// Mock Mongoose model methods
 jest.mock('mongoose', () => {
     const actualMongoose = jest.requireActual('mongoose');
+    const mockReportModel = jest.fn();
+    mockReportModel.find = jest.fn();
+    mockReportModel.findByIdAndUpdate = jest.fn();
+
     return {
         ...actualMongoose,
-        model: jest.fn().mockReturnValue({
-            find: jest.fn(),
-            findByIdAndUpdate: jest.fn()
-        }),
+        model: jest.fn(() => mockReportModel),
         models: {}
     };
 });
 
-// Import or reference the mocked model via mongoose.model
 const ReportModel = mongoose.model('Report');
 
 describe('ReportDao Unit Tests', () => {
@@ -41,32 +40,18 @@ describe('ReportDao Unit Tests', () => {
                 reason: 'Cheating',
                 details: 'Used wallhack'
             };
+            const savedReport = { _id: 'reportId123', ...mockReportData, resolved: false };
+            const mockSave = jest.fn().mockResolvedValue(savedReport);
 
-            // Mock instance save method
-            const mockSave = jest.fn().mockResolvedValue({ _id: 'reportId123', ...mockReportData });
-            
-            // Override the constructor behavior in our test
-            ReportModel.mockImplementation = function(data) {
-                return {
-                    ...data,
-                    save: mockSave
-                };
-            };
+            ReportModel.mockImplementationOnce(function () {
+                return { save: mockSave };
+            });
 
-            // Since ReportModel is mocked as a function/constructor in tests, let's mock the constructor directly
-            // A common pattern for Mongoose model instantiation tests:
-            const Report = mongoose.model('Report');
-            
-            // Re-mock implementation for instantiation
-            Report.mockImplementation = function(data) {
-                return {
-                    ...data,
-                    save: mockSave
-                };
-            };
+            const result = await reportDao.create(mockReportData);
 
-            // Alternatively, let's test via a direct spy or mock on model prototype if needed, 
-            // or test the DAO function assuming standard Mongoose instantiation:
+            expect(ReportModel).toHaveBeenCalledWith(mockReportData);
+            expect(mockSave).toHaveBeenCalledTimes(1);
+            expect(result).toEqual(savedReport);
         });
     });
 
