@@ -412,9 +412,13 @@ document.addEventListener("DOMContentLoaded", () => {
                         "success"
                     );
                 } else if (previousStatus === "pending" && newStatus === "rejected") {
+                    const rejectionReason = updatedBanner.moderationNote
+                        ? ` Reason: ${updatedBanner.moderationNote}`
+                        : "";
+
                     showSponsorNotification(
                         "Banner Rejected",
-                        `"${updatedBanner.headline}" was rejected. Please check its status for details.`,
+                        `"${updatedBanner.headline}" was rejected.${rejectionReason}`,
                         "error"
                     );
                 }
