@@ -2264,3 +2264,29 @@ body.table-page {
     background: rgba(255, 107, 107, 0.25);
     color: #fff;
 }
+
+/* Sponsor Dashboard Edit Button */
+.sponsor-edit-btn {
+    background: #315CA8;
+    color: #ffffff;
+    border: 1px solid #527FD1;
+    border-radius: 6px;
+    padding: 7px 12px;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.2s ease, transform 0.2s ease;
+}
+
+.sponsor-edit-btn:hover {
+    background: #527FD1;
+    transform: translateY(-1px);
+}
+
+.sponsor-edit-btn:active {
+    transform: translateY(0);
+}
+
+.sponsor-edit-btn i {
+    margin-right: 4px;
+}

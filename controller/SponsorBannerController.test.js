@@ -96,16 +96,31 @@ describe('SponsorBannerController', () => {
             expect(res.json).toHaveBeenCalledWith({ banner: createdBanner });
         });
 
-        test('updates existing banner when bannerId is provided and resets moderation fields', async () => {
+        test('updates an existing pending banner while preserving its queue position', async () => {
             userController.sponsorCheck.mockReturnValue(true);
+
+            const existingQueuedAt = new Date('2026-11-20T10:00:00Z');
+
+            SponsorBanner.findOne.mockResolvedValue({
+                _id: 'b1',
+                status: 'pending',
+                queuedAt: existingQueuedAt
+            });
+
             const updatedBanner = { _id: 'b1', status: 'pending' };
             SponsorBanner.findOneAndUpdate.mockResolvedValue(updatedBanner);
+
             const res = createRes();
 
             await sponsorBannerController.submitBanner({
                 ...sponsorReq,
                 body: { ...sponsorReq.body, bannerId: 'b1' }
             }, res);
+
+            expect(SponsorBanner.findOne).toHaveBeenCalledWith({
+                _id: 'b1',
+                sponsorUsername: 'sponsor1'
+            });
 
             expect(SponsorBanner.findOneAndUpdate).toHaveBeenCalledWith(
                 { _id: 'b1', sponsorUsername: 'sponsor1' },
@@ -117,12 +132,50 @@ describe('SponsorBannerController', () => {
                 }),
                 { new: true }
             );
+
+            const updatedFields = SponsorBanner.findOneAndUpdate.mock.calls[0][1];
+
+            expect(updatedFields).not.toHaveProperty('queuedAt');
             expect(res.status).toHaveBeenCalledWith(201);
         });
 
+        test.each(['approved', 'rejected'])(
+            'moves an edited %s banner to the back of the review queue',
+            async (previousStatus) => {
+                userController.sponsorCheck.mockReturnValue(true);
+
+                SponsorBanner.findOne.mockResolvedValue({
+                    _id: 'b1',
+                    status: previousStatus,
+                    queuedAt: new Date('2026-11-20T10:00:00Z')
+                });
+
+                SponsorBanner.findOneAndUpdate.mockResolvedValue({
+                    _id: 'b1',
+                    status: 'pending'
+                });
+
+                const res = createRes();
+
+                await sponsorBannerController.submitBanner({
+                    ...sponsorReq,
+                    body: { ...sponsorReq.body, bannerId: 'b1' }
+                }, res);
+
+                const updatedFields = SponsorBanner.findOneAndUpdate.mock.calls[0][1];
+
+                expect(updatedFields.status).toBe('pending');
+                expect(updatedFields.queuedAt).toEqual(expect.any(Date));
+
+                expect(res.status).toHaveBeenCalledWith(201);
+            }
+        );
+
         test('returns 404 when updating a non-existent or unowned bannerId', async () => {
             userController.sponsorCheck.mockReturnValue(true);
-            SponsorBanner.findOneAndUpdate.mockResolvedValue(null);
+
+            SponsorBanner.findOne.mockResolvedValue(null);
+
             const res = createRes();
 
             await sponsorBannerController.submitBanner({
@@ -130,6 +183,12 @@ describe('SponsorBannerController', () => {
                 body: { ...sponsorReq.body, bannerId: 'missing-id' }
             }, res);
 
+            expect(SponsorBanner.findOne).toHaveBeenCalledWith({
+                _id: 'missing-id',
+                sponsorUsername: 'sponsor1'
+            });
+
+            expect(SponsorBanner.findOneAndUpdate).not.toHaveBeenCalled();
             expect(res.status).toHaveBeenCalledWith(404);
         });
     });
@@ -345,6 +404,26 @@ describe('SponsorBannerController', () => {
                 ]
             });
         });
+        test('does not include an approved banner after it is edited and returned to pending', async () => {
+            const findMock = {
+                select: jest.fn().mockReturnThis(),
+                sort: jest.fn().mockResolvedValue([])
+            };
+
+            SponsorBanner.find.mockReturnValue(findMock);
+
+            const res = createRes();
+
+            await sponsorBannerController.getApprovedActiveBanners({}, res);
+
+            expect(SponsorBanner.find).toHaveBeenCalledWith({
+                status: 'approved',
+                isActive: true
+            });
+
+            expect(res.status).toHaveBeenCalledWith(200);
+            expect(res.json).toHaveBeenCalledWith({ banners: [] });
+        });
     });
 
     describe('getModerationQueue & moderateBanner', () => {
@@ -364,6 +443,7 @@ describe('SponsorBannerController', () => {
             }, res);
 
             expect(SponsorBanner.find).toHaveBeenCalledWith({ status: 'pending', sponsorCode: 'VIP' });
+            expect(sortMock).toHaveBeenCalledWith({ queuedAt: 1, createdAt: 1 });
             expect(res.status).toHaveBeenCalledWith(200);
         });
 

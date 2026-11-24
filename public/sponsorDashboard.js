@@ -10,6 +10,14 @@ const SPONSOR_SESSION_API = "/loggeduser";        // Adjust if your session endp
 document.addEventListener("DOMContentLoaded", () => {
     const form = document.getElementById("sponsor-banner-form");
     const submitBtn = form?.querySelector('button[type="submit"]');
+    const cancelEditBtn = document.createElement("button");
+    cancelEditBtn.type = "button";
+    cancelEditBtn.textContent = "Cancel Edit";
+    cancelEditBtn.className = "sponsor-delete-btn";
+    cancelEditBtn.style.display = "none";
+    cancelEditBtn.style.marginLeft = "8px";
+
+    submitBtn?.insertAdjacentElement("afterend", cancelEditBtn);
     const feedbackEl = document.getElementById("sponsor-form-feedback");
     const statusPillEl = document.getElementById("banner-approval-status");
     const bannerListEl = document.getElementById("sponsor-banner-list");
@@ -28,6 +36,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     let submittedBanners = [];
     let currentSponsor = { sponsorName: "Sponsor Account", sponsorCode: "--" };
+    let editingBannerId = null;
 
     function escapeHtml(value) {
         return String(value ?? "")
@@ -164,6 +173,9 @@ document.addEventListener("DOMContentLoaded", () => {
 
     function loadBannerIntoForm(banner) {
         if (!banner) return;
+
+        editingBannerId = String(banner._id);
+
         if (headlineInput) headlineInput.value = banner.headline || "";
         if (subtextInput) subtextInput.value = banner.subtext || "";
         if (urlInput) urlInput.value = banner.linkUrl || "";
@@ -171,10 +183,25 @@ document.addEventListener("DOMContentLoaded", () => {
         if (durationInput) durationInput.value = Number(banner.durationSec) || 20;
         if (activeCheckbox) activeCheckbox.checked = banner.isActive !== false;
 
+        if (submitBtn) {
+            submitBtn.innerHTML = '<i class="bi bi-pencil-square"></i> Save Changes';
+        }
+
+        if (cancelEditBtn) {
+            cancelEditBtn.style.display = "inline-block";
+        }
+
         updateLivePreview();
+
         const statusUpper = String(banner.status || "pending").toUpperCase();
         setStatusPill(statusUpper, statusUpper.toLowerCase());
-        setFeedback(`Loaded "<strong>${escapeHtml(banner.headline)}</strong>" into preview &amp; editor.`, "info");
+
+        setFeedback(
+            `Editing "<strong>${escapeHtml(banner.headline)}</strong>". Changes will require admin approval.`,
+            "info"
+        );
+
+        form.scrollIntoView({ behavior: "smooth", block: "start" });
     }
 
     function renderSubmittedBanners() {
@@ -215,25 +242,39 @@ document.addEventListener("DOMContentLoaded", () => {
                     </div>
                 </div>
                 <div style="display: flex; gap: 6px; flex-shrink: 0;">
-                <button
-                    type="button"
-                    class="sponsor-preview-btn"
-                    data-index="${idx}">
-                    <i class="bi bi-eye-fill"></i>
-                    Preview
-                </button>
+                    <button
+                        type="button"
+                        class="sponsor-preview-btn"
+                        data-index="${idx}">
+                        <i class="bi bi-eye-fill"></i>
+                        Preview
+                    </button>
 
-                <button
-                    type="button"
-                    class="sponsor-delete-btn"
-                    data-id="${escapeHtml(banner._id)}">
-                    <i class="bi bi-trash-fill"></i>
-                    Delete
-                </button>
-            </div>
+                    <button
+                        type="button"
+                        class="sponsor-edit-btn"
+                        data-index="${idx}">
+                        <i class="bi bi-pencil-square"></i>
+                        Edit
+                    </button>
+
+                    <button
+                        type="button"
+                        class="sponsor-delete-btn"
+                        data-id="${escapeHtml(banner._id)}">
+                        <i class="bi bi-trash-fill"></i>
+                        Delete
+                    </button>
+                </div>
             `;
 
             item.addEventListener("click", () => loadBannerIntoForm(banner));
+            
+            const editBtn = item.querySelector(".sponsor-edit-btn");
+            editBtn.addEventListener("click", (event) => {
+                event.stopPropagation();
+                loadBannerIntoForm(banner);
+            });
 
             const deleteBtn = item.querySelector(".sponsor-delete-btn");
 
@@ -364,6 +405,11 @@ document.addEventListener("DOMContentLoaded", () => {
             sponsorCode: currentSponsor.sponsorCode !== "--" ? currentSponsor.sponsorCode : undefined
         };
 
+        // Include the existing banner ID when editing.
+        if (editingBannerId) {
+            payload.bannerId = editingBannerId;
+        }
+
         if (submitBtn) {
             submitBtn.disabled = true;
             submitBtn.dataset.originalHtml = submitBtn.innerHTML;
@@ -394,7 +440,18 @@ document.addEventListener("DOMContentLoaded", () => {
                 createdAt: new Date().toISOString()
             };
 
-            submittedBanners.unshift(savedBanner);
+            if (editingBannerId) {
+                // Replace the existing banner in the list.
+                submittedBanners = submittedBanners.map((banner) =>
+                    String(banner._id) === String(editingBannerId)
+                        ? savedBanner
+                        : banner
+                );
+            } else {
+                // Add a new banner to the list.
+                submittedBanners.unshift(savedBanner);
+            }
+
             renderSubmittedBanners();
             setStatusPill(String(savedBanner.status || "pending").toUpperCase(), "pending");
             setFeedback(
@@ -416,12 +473,37 @@ document.addEventListener("DOMContentLoaded", () => {
         } finally {
             if (submitBtn) {
                 submitBtn.disabled = false;
-                submitBtn.innerHTML = submitBtn.dataset.originalHtml || '<i class="bi bi-send-check-fill"></i> Submit Banner for Approval';
+                submitBtn.innerHTML = editingBannerId
+                    ? '<i class="bi bi-pencil-square"></i> Save Changes'
+                    : '<i class="bi bi-send-check-fill"></i> Submit Banner for Approval';
             }
         }
     });
 
+    cancelEditBtn.addEventListener("click", () => {
+        editingBannerId = null;
+        form.reset();
+
+        if (submitBtn) {
+            submitBtn.innerHTML = '<i class="bi bi-send-check-fill"></i> Submit Banner for Approval';
+        }
+
+        cancelEditBtn.style.display = "none";
+
+        setFeedback("Editing cancelled. Your existing banner was not changed.", "info");
+    });
+
     form?.addEventListener("reset", () => {
+        editingBannerId = null;
+
+        if (submitBtn) {
+            submitBtn.innerHTML = '<i class="bi bi-send-check-fill"></i> Submit Banner for Approval';
+        }
+
+        if (cancelEditBtn) {
+            cancelEditBtn.style.display = "none";
+        }
+
         requestAnimationFrame(() => {
             if (durationInput) durationInput.value = "20";
             if (activeCheckbox) activeCheckbox.checked = true;
