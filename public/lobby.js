@@ -11,6 +11,8 @@
 let joinSidebar;
 let lobbyAchievementsCache = [];
 let publicLeaderboardIntervalId = null;
+let publicTablesCache = [];
+let publicSortAscending = true;
 
 document.addEventListener("DOMContentLoaded", async function () {
     const sidebarElement = document.getElementById("joinGameSidebar");
@@ -23,6 +25,11 @@ document.addEventListener("DOMContentLoaded", async function () {
     if (!publicLeaderboardIntervalId) {
         publicLeaderboardIntervalId = setInterval(loadPublicTableLeaderboards, 15000);
     }
+
+    loadRankedPlayerCounts();
+
+    // Refresh player counts every 5 seconds
+    setInterval(loadRankedPlayerCounts, 5000);
 
     const urlParams = new URLSearchParams(window.location.search);
     let playerId = urlParams.get("playerId");
@@ -156,6 +163,32 @@ function openAchievementInfo(achievementId) {
     }
 }
 
+async function loadRankedPlayerCounts() {
+    try {
+        const response = await fetch("/api/tables/ranked/counts", {
+            cache: "no-store"
+        });
+
+        if (!response.ok) {
+            throw new Error("Failed to load ranked player counts.");
+        }
+
+        const counts = await response.json();
+
+        document.getElementById("beginnerPlayerCount").textContent =
+            counts.beginner;
+
+        document.getElementById("intermediatePlayerCount").textContent =
+            counts.intermediate;
+
+        document.getElementById("advancedPlayerCount").textContent =
+            counts.advanced;
+
+    } catch (error) {
+        console.error("Error loading ranked player counts:", error);
+    }
+}
+
 function setupGuestLobbyView(playerId) {
     const dashboardNavItem = document.getElementById("dashboard-nav-item");
     const saveContainer = document.getElementById("lobby-save-container");
@@ -235,14 +268,8 @@ function setupCommonLobbyListeners(playerId) {
 }
 
 function openJoinSidebar(tableId, tableName, blinds, minBuyin) {
-    const rankedTables = [
-        "ranked-beginner",
-        "ranked-intermediate",
-        "ranked-advanced"
-    ];
-
-    if (!rankedTables.includes(tableId)) {
-        console.error("Invalid ranked table:", tableId);
+    if (!tableId) {
+        console.error("Invalid table ID.");
         return;
     }
 
@@ -277,9 +304,200 @@ function togglePublicLobbies() {
 
     section.classList.toggle("d-none");
     if (!section.classList.contains("d-none")) {
+        loadPublicTables();
         loadPublicTableLeaderboards();
-        section.scrollIntoView({ behavior: "smooth", block: "start" });
+
+        section.scrollIntoView({
+            behavior: "smooth",
+            block: "start"
+        });
     }
+}
+
+// ============================================================================
+// PUBLIC CUSTOM TABLES
+// ============================================================================
+
+// Retrieves public custom tables from the backend
+async function loadPublicTables() {
+    const container = document.getElementById("publicLobbyList");
+
+    if (!container) return;
+
+    try {
+        const response = await fetch("/api/tables/public", {
+            cache: "no-store"
+        });
+
+        if (!response.ok) {
+            throw new Error("Failed to load public tables.");
+        }
+
+        publicTablesCache = await response.json();
+
+        renderPublicTables();
+
+    } catch (error) {
+        console.error("Error loading public tables:", error);
+
+        publicTablesCache = [];
+
+        container.innerHTML = `
+            <div class="col-12">
+                <p class="text-danger mb-0">
+                    Unable to load public tables.
+                </p>
+            </div>
+        `;
+    }
+}
+
+// Sorts and displays public custom tables
+function renderPublicTables() {
+    const container = document.getElementById("publicLobbyList");
+    const sortBy = document.getElementById("publicTableSort").value;
+
+    if (!container) return;
+
+    container.textContent = "";
+
+    // No custom tables available
+    if (publicTablesCache.length === 0) {
+        container.innerHTML = `
+            <div class="col-12">
+                <p class="text-white opacity-75 mb-0">
+                    No public tables are currently available.
+                </p>
+            </div>
+        `;
+        return;
+    }
+
+    // Sort public tables
+    const sortedTables = [...publicTablesCache].sort((a, b) => {
+        let comparison;
+
+        if (sortBy === "tableName") {
+            comparison = a.tableName.localeCompare(
+                b.tableName,
+                undefined,
+                { sensitivity: "base" }
+            );
+        } else {
+            comparison = Number(a[sortBy]) - Number(b[sortBy]);
+        }
+
+        return publicSortAscending ? comparison : -comparison;
+    });
+
+    // Display sorted public tables
+    sortedTables.forEach(table => {
+        container.appendChild(createPublicTableCard(table));
+    });
+}
+
+// Toggles ascending and descending sorting
+function togglePublicSortDirection() {
+    publicSortAscending = !publicSortAscending;
+
+    const button = document.getElementById("publicSortDirection");
+
+    button.innerHTML = publicSortAscending
+        ? '<i class="bi bi-arrow-up"></i>'
+        : '<i class="bi bi-arrow-down"></i>';
+
+    button.title = publicSortAscending
+        ? "Ascending order"
+        : "Descending order";
+
+    button.setAttribute("aria-label", button.title);
+
+    renderPublicTables();
+}
+
+// Creates a card for an individual public table
+function createPublicTableCard(table) {
+    const col = document.createElement("div");
+    col.className = "col-md-6 col-lg-4";
+
+    col.innerHTML = `
+        <div class="card shadow-sm border-secondary h-100 midnight-card"
+             style="background-color: #0b132b; color: #ffffff;">
+
+            <div class="card-body d-flex flex-column p-4">
+
+                <div class="mb-3">
+                    <h5 class="card-title fw-bold mb-1 text-white"></h5>
+
+                    <div class="d-flex flex-wrap gap-2">
+                        <span class="badge bg-secondary">Unranked</span>
+
+                        <span class="badge ${
+                            table.isFull
+                                ? "bg-danger"
+                                : table.gameInProgress
+                                    ? "bg-warning text-dark"
+                                    : "bg-success"
+                        }">
+                            ${
+                                table.isFull
+                                    ? "Full"
+                                    : table.gameInProgress
+                                        ? "In Progress"
+                                        : "Open"
+                            }
+                        </span>
+                    </div>
+                </div>
+
+                <ul class="list-unstyled small mb-4 text-white">
+
+                    <li class="mb-2">
+                        <i class="bi bi-cash-coin text-primary me-2"></i>
+                        Blinds: $${table.smallBlind} / $${table.bigBlind}
+                    </li>
+
+                    <li class="mb-2">
+                        <i class="bi bi-people-fill text-primary me-2"></i>
+                        Players: ${table.playerCount} / ${table.maxPlayers}
+                    </li>
+
+                    <li>
+                        <i class="bi bi-shield-check text-primary me-2"></i>
+                        Min Buy-in: $${table.buyIn.toLocaleString()}
+                    </li>
+
+                </ul>
+
+                <button type="button"
+                        class="mt-auto btn btn-outline-primary w-100 py-2 fw-semibold"
+                        ${table.isFull ? "disabled" : ""}>
+
+                    <i class="bi bi-box-arrow-in-right me-1"></i>
+                    ${table.isFull ? "Table Full" : "Join Table"}
+
+                </button>
+
+            </div>
+        </div>
+    `;
+
+    // Safely display the user-created table name
+    col.querySelector(".card-title").textContent = table.tableName;
+
+    // Connect the custom table join button
+    const joinButton = col.querySelector("button");
+
+    joinButton.addEventListener("click", () => {
+        openJoinSidebar(
+            table.tableId,
+            table.tableName,
+            `$${table.smallBlind} / $${table.bigBlind}`,
+            `$${table.buyIn.toLocaleString()}`
+        );
+    });
+
+    return col;
 }
 
 const joinTableForm = document.getElementById("joinTableForm");
@@ -334,33 +552,58 @@ if (joinTableForm) {
 
         const selectedTableId = this.querySelector('input[name="tableId"]')?.value;
 
-        const skillLevel = selectedTableId?.replace("ranked-", "");
+        if (!selectedTableId) {
+            alert("No table selected.");
+            return;
+        }
+
+        // Determine whether the selected table is ranked
+        const rankedTables = [
+            "ranked-beginner",
+            "ranked-intermediate",
+            "ranked-advanced"
+        ];
+
+        const isRanked = rankedTables.includes(selectedTableId);
+
+        // Determine which endpoint to use
+        const endpoint = isRanked
+            ? "/api/table/ranked/join"
+            : "/api/table/join";
+
+        // Prepare the request depending on the game mode
+        const requestBody = isRanked
+            ? {
+                playerId: resolvedPlayerId,
+                skillLevel: selectedTableId.replace("ranked-", "")
+            }
+            : {
+                playerId: resolvedPlayerId,
+                tableId: selectedTableId
+            };
 
         try {
-            const response = await fetch("/api/table/ranked/join", {
+            const response = await fetch(endpoint, {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json"
                 },
-                body: JSON.stringify({
-                    playerId: resolvedPlayerId,
-                    skillLevel
-                })
+                body: JSON.stringify(requestBody)
             });
 
             const data = await response.json();
 
             if (!response.ok) {
-                throw new Error(data.error || "Failed to join ranked table.");
+                throw new Error(data.error || "Failed to join table.");
             }
 
-            // Redirect using the ACTUAL dynamically assigned table ID
+            // Redirect to the correct table
             window.location.href =
                 `tableDisplay.html?tableId=${encodeURIComponent(data.tableId)}` +
                 `&playerId=${encodeURIComponent(resolvedPlayerId)}`;
 
         } catch (error) {
-            console.error("Ranked matchmaking failed:", error);
+            console.error("Table joining failed:", error);
             alert(error.message);
         }
     });

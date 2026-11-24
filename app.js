@@ -75,7 +75,7 @@ app.get('/api/achievements', achievementCont.getAchievements);
 app.get('/api/achievements/:playerId', achievementCont.getAchievements);
 
 // Table Actions (Query/Body Table ID)
-const {createTable, joinRankedTable, joinTable, leaveTable, playerAction, startGame, nextRound, getTableStatus, postChatMessage, updateMuckPreference} = require("./controller/tableController");
+const {createTable, getPublicTables, getRankedPlayerCounts, joinRankedTable, joinTable, leaveTable, playerAction, startGame, nextRound, getTableStatus, postChatMessage, updateMuckPreference} = require("./controller/tableController");
 app.get("/api/table/status", getTableStatus);
 app.post("/api/table/join", joinTable);
 app.post("/api/table/ranked/join", joinRankedTable);
@@ -88,6 +88,8 @@ app.post("/api/table/muck", updateMuckPreference);
 
 // Table Actions (URL Parameter Table ID)
 app.post("/api/tables/create", createTable);
+app.get("/api/tables/public", getPublicTables);
+app.get("/api/tables/ranked/counts", getRankedPlayerCounts);
 
 app.get("/api/tables/:tableId/status", getTableStatus);
 app.post("/api/tables/:tableId/join", joinTable);

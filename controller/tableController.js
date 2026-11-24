@@ -322,6 +322,31 @@ function createTable(req, res) {
 }
 
 // ============================================================================
+// GET PUBLIC CUSTOM TABLES
+// ============================================================================
+
+function getPublicTables(req, res) {
+    const tables = tableManager.getPublicTables();
+
+    const publicTables = tables.map(table => ({
+        tableId: table.tableId,
+        tableName: table.tableName,
+        gameMode: table.gameMode,
+        maxPlayers: table.maxPlayers,
+        playerCount: table.getPlayerCount(),
+        smallBlind: table.smallBlind,
+        bigBlind: table.bigBlind,
+        buyIn: table.buyIn,
+        visibility: table.visibility,
+        gameInProgress: table.gameInProgress,
+        isFull: table.isFull()
+    }));
+
+    return res.status(200).json(publicTables);
+}
+
+
+// ============================================================================
 // TABLE LOGIC & CHAT
 // ============================================================================
 
@@ -495,45 +520,52 @@ async function joinTable(req, res) {
         });
     }
 
-    // Prevent joining a full custom table.
-    if (table.isFull()) {
-        return res.status(409).json({
-            error: "This custom table is full."
-        });
-    }
-
     if (table.hasPlayer(id)) {
         return res.status(200).json({
             message: "Player is already at the table.",
             isPlayer: table.players.includes(id)
         });
     }
-    
-// Default values for guest players
-let startingChips = 1000;
-let playerAvatar = "default";
 
-// Load registered user's saved points and avatar
-if (!id.startsWith("Guest_")) {
-    try {
-        const dbUser = await UserDao.findOne({
-            $or: [{ username: id }, { email: id }]
+    // Prevent joining a full custom table.
+    if (table.isFull()) {
+        return res.status(409).json({
+            error: "This custom table is full."
         });
+    }
+    
+    // Default values for guest players
+    let startingChips = 1000;
+    let playerAvatar = "default";
 
-        if (dbUser) {
-            if (typeof dbUser.points === "number") {
-                startingChips = Math.max(
-                    0,
-                    Math.floor(dbUser.points)
-                );
+    // Load registered user's saved points and avatar
+    if (!id.startsWith("Guest_")) {
+        try {
+            const dbUser = await UserDao.findOne({
+                $or: [{ username: id }, { email: id }]
+            });
+
+            if (dbUser) {
+                if (typeof dbUser.points === "number") {
+                    startingChips = Math.max(
+                        0,
+                        Math.floor(dbUser.points)
+                    );
+                }
+
+                playerAvatar = dbUser.avatar || "default";
             }
 
-            playerAvatar = dbUser.avatar || "default";
-        }
-
-    } catch (err) {
+        } 
+    catch (err) {
         console.error("Failed to fetch user profile on table join:", err);
     }
+}
+
+if (table.isFull()) {
+    return res.status(409).json({
+        error: "This custom table is full."
+    });
 }
 
 // Add player to table
@@ -595,6 +627,15 @@ function leaveTable(req, res) {
     return res.status(200).json({
         message: "Successfully left the table.",
         playerCount: table.getPlayerCount()
+    });
+}
+
+// Returns total player counts for ranked queues
+function getRankedPlayerCounts(req, res) {
+    return res.status(200).json({
+        beginner: tableManager.getRankedPlayerCount("beginner"),
+        intermediate: tableManager.getRankedPlayerCount("intermediate"),
+        advanced: tableManager.getRankedPlayerCount("advanced")
     });
 }
 
@@ -783,6 +824,8 @@ module.exports = {
     playerAction,
     nextRound,
     getTableStatus,
+    getPublicTables,
+    getRankedPlayerCounts,
     postChatMessage,
     updateMuckPreference,
     tableManager,
