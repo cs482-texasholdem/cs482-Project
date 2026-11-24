@@ -308,7 +308,7 @@ function openEditModal(user) {
  */
 
 const BANNER_SCROLL_THRESHOLD = 3;
-const ADMIN_BANNERS_ENDPOINT = "/api/sponsors/banners"; // Update if your banner route path differs
+const ADMIN_BANNERS_ENDPOINT = "/api/admin/sponsor-banners"; // Update if your banner route path differs
 
 function applyBannerScrollThreshold(containerEl, count) {
     if (!containerEl) return;
@@ -417,8 +417,10 @@ async function loadAdminBanners() {
         renderAdminBannerSections(banners);
     } catch (error) {
         console.error("Error loading sponsor banners:", error);
+
         if (pendingList) {
-            pendingList.innerHTML = `<p class="text-danger small mb-0">Failed to load sponsor banners.</p>`;
+            pendingList.innerHTML =
+                `<p class="text-danger small mb-0">${error.message}</p>`;
         }
     }
 }
@@ -427,7 +429,7 @@ async function moderateSponsorBanner(bannerId, nextStatus) {
     if (!bannerId) return;
     try {
         // Adjust method/body/URL if your backend uses a dedicated /:id/approve or /:id/reject route
-        const response = await fetch(`${ADMIN_BANNERS_ENDPOINT}/${encodeURIComponent(bannerId)}`, {
+        const response = await fetch(`${ADMIN_BANNERS_ENDPOINT}/${encodeURIComponent(bannerId)}/moderate`, {
             method: "PATCH",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ status: nextStatus })

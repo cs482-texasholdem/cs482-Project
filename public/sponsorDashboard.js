@@ -4,7 +4,7 @@
  * and submitted banner list updates.
  */
 
-const SPONSOR_BANNERS_API = "/api/sponsors/banners"; // Adjust if your backend route path differs
+const SPONSOR_BANNERS_API = "/api/sponsors/banner"; // Adjust if your backend route path differs
 const SPONSOR_SESSION_API = "/loggeduser";        // Adjust if your session endpoint differs
 
 document.addEventListener("DOMContentLoaded", () => {
@@ -204,14 +204,20 @@ document.addEventListener("DOMContentLoaded", () => {
 
     async function fetchExistingBanners() {
     try {
-        const res = await fetch('/api/sponsors/my-banners', { cache: 'no-store' }); // Matches SponsorBannerController.getMyBanners[cite: 5]
-        if (!res.ok) return;
+        const res = await fetch('/api/sponsors/my-banners', {
+            method: 'GET',
+            cache: 'no-store'
+        });
+
         const data = await res.json();
-        const list = Array.isArray(data) ? data : (data.banners || []);
-        if (list.length > 0) {
-            submittedBanners = list;
-            renderSubmittedBanners();
+
+        if (!res.ok) {
+            console.warn('Could not load existing banners:', data);
+            return;
         }
+
+        submittedBanners = data.banners || [];
+        renderSubmittedBanners();
     } catch (err) {
         console.warn('Could not load existing sponsor banners:', err);
     }
