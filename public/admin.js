@@ -449,15 +449,39 @@ async function loadAdminBanners() {
     }
 }
 
+
 async function moderateSponsorBanner(bannerId, nextStatus) {
     if (!bannerId) return;
+
+    let moderationNote = "";
+
+    // Ask the admin for a reason when rejecting a banner.
+    if (nextStatus === "rejected") {
+        moderationNote = prompt("Please enter a reason for rejecting this banner:");
+
+        // Cancel if the admin does not provide a reason.
+        if (moderationNote === null) return;
+
+        moderationNote = moderationNote.trim();
+
+        if (!moderationNote) {
+            alert("Please provide a rejection reason.");
+            return;
+        }
+    }
+
     try {
-        // Adjust method/body/URL if your backend uses a dedicated /:id/approve or /:id/reject route
-        const response = await fetch(`${ADMIN_BANNERS_ENDPOINT}/${encodeURIComponent(bannerId)}/moderate`, {
-            method: "PATCH",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ status: nextStatus })
-        });
+        const response = await fetch(
+            `${ADMIN_BANNERS_ENDPOINT}/${encodeURIComponent(bannerId)}/moderate`,
+            {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    status: nextStatus,
+                    moderationNote: moderationNote
+                })
+            }
+        );
 
         if (!response.ok) {
             const errData = await response.json().catch(() => ({}));
@@ -466,11 +490,13 @@ async function moderateSponsorBanner(bannerId, nextStatus) {
         }
 
         await loadAdminBanners();
+
     } catch (error) {
         console.error("Error updating banner moderation status:", error);
         alert("Network error while updating banner status.");
     }
 }
+
 
 async function deleteAdminSponsorBanner(bannerId) {
     if (!bannerId) return;
