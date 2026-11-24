@@ -994,3 +994,733 @@ describe("Ranked Matchmaking Controller Tests", () => {
         );
     });
 });
+
+// ============================================================================
+// ADDITIONAL TABLE CONTROLLER TESTS
+// ============================================================================
+
+describe('Additional Table Controller Tests', () => {
+    const controller = require('../controller/tableController.js');
+    const UserDao = require('../model/UserDao');
+
+    let req, res, io, table, originalTables;
+
+    const settings = {
+        tableName: ' Friday Poker ',
+        maxPlayers: 4,
+        buyIn: 100,
+        smallBlind: 1,
+        bigBlind: 2,
+        visibility: 'public'
+    };
+
+    beforeEach(() => {
+        jest.clearAllMocks();
+
+        UserDao.findOne.mockReset().mockResolvedValue(null);
+
+        // Preserve existing tables
+        originalTables = new Map(tableManager.tables);
+        tableManager.tables.clear();
+
+        // Create a fresh custom table for each test
+        table = tableManager.createTable(
+            'general', 30, 'custom', 4, 1, 2
+        );
+
+        io = {
+            emit: jest.fn(),
+            to: jest.fn().mockReturnThis()
+        };
+
+        req = {
+            params: {},
+            query: {},
+            body: {},
+            session: {},
+            app: {
+                get: jest.fn().mockReturnValue(io)
+            }
+        };
+
+        res = {
+            status: jest.fn().mockReturnThis(),
+            json: jest.fn()
+        };
+
+        req.params.tableId = table.tableId;
+    });
+
+    afterEach(() => {
+        jest.restoreAllMocks();
+
+        UserDao.findOne.mockReset().mockResolvedValue(null);
+
+        // Restore original tables
+        tableManager.tables.clear();
+
+        for (const [id, saved] of originalTables) {
+            tableManager.tables.set(id, saved);
+        }
+    });
+
+    // ========================================================================
+    // CREATE CUSTOM TABLE
+    // ========================================================================
+
+    test.each(['public', 'private'])(
+        'createTable creates a %s custom table',
+        visibility => {
+            req.body = {
+                ...settings,
+                visibility,
+                maxPlayers: '4',
+                buyIn: '100'
+            };
+
+            controller.createTable(req, res);
+
+            expect(res.status).toHaveBeenLastCalledWith(201);
+
+            const data = res.json.mock.calls.at(-1)[0];
+            const created = tableManager.getTable(data.tableId);
+
+            expect(created).toMatchObject({
+                tableName: 'Friday Poker',
+                gameMode: 'custom',
+                maxPlayers: 4,
+                buyIn: 100,
+                visibility
+            });
+
+            expect(created.chatMessages).toEqual(
+                expect.arrayContaining([
+                    expect.objectContaining({
+                        sender: 'Dealer'
+                    })
+                ])
+            );
+
+            expect(io.emit).toHaveBeenCalledWith(
+                'TABLE_UPDATED',
+                { tableId: data.tableId }
+            );
+        }
+    );
+
+    test.each([
+        [
+            { tableName: '' },
+            'Missing required table settings.'
+        ],
+        [
+            { maxPlayers: undefined },
+            'Missing required table settings.'
+        ],
+        [
+            { buyIn: undefined },
+            'Missing required table settings.'
+        ],
+        [
+            { smallBlind: undefined },
+            'Missing required table settings.'
+        ],
+        [
+            { bigBlind: undefined },
+            'Missing required table settings.'
+        ],
+        [
+            { tableName: '   ' },
+            'Invalid table name.'
+        ],
+        [
+            { tableName: 123 },
+            'Invalid table name.'
+        ],
+        [
+            { maxPlayers: 2.5 },
+            'Invalid table settings.'
+        ],
+        [
+            { maxPlayers: 1 },
+            'Invalid table settings.'
+        ],
+        [
+            { maxPlayers: 10 },
+            'Invalid table settings.'
+        ],
+        [
+            { buyIn: 'abc' },
+            'Invalid table settings.'
+        ],
+        [
+            { smallBlind: 'abc' },
+            'Invalid table settings.'
+        ],
+        [
+            { bigBlind: 'abc' },
+            'Invalid table settings.'
+        ],
+        [
+            { buyIn: -1 },
+            'Invalid table settings.'
+        ],
+        [
+            { smallBlind: -1 },
+            'Invalid table settings.'
+        ],
+        [
+            { bigBlind: 1 },
+            'Invalid table settings.'
+        ],
+        [
+            { smallBlind: 2, bigBlind: 3, buyIn: 2 },
+            'Invalid table settings.'
+        ],
+        [
+            { visibility: 'unknown' },
+            'Invalid table visibility.'
+        ]
+    ])(
+        'createTable rejects invalid settings %j',
+        (changes, error) => {
+            const count = tableManager.tables.size;
+
+            req.body = {
+                ...settings,
+                ...changes
+            };
+
+            controller.createTable(req, res);
+
+            expect(res.status).toHaveBeenLastCalledWith(400);
+            expect(res.json).toHaveBeenLastCalledWith({ error });
+
+            // Invalid tables should not be created
+            expect(tableManager.tables.size).toBe(count);
+
+            // No update should be broadcast
+            expect(io.emit).not.toHaveBeenCalled();
+        }
+    );
+
+    // ========================================================================
+    // PUBLIC CUSTOM TABLES
+    // ========================================================================
+
+    test('getPublicTables returns table configuration and player count', () => {
+        Object.assign(table, {
+            tableName: 'Public Poker',
+            buyIn: 100,
+            visibility: 'public'
+        });
+
+        table.addPlayer('Guest_Public', 1000);
+
+        const privateTable = tableManager.createTable(
+            'general', 30, 'custom'
+        );
+
+        privateTable.visibility = 'private';
+
+        const ranked = tableManager.getOrCreateRankedTable(
+            'beginner'
+        );
+
+        controller.getPublicTables(req, res);
+
+        expect(res.status).toHaveBeenLastCalledWith(200);
+
+        const data = res.json.mock.calls.at(-1)[0];
+
+        expect(data).toEqual(
+            expect.arrayContaining([
+                expect.objectContaining({
+                    tableId: table.tableId,
+                    tableName: 'Public Poker',
+                    gameMode: 'custom',
+                    playerCount: 1,
+                    maxPlayers: 4,
+                    smallBlind: 1,
+                    bigBlind: 2,
+                    buyIn: 100,
+                    visibility: 'public',
+                    gameInProgress: false,
+                    isFull: false
+                })
+            ])
+        );
+
+        // Private tables should not appear in the public lobby
+        expect(data.map(t => t.tableId))
+            .not.toContain(privateTable.tableId);
+
+        // Ranked tables should not appear as custom tables
+        expect(data.map(t => t.tableId))
+            .not.toContain(ranked.tableId);
+    });
+
+    test('getPublicTables returns an empty array when there are no public tables', () => {
+        tableManager.tables.clear();
+
+        controller.getPublicTables(req, res);
+
+        expect(res.status).toHaveBeenLastCalledWith(200);
+        expect(res.json).toHaveBeenLastCalledWith([]);
+    });
+
+    // ========================================================================
+    // RANKED PLAYER COUNTS
+    // ========================================================================
+
+    test('getRankedPlayerCounts totals multiple tables and excludes custom players', async () => {
+        table.addPlayer('Guest_Custom', 1000);
+
+        const queues = [
+            ['beginner', 10],
+            ['intermediate', 2],
+            ['advanced', 1]
+        ];
+
+        for (const [skillLevel, count] of queues) {
+            for (let i = 0; i < count; i++) {
+                req.body = {
+                    playerId: `Guest_${skillLevel}_${i}`,
+                    skillLevel
+                };
+
+                await controller.joinRankedTable(req, res);
+
+                expect(res.status)
+                    .toHaveBeenLastCalledWith(200);
+            }
+        }
+
+        controller.getRankedPlayerCounts(req, res);
+
+        expect(res.status).toHaveBeenLastCalledWith(200);
+
+        expect(res.json).toHaveBeenLastCalledWith({
+            beginner: 10,
+            intermediate: 2,
+            advanced: 1
+        });
+    });
+
+    test('getRankedPlayerCounts returns zero for empty queues', () => {
+        controller.getRankedPlayerCounts(req, res);
+
+        expect(res.status).toHaveBeenLastCalledWith(200);
+
+        expect(res.json).toHaveBeenLastCalledWith({
+            beginner: 0,
+            intermediate: 0,
+            advanced: 0
+        });
+    });
+
+    // ========================================================================
+    // MUCK PREFERENCES
+    // ========================================================================
+
+    test.each([true, false])(
+        'updateMuckPreference sets preference to %s',
+        muckPreference => {
+            table.addPlayer('Guest_Muck', 1000);
+
+            const player = table.playerManager.getPlayer(
+                'Guest_Muck'
+            );
+
+            player.muckPreference = !muckPreference;
+
+            req.body = {
+                playerId: 'Guest_Muck',
+                muckPreference
+            };
+
+            controller.updateMuckPreference(req, res);
+
+            expect(player.muckPreference).toBe(muckPreference);
+
+            expect(res.status).toHaveBeenLastCalledWith(200);
+
+            expect(res.json).toHaveBeenLastCalledWith({
+                success: true,
+                muckPreference
+            });
+        }
+    );
+
+    test.each([
+        { playerId: 12, muckPreference: true },
+        { playerId: 'Guest_A', muckPreference: 'true' }
+    ])(
+        'updateMuckPreference rejects invalid body %j',
+        body => {
+            req.body = body;
+
+            controller.updateMuckPreference(req, res);
+
+            expect(res.status).toHaveBeenLastCalledWith(400);
+
+            expect(res.json).toHaveBeenLastCalledWith({
+                error: 'Invalid muck preference.'
+            });
+        }
+    );
+
+    test('updateMuckPreference rejects an unknown player', () => {
+        req.body = {
+            playerId: 'Guest_Unknown',
+            muckPreference: true
+        };
+
+        controller.updateMuckPreference(req, res);
+
+        expect(res.status).toHaveBeenLastCalledWith(404);
+
+        expect(res.json).toHaveBeenLastCalledWith({
+            error: 'Player not found at table.'
+        });
+    });
+
+    // ========================================================================
+    // INVALID TABLE IDs
+    // ========================================================================
+
+    test.each([
+        'getTableStatus',
+        'startGame',
+        'finishGame',
+        'nextRound',
+        'updateMuckPreference'
+    ])(
+        '%s returns 404 for an unknown table',
+        method => {
+            req.params.tableId = 'missing-table';
+
+            controller[method](req, res);
+
+            expect(res.status).toHaveBeenLastCalledWith(404);
+
+            expect(res.json).toHaveBeenLastCalledWith({
+                error: 'Table not found.'
+            });
+        }
+    );
+
+    // ========================================================================
+    // REGISTERED USER CHIPS AND AVATARS
+    // ========================================================================
+
+    test.each(['custom', 'ranked'])(
+        '%s join loads registered user chips and avatar',
+        async mode => {
+            UserDao.findOne.mockResolvedValue({
+                points: 1234.9,
+                avatar: 'blossom'
+            });
+
+            req.body = {
+                playerId: ' Alice ',
+                skillLevel: 'beginner'
+            };
+
+            const method = mode === 'custom'
+                ? 'joinTable'
+                : 'joinRankedTable';
+
+            await controller[method](req, res);
+
+            expect(res.status).toHaveBeenLastCalledWith(200);
+
+            const data = res.json.mock.calls.at(-1)[0];
+
+            const joined = tableManager.getTable(data.tableId);
+
+            expect(
+                joined.playerManager.getPlayer('Alice')
+            ).toMatchObject({
+                chips: 1234,
+                avatar: 'blossom'
+            });
+
+            expect(UserDao.findOne).toHaveBeenCalledWith({
+                $or: [
+                    { username: 'Alice' },
+                    { email: 'Alice' }
+                ]
+            });
+        }
+    );
+
+    test.each(['custom', 'ranked'])(
+        '%s join falls back to defaults on database error',
+        async mode => {
+            jest.spyOn(console, 'error')
+                .mockImplementation(() => {});
+
+            UserDao.findOne.mockRejectedValue(
+                new Error('Database unavailable')
+            );
+
+            req.body = {
+                playerId: 'Alice',
+                skillLevel: 'beginner'
+            };
+
+            const method = mode === 'custom'
+                ? 'joinTable'
+                : 'joinRankedTable';
+
+            await controller[method](req, res);
+
+            expect(res.status).toHaveBeenLastCalledWith(200);
+
+            const data = res.json.mock.calls.at(-1)[0];
+
+            const joined = tableManager.getTable(data.tableId);
+
+            expect(
+                joined.playerManager.getPlayer('Alice')
+            ).toMatchObject({
+                chips: 1000,
+                avatar: 'default'
+            });
+        }
+    );
+
+    // ========================================================================
+    // CUSTOM TABLE CAPACITY
+    // ========================================================================
+
+    test('joinTable rejects a full custom table', async () => {
+        // Fill all four available seats
+        for (let i = 0; i < 4; i++) {
+            table.addPlayer(`Guest_Full${i}`, 1000);
+        }
+
+        req.body = {
+            playerId: 'Guest_Overflow'
+        };
+
+        await controller.joinTable(req, res);
+
+        expect(res.status).toHaveBeenLastCalledWith(409);
+
+        expect(res.json).toHaveBeenLastCalledWith({
+            error: 'This custom table is full.'
+        });
+
+        expect(table.hasPlayer('Guest_Overflow')).toBe(false);
+        expect(table.getPlayerCount()).toBe(4);
+    });
+
+    test('joinTable checks capacity again after database lookup', async () => {
+        // Simulate a table filling while the database is queried
+        jest.spyOn(table, 'isFull')
+            .mockReturnValueOnce(false)
+            .mockReturnValue(true);
+
+        req.body = {
+            playerId: 'Alice'
+        };
+
+        await controller.joinTable(req, res);
+
+        expect(UserDao.findOne).toHaveBeenCalled();
+
+        expect(res.status).toHaveBeenLastCalledWith(409);
+
+        expect(res.json).toHaveBeenLastCalledWith({
+            error: 'This custom table is full.'
+        });
+
+        expect(table.hasPlayer('Alice')).toBe(false);
+    });
+
+    // ========================================================================
+    // RANKED MATCHMAKING FAILURE HANDLING
+    // ========================================================================
+
+    test.each([
+        'full',
+        'in progress',
+        'add failed'
+    ])(
+        'ranked join handles %s table',
+        async condition => {
+            const ranked = tableManager.getOrCreateRankedTable(
+                'beginner'
+            );
+
+            jest.spyOn(
+                tableManager,
+                'getOrCreateRankedTable'
+            ).mockReturnValue(ranked);
+
+            if (condition === 'full') {
+                jest.spyOn(ranked, 'isFull')
+                    .mockReturnValue(true);
+            } else if (condition === 'in progress') {
+                ranked.gameInProgress = true;
+            } else {
+                jest.spyOn(ranked, 'addPlayer')
+                    .mockReturnValue(false);
+            }
+
+            req.body = {
+                playerId: 'Guest_Rejected',
+                skillLevel: 'beginner'
+            };
+
+            await controller.joinRankedTable(req, res);
+
+            expect(res.status).toHaveBeenLastCalledWith(409);
+
+            const error = condition === 'add failed'
+                ? 'Could not join ranked table.'
+                : 'Ranked table is no longer available.';
+
+            expect(res.json).toHaveBeenLastCalledWith({
+                error
+            });
+
+            expect(io.emit).not.toHaveBeenCalled();
+        }
+    );
+
+    // ========================================================================
+    // CHAT ISOLATION
+    // ========================================================================
+
+    test('chat is isolated between tables and works without sockets', () => {
+        const other = tableManager.createTable(
+            'general', 30, 'custom'
+        );
+
+        req.app.get.mockReturnValue(null);
+
+        req.body = {
+            playerId: ' Guest_Chat ',
+            message: ' Hello! '
+        };
+
+        controller.postChatMessage(req, res);
+
+        expect(res.status).toHaveBeenLastCalledWith(200);
+
+        expect(table.chatMessages.at(-1)).toMatchObject({
+            sender: 'Guest_Chat',
+            text: 'Hello!'
+        });
+
+        // Message should not appear at the other table
+        expect(other.chatMessages || []).not.toEqual(
+            expect.arrayContaining([
+                expect.objectContaining({
+                    text: 'Hello!'
+                })
+            ])
+        );
+    });
+
+    // ========================================================================
+    // PLAYER ACTION AND MUCK INTEGRATION
+    // ========================================================================
+
+    test('playerAction passes numeric amount and updates muck preference', () => {
+        table.addPlayer('Guest_Action', 1000);
+
+        const spy = jest.spyOn(table, 'recordAction')
+            .mockReturnValue({
+                success: true
+            });
+
+        req.body = {
+            playerId: 'Guest_Action',
+            action: 'Raise',
+            amount: '50',
+            muckPreference: false
+        };
+
+        controller.playerAction(req, res);
+
+        expect(spy).toHaveBeenCalledWith(
+            'Guest_Action',
+            'Raise',
+            50
+        );
+
+        expect(
+            table.playerManager.getPlayer('Guest_Action')
+                .muckPreference
+        ).toBe(false);
+
+        expect(res.status).toHaveBeenLastCalledWith(200);
+    });
+
+    // ========================================================================
+    // BETTING PERMISSIONS AND RAISE LIMITS
+    // ========================================================================
+
+    test.each([
+        [0, 0, 100, true, false, true],
+        [2, 0, 1, false, true, false],
+        [2, 0, 0, false, false, false]
+    ])(
+        'getTableStatus calculates betting permissions (highest=%i, bet=%i, chips=%i)',
+        (
+            highest,
+            bet,
+            chips,
+            canCheck,
+            canCall,
+            canRaise
+        ) => {
+            table.addPlayer('Guest_Turn', 1000);
+
+            const player = table.playerManager.getPlayer(
+                'Guest_Turn'
+            );
+
+            Object.assign(player, {
+                chips,
+                currentBet: bet,
+                hasActed: false
+            });
+
+            table.gameInProgress = true;
+            table.currentTurnIndex = 0;
+            table.currentHighestBet = highest;
+
+            jest.spyOn(table, 'checkTimeout')
+                .mockImplementation(() => {});
+
+            jest.spyOn(table, 'dealHandToPlayer')
+                .mockReturnValue([]);
+
+            jest.spyOn(table, 'displayCards')
+                .mockReturnValue([]);
+
+            req.query.playerId = 'Guest_Turn';
+
+            controller.getTableStatus(req, res);
+
+            expect(res.status).toHaveBeenLastCalledWith(200);
+
+            expect(res.json).toHaveBeenLastCalledWith(
+                expect.objectContaining({
+                    isCurrentTurn: true,
+                    buttonsBlocked: false,
+                    canCheck,
+                    canCall,
+                    canRaise,
+                    minRaise: highest === 0 ? 2 : highest + 2,
+                    maxRaise: bet + chips
+                })
+            );
+        }
+    );
+});

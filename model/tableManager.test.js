@@ -355,3 +355,5 @@ describe("Ranked Multitable Matchmaking", () => {
         expect(custom.players).not.toContain("rankedPlayer");
     });
 });
+
+
