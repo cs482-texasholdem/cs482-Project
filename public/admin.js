@@ -334,6 +334,9 @@ function createBannerModerationCard(banner, isPending) {
     const sponsorCode = banner.sponsorCode ? ` (${banner.sponsorCode})` : "";
     const duration = Number(banner.durationSec) || 20;
     const theme = banner.theme || "midnight";
+    const lastUpdated = banner.updatedAt
+    ? new Date(banner.updatedAt).toLocaleString()
+    : "N/A";
 
     const badgeClass = statusText === "APPROVED"
         ? "bg-success"
@@ -350,6 +353,10 @@ function createBannerModerationCard(banner, isPending) {
             <strong>${escapeBannerHtml(sponsorName)}</strong>${escapeBannerHtml(sponsorCode)}
             &bull; Theme: ${escapeBannerHtml(theme)}
             &bull; Duration: ${duration}s
+            <br>
+            <span class="text-info">
+                Last Updated: ${escapeBannerHtml(lastUpdated)}
+            </span>
         </div>
         ${banner.subtext ? `<p class="small text-white opacity-90 mb-2">${escapeBannerHtml(banner.subtext)}</p>` : ""}
         ${banner.linkUrl ? `<div class="small text-info text-break mb-2">${escapeBannerHtml(banner.linkUrl)}</div>` : ""}
