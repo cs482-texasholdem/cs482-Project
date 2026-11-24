@@ -526,13 +526,6 @@ async function joinTable(req, res) {
             isPlayer: table.players.includes(id)
         });
     }
-
-    // Prevent joining a full custom table.
-    if (table.isFull()) {
-        return res.status(409).json({
-            error: "This custom table is full."
-        });
-    }
     
     // Default values for guest players
     let startingChips = 1000;
@@ -562,12 +555,6 @@ async function joinTable(req, res) {
     }
 }
 
-if (table.isFull()) {
-    return res.status(409).json({
-        error: "This custom table is full."
-    });
-}
-
 // Add player to table
 if (!table.addPlayer(id, startingChips)) {
     return res.status(409).json({
@@ -588,7 +575,9 @@ if (player) {
     broadcastTableUpdate(req, table.tableId); // Notify all clients of the table update
 
     return res.status(200).json({
-        message: isPlayer ? "Successfully joined the table as a player." : "Game in progress. Added to spectator queue.",
+        message: isPlayer
+            ? "Successfully joined the table as a player."
+            : "Table is full or a game is in progress. Added to spectator queue.",
         tableId: table.tableId,
         isPlayer,
         playerCount: table.getPlayerCount()

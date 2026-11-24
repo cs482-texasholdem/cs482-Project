@@ -62,11 +62,6 @@ class PlayerManager {
             return false;
         }
 
-        // Prevent players from exceeding the table's maximum capacity
-        if (this.isFull()) {
-            return false;
-        }
-
         const validChips = (typeof startingChips === "number" && Number.isFinite(startingChips) && startingChips >= 0)
             ? Math.floor(startingChips)
             : 1000;
