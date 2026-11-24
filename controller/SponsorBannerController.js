@@ -166,6 +166,44 @@ exports.getMyBanners = async function(req, res) {
 };
 
 /**
+ * DELETE /api/sponsors/banner/:id
+ * Allows a sponsor to delete only their own banner.
+ */
+exports.deleteMyBanner = async function(req, res) {
+    try {
+        if (!userController.sponsorCheck(req)) {
+            return res.status(403).json({ error: 'Sponsor access required.' });
+        }
+
+        const username = getSessionUsername(getSessionUser(req));
+
+        const deletedBanner = await SponsorBanner.findOneAndDelete({
+            _id: req.params.id,
+            sponsorUsername: username
+        });
+
+        if (!deletedBanner) {
+            return res.status(404).json({
+                error: 'Banner not found or you do not have permission to delete it.'
+            });
+        }
+
+        const io = req.app?.get?.('io');
+        if (io && typeof io.emit === 'function') {
+            io.emit('SPONSOR_BANNERS_UPDATED');
+        }
+
+        return res.status(200).json({
+            message: 'Banner deleted successfully.'
+        });
+
+    } catch (error) {
+        console.error('Error deleting sponsor banner:', error);
+        return res.status(500).json({ error: 'Failed to delete banner.' });
+    }
+};
+
+/**
  * GET /api/sponsors/active
  * Public/gameplay read endpoint returning only approved, active banners with safe URLs.
  */
@@ -269,5 +307,36 @@ exports.moderateBanner = async function(req, res) {
     } catch (error) {
         console.error('Error moderating sponsor banner:', error);
         return res.status(500).json({ error: 'Failed to moderate banner.' });
+    }
+};
+
+/**
+ * DELETE /api/admin/sponsor-banners/:id
+ * Allows an admin to delete any sponsor banner.
+ */
+exports.deleteBanner = async function(req, res) {
+    try {
+        if (!userController.adminCheck(req)) {
+            return res.status(403).json({ error: 'Admin access required.' });
+        }
+
+        const deletedBanner = await SponsorBanner.findByIdAndDelete(req.params.id);
+
+        if (!deletedBanner) {
+            return res.status(404).json({ error: 'Banner not found.' });
+        }
+
+        const io = req.app?.get?.('io');
+        if (io && typeof io.emit === 'function') {
+            io.emit('SPONSOR_BANNERS_UPDATED');
+        }
+
+        return res.status(200).json({
+            message: 'Banner deleted successfully.'
+        });
+
+    } catch (error) {
+        console.error('Error deleting banner as admin:', error);
+        return res.status(500).json({ error: 'Failed to delete banner.' });
     }
 };

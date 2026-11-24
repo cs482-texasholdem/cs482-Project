@@ -186,6 +186,8 @@ app.get('/api/sponsors/my-banners', sponsorBannerCont.getMyBanners);
 app.get('/api/sponsors/active', sponsorBannerCont.getApprovedActiveBanners);
 app.get('/api/admin/sponsor-banners', sponsorBannerCont.getModerationQueue);
 app.patch('/api/admin/sponsor-banners/:id/moderate', sponsorBannerCont.moderateBanner);
+app.delete('/api/sponsors/banner/:id', sponsorBannerCont.deleteMyBanner);
+app.delete('/api/admin/sponsor-banners/:id', sponsorBannerCont.deleteBanner);
 
 if (require.main === module) {
     const port = process.env.PORT || 3000;

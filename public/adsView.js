@@ -7,6 +7,12 @@ let elapsedMs = 0;
 let durationMs = 20000;
 let lastTick = Date.now();
 let socketInitialized = false;
+// Embedded banner rotation (lobby and active table)
+let embeddedBanners = [];
+let embeddedActiveIndex = 0;
+let embeddedElapsedMs = 0;
+let embeddedDurationMs = 20000;
+let embeddedLastTick = Date.now();
 
 const bannerContainer = document.getElementById('bannerContainer');
 const dotsContainer = document.getElementById('dotsContainer');
@@ -203,7 +209,13 @@ function renderEmbeddedBanners(activeBanners) {
             return;
         }
 
-        const banner = activeBanners[0];
+        if (embeddedActiveIndex >= activeBanners.length) {
+            embeddedActiveIndex = 0;
+        }
+
+        const banner = activeBanners[embeddedActiveIndex];
+
+        embeddedDurationMs = clampDurationSec(banner.durationSec) * 1000;
         const theme = ALLOWED_THEMES.has(banner.theme)
             ? banner.theme
             : 'midnight';
@@ -271,6 +283,18 @@ function renderEmbeddedBanners(activeBanners) {
     });
 }
 
+function goToNextEmbeddedBanner() {
+    if (embeddedBanners.length <= 1) return;
+
+    embeddedActiveIndex =
+        (embeddedActiveIndex + 1) % embeddedBanners.length;
+
+    embeddedElapsedMs = 0;
+    embeddedLastTick = Date.now();
+
+    renderEmbeddedBanners(embeddedBanners);
+}
+
 async function loadSponsorBanners() {
     const hasRotationView = Boolean(bannerContainer);
     const hasEmbeddedView = document.querySelectorAll('.sponsor-banner').length > 0;
@@ -293,7 +317,12 @@ async function loadSponsorBanners() {
         }
 
         if (hasEmbeddedView) {
-            renderEmbeddedBanners(loaded);
+            embeddedBanners = loaded;
+            embeddedActiveIndex = 0;
+            embeddedElapsedMs = 0;
+            embeddedLastTick = Date.now();
+
+            renderEmbeddedBanners(embeddedBanners);
         }
     } catch (error) {
         console.error('Error loading sponsor banners:', error);
@@ -335,6 +364,25 @@ function initAdsView() {
 
             if (elapsedMs >= durationMs) {
                 goToNext();
+            }
+        }, 100);
+    }
+
+    // Automatically rotate lobby and active table banners
+    if (document.querySelectorAll('.sponsor-banner').length > 0) {
+        setInterval(() => {
+            if (embeddedBanners.length <= 1) {
+                embeddedLastTick = Date.now();
+                return;
+            }
+
+            const now = Date.now();
+
+            embeddedElapsedMs += now - embeddedLastTick;
+            embeddedLastTick = now;
+
+            if (embeddedElapsedMs >= embeddedDurationMs) {
+                goToNextEmbeddedBanner();
             }
         }, 100);
     }
