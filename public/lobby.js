@@ -277,9 +277,141 @@ function togglePublicLobbies() {
 
     section.classList.toggle("d-none");
     if (!section.classList.contains("d-none")) {
+        loadPublicTables();
         loadPublicTableLeaderboards();
-        section.scrollIntoView({ behavior: "smooth", block: "start" });
+
+        section.scrollIntoView({
+            behavior: "smooth",
+            block: "start"
+        });
     }
+}
+
+// ============================================================================
+// PUBLIC CUSTOM TABLES
+// ============================================================================
+
+// Retrieves public custom tables from the backend
+async function loadPublicTables() {
+    const container = document.getElementById("publicLobbyList");
+
+    if (!container) return;
+
+    try {
+        const response = await fetch("/api/tables/public", {
+            cache: "no-store"
+        });
+
+        if (!response.ok) {
+            throw new Error("Failed to load public tables.");
+        }
+
+        const tables = await response.json();
+
+        // Clear previously displayed tables
+        container.textContent = "";
+
+        // No custom tables available
+        if (tables.length === 0) {
+            container.innerHTML = `
+                <div class="col-12">
+                    <p class="text-white opacity-75 mb-0">
+                        No public tables are currently available.
+                    </p>
+                </div>
+            `;
+            return;
+        }
+
+        // Display each public table
+        tables.forEach(table => {
+            container.appendChild(createPublicTableCard(table));
+        });
+
+    } catch (error) {
+        console.error("Error loading public tables:", error);
+
+        container.innerHTML = `
+            <div class="col-12">
+                <p class="text-danger mb-0">
+                    Unable to load public tables.
+                </p>
+            </div>
+        `;
+    }
+}
+
+// Creates a card for an individual public table
+function createPublicTableCard(table) {
+    const col = document.createElement("div");
+    col.className = "col-md-6 col-lg-4";
+
+    col.innerHTML = `
+        <div class="card shadow-sm border-secondary h-100 midnight-card"
+             style="background-color: #0b132b; color: #ffffff;">
+
+            <div class="card-body d-flex flex-column p-4">
+
+                <div class="mb-3">
+                    <h5 class="card-title fw-bold mb-1 text-white"></h5>
+
+                    <div class="d-flex flex-wrap gap-2">
+                        <span class="badge bg-secondary">Unranked</span>
+
+                        <span class="badge ${
+                            table.isFull
+                                ? "bg-danger"
+                                : table.gameInProgress
+                                    ? "bg-warning text-dark"
+                                    : "bg-success"
+                        }">
+                            ${
+                                table.isFull
+                                    ? "Full"
+                                    : table.gameInProgress
+                                        ? "In Progress"
+                                        : "Open"
+                            }
+                        </span>
+                    </div>
+                </div>
+
+                <ul class="list-unstyled small mb-4 text-white">
+
+                    <li class="mb-2">
+                        <i class="bi bi-cash-coin text-primary me-2"></i>
+                        Blinds: $${table.smallBlind} / $${table.bigBlind}
+                    </li>
+
+                    <li class="mb-2">
+                        <i class="bi bi-people-fill text-primary me-2"></i>
+                        Players: ${table.playerCount} / ${table.maxPlayers}
+                    </li>
+
+                    <li>
+                        <i class="bi bi-shield-check text-primary me-2"></i>
+                        Min Buy-in: $${table.buyIn.toLocaleString()}
+                    </li>
+
+                </ul>
+
+                <button type="button"
+                        class="mt-auto btn btn-outline-primary w-100 py-2 fw-semibold"
+                        ${table.isFull ? "disabled" : ""}>
+
+                    <i class="bi bi-box-arrow-in-right me-1"></i>
+                    ${table.isFull ? "Table Full" : "Join Table"}
+
+                </button>
+
+            </div>
+        </div>
+    `;
+
+    // Safely display the user-created table name
+    col.querySelector(".card-title").textContent = table.tableName;
+
+    return col;
 }
 
 const joinTableForm = document.getElementById("joinTableForm");
