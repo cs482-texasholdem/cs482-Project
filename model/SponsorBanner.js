@@ -18,6 +18,9 @@ const SponsorBannerSchema = new mongoose.Schema({
         type: String,
         required: true,
         trim: true,
+        maxlength:40,
+        minlength:6,
+        default: "",
         uppercase: true
     },
     sponsorName: {

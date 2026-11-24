@@ -23,7 +23,8 @@ document.addEventListener("DOMContentLoaded", async function() {
     await Promise.all([
         loadUsers(),
         loadReports(),
-        loadGameHistory()
+        loadGameHistory(),
+        loadAdminBanners()
     ]);
 });
 
@@ -301,3 +302,153 @@ function openEditModal(user) {
     document.getElementById('txt_pass').value = ''; // Reset password field
     editModal.show();
 }
+
+/**
+ * For sponsor banner, reviewing on admin side
+ */
+
+const BANNER_SCROLL_THRESHOLD = 3;
+const ADMIN_BANNERS_ENDPOINT = "/api/sponsors/banners"; // Update if your banner route path differs
+
+function applyBannerScrollThreshold(containerEl, count) {
+    if (!containerEl) return;
+    containerEl.classList.toggle("is-scrollable", count > BANNER_SCROLL_THRESHOLD);
+}
+
+function escapeBannerHtml(value) {
+    return String(value ?? "")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#39;");
+}
+
+function createBannerModerationCard(banner, isPending) {
+    const card = document.createElement("div");
+    card.className = "p-3 rounded border border-secondary";
+    card.style.backgroundColor = "#131b2e";
+
+    const statusText = String(banner.status || (isPending ? "pending" : "completed")).toUpperCase();
+    const sponsorName = banner.sponsorName || banner.sponsorCode || "Sponsor";
+    const sponsorCode = banner.sponsorCode ? ` (${banner.sponsorCode})` : "";
+    const duration = Number(banner.durationSec) || 20;
+    const theme = banner.theme || "midnight";
+
+    const badgeClass = statusText === "APPROVED"
+        ? "bg-success"
+        : statusText === "REJECTED"
+            ? "bg-danger"
+            : "bg-warning text-dark";
+
+    card.innerHTML = `
+        <div class="d-flex justify-content-between align-items-start gap-2 mb-1">
+            <div class="fw-bold text-white">${escapeBannerHtml(banner.headline || "Untitled Banner")}</div>
+            <span class="badge ${badgeClass}">${escapeBannerHtml(statusText)}</span>
+        </div>
+        <div class="small text-white opacity-75 mb-2">
+            <strong>${escapeBannerHtml(sponsorName)}</strong>${escapeBannerHtml(sponsorCode)}
+            &bull; Theme: ${escapeBannerHtml(theme)}
+            &bull; Duration: ${duration}s
+        </div>
+        ${banner.subtext ? `<p class="small text-white opacity-90 mb-2">${escapeBannerHtml(banner.subtext)}</p>` : ""}
+        ${banner.linkUrl ? `<div class="small text-info text-break mb-2">${escapeBannerHtml(banner.linkUrl)}</div>` : ""}
+        ${isPending ? `
+            <div class="d-flex gap-2 mt-2">
+                <button type="button" class="btn btn-sm btn-success fw-bold" onclick="moderateSponsorBanner('${escapeBannerHtml(banner._id)}', 'approved')">
+                    <i class="bi bi-check-lg me-1"></i> Approve
+                </button>
+                <button type="button" class="btn btn-sm btn-outline-danger" onclick="moderateSponsorBanner('${escapeBannerHtml(banner._id)}', 'rejected')">
+                    <i class="bi bi-x-lg me-1"></i> Reject
+                </button>
+            </div>
+        ` : ""}
+    `;
+
+    return card;
+}
+
+function renderAdminBannerSections(banners = []) {
+    const pendingList = document.getElementById("pending-banners-list");
+    const completedList = document.getElementById("completed-banners-list");
+    const pendingCount = document.getElementById("pending-count");
+    const completedCount = document.getElementById("completed-count");
+
+    const pendingBanners = banners.filter(
+        (b) => String(b.status || "pending").toLowerCase() === "pending"
+    );
+    const completedBanners = banners.filter(
+        (b) => String(b.status || "pending").toLowerCase() !== "pending"
+    );
+
+    if (pendingCount) pendingCount.textContent = String(pendingBanners.length);
+    if (completedCount) completedCount.textContent = String(completedBanners.length);
+
+    if (pendingList) {
+        pendingList.innerHTML = "";
+        applyBannerScrollThreshold(pendingList, pendingBanners.length);
+        if (pendingBanners.length === 0) {
+            pendingList.innerHTML = `<p class="text-white opacity-75 small fst-italic mb-0">No pending banners.</p>`;
+        } else {
+            pendingBanners.forEach((b) => pendingList.appendChild(createBannerModerationCard(b, true)));
+        }
+    }
+
+    if (completedList) {
+        completedList.innerHTML = "";
+        applyBannerScrollThreshold(completedList, completedBanners.length);
+        if (completedBanners.length === 0) {
+            completedList.innerHTML = `<p class="text-white opacity-75 small fst-italic mb-0">No completed banners yet.</p>`;
+        } else {
+            completedBanners.forEach((b) => completedList.appendChild(createBannerModerationCard(b, false)));
+        }
+    }
+}
+
+async function loadAdminBanners() {
+    const pendingList = document.getElementById("pending-banners-list");
+    try {
+        const response = await fetch(ADMIN_BANNERS_ENDPOINT, { cache: "no-store" });
+        if (!response.ok) {
+            throw new Error(`Failed to fetch banners (${response.status})`);
+        }
+        const data = await response.json();
+        const banners = Array.isArray(data) ? data : (data.banners || []);
+        renderAdminBannerSections(banners);
+    } catch (error) {
+        console.error("Error loading sponsor banners:", error);
+        if (pendingList) {
+            pendingList.innerHTML = `<p class="text-danger small mb-0">Failed to load sponsor banners.</p>`;
+        }
+    }
+}
+
+async function moderateSponsorBanner(bannerId, nextStatus) {
+    if (!bannerId) return;
+    try {
+        // Adjust method/body/URL if your backend uses a dedicated /:id/approve or /:id/reject route
+        const response = await fetch(`${ADMIN_BANNERS_ENDPOINT}/${encodeURIComponent(bannerId)}`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ status: nextStatus })
+        });
+
+        if (!response.ok) {
+            const errData = await response.json().catch(() => ({}));
+            alert(errData.error || `Failed to mark banner as ${nextStatus}.`);
+            return;
+        }
+
+        await loadAdminBanners();
+    } catch (error) {
+        console.error("Error updating banner moderation status:", error);
+        alert("Network error while updating banner status.");
+    }
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+    const refreshBtn = document.getElementById("refresh-banners-btn");
+    if (refreshBtn) {
+        refreshBtn.addEventListener("click", loadAdminBanners);
+    }
+});

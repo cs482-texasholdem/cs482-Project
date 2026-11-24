@@ -62,233 +62,249 @@
         </nav>
         
         <br/>
-
+        <div class="page-with-sponsor-rail">
+            <main class="main-game-area">
         <!-- Main Lobby Container -->
-        <div class="container my-5">
-            <div class="row mb-4">
-                <div class="col">
-                    <h2 class="fw-bold text-white">Active Poker Lobbies</h2>
-                    <p class="text-white opacity-90 mb-0">Choose from available rooms below to take your seat at the table.</p>
-                </div>
-            </div>
+                <div class="container my-5">
+                    <div class="row mb-4">
+                        <div class="col">
+                            <h2 class="fw-bold text-white">Active Poker Lobbies</h2>
+                            <p class="text-white opacity-90 mb-0">Choose from available rooms below to take your seat at the table.</p>
+                        </div>
+                    </div>
 
-            <!-- Lobby Table Cards Grid -->
-            <div class="row g-4" id="lobbyTableContainer">
-                
-                <!-- Table Card 1 -->
-                <div class="col-md-6 col-lg-3">
-                    <div class="card shadow-sm border-secondary h-100 midnight-card" style="background-color: #0b132b; color: #ffffff;">
-                        <div class="card-body d-flex flex-column p-4">
-                            
-                            <div class="mb-3">
-                                <h5 class="card-title fw-bold mb-1 text-white">
-                                    Beginner Lounge
-                                </h5>
-                                 <div class="d-flex flex-wrap gap-2">
-                                    <span class="badge bg-success">Active</span>
-                                    <span class="badge bg-primary">Ranked</span>
+                    <!-- Lobby Table Cards Grid -->
+                    <div class="row g-4" id="lobbyTableContainer">
+                        
+                        <!-- Table Card 1 -->
+                        <div class="col-md-6 col-lg-3">
+                            <div class="card shadow-sm border-secondary h-100 midnight-card" style="background-color: #0b132b; color: #ffffff;">
+                                <div class="card-body d-flex flex-column p-4">
+                                    
+                                    <div class="mb-3">
+                                        <h5 class="card-title fw-bold mb-1 text-white">
+                                            Beginner Lounge
+                                        </h5>
+                                        <div class="d-flex flex-wrap gap-2">
+                                            <span class="badge bg-success">Active</span>
+                                            <span class="badge bg-primary">Ranked</span>
+                                        </div>
+                                    </div>
+
+                                    <p class="text-white opacity-90 small mb-3">Perfect for casual play and practicing your hand strategies.</p>
+                                    <ul class="list-unstyled small mb-4 text-white">
+                                        <li class="mb-2"><i class="bi bi-cash-coin text-primary me-2"></i> Blinds: $1 / $2</li>
+                                        <li class="mb-2"><i class="bi bi-people-fill text-primary me-2"></i> Players: 4 / 9</li>
+                                        <li><i class="bi bi-shield-check text-primary me-2"></i> Min Buy-in: $100</li>
+                                    </ul>
+                                    <button class="mt-auto btn btn-outline-primary w-100 py-2 fw-semibold" onclick="openJoinSidebar('ranked-beginner', 'Beginner Lounge', '$1 / $2', '$100')">
+                                        <i class="bi bi-box-arrow-in-right me-1"></i> Join Table
+                                    </button>
                                 </div>
                             </div>
-
-                            <p class="text-white opacity-90 small mb-3">Perfect for casual play and practicing your hand strategies.</p>
-                            <ul class="list-unstyled small mb-4 text-white">
-                                <li class="mb-2"><i class="bi bi-cash-coin text-primary me-2"></i> Blinds: $1 / $2</li>
-                                <li class="mb-2"><i class="bi bi-people-fill text-primary me-2"></i> Players: 4 / 9</li>
-                                <li><i class="bi bi-shield-check text-primary me-2"></i> Min Buy-in: $100</li>
-                            </ul>
-                            <button class="mt-auto btn btn-outline-primary w-100 py-2 fw-semibold" onclick="openJoinSidebar('ranked-beginner', 'Beginner Lounge', '$1 / $2', '$100')">
-                                <i class="bi bi-box-arrow-in-right me-1"></i> Join Table
-                            </button>
                         </div>
-                    </div>
-                </div>
 
-                <!-- Table Card 2 -->
-                <div class="col-md-6 col-lg-3">
-                    <div class="card shadow-sm border-secondary h-100 midnight-card" style="background-color: #0b132b; color: #ffffff;">
-                        <div class="card-body d-flex flex-column p-4">
-                            <div class="mb-3">
-                                
-                                <h5 class="card-title fw-bold mb-1 text-white">
-                                    Intermediate Lounge
-                                </h5>
-                                <div class="d-flex flex-wrap gap-2">
-                                    <span class="badge bg-danger">High Stakes</span>
-                                    <span class="badge bg-primary">Ranked</span>
+                        <!-- Table Card 2 -->
+                        <div class="col-md-6 col-lg-3">
+                            <div class="card shadow-sm border-secondary h-100 midnight-card" style="background-color: #0b132b; color: #ffffff;">
+                                <div class="card-body d-flex flex-column p-4">
+                                    <div class="mb-3">
+                                        
+                                        <h5 class="card-title fw-bold mb-1 text-white">
+                                            Intermediate Lounge
+                                        </h5>
+                                        <div class="d-flex flex-wrap gap-2">
+                                            <span class="badge bg-danger">High Stakes</span>
+                                            <span class="badge bg-primary">Ranked</span>
+                                        </div>
+                                    </div>
+                                    <p class="text-white opacity-90 small mb-3">For experienced players ready to risk big for massive rewards.</p>
+                                    <ul class="list-unstyled small mb-4 text-white">
+                                        <li class="mb-2"><i class="bi bi-cash-coin text-primary me-2"></i> Blinds: $25 / $50</li>
+                                        <li class="mb-2"><i class="bi bi-people-fill text-primary me-2"></i> Players: 7 / 9</li>
+                                        <li><i class="bi bi-shield-check text-primary me-2"></i> Min Buy-in: $2,500</li>
+                                    </ul>
+                                    <button class="mt-auto btn btn-outline-primary w-100 py-2 fw-semibold" onclick="openJoinSidebar('ranked-intermediate', 'Intermediate Lounge', '$25 / $50', '$2,500')">
+                                        <i class="bi bi-box-arrow-in-right me-1"></i> Join Table
+                                    </button>
                                 </div>
                             </div>
-                            <p class="text-white opacity-90 small mb-3">For experienced players ready to risk big for massive rewards.</p>
-                            <ul class="list-unstyled small mb-4 text-white">
-                                <li class="mb-2"><i class="bi bi-cash-coin text-primary me-2"></i> Blinds: $25 / $50</li>
-                                <li class="mb-2"><i class="bi bi-people-fill text-primary me-2"></i> Players: 7 / 9</li>
-                                <li><i class="bi bi-shield-check text-primary me-2"></i> Min Buy-in: $2,500</li>
-                            </ul>
-                            <button class="mt-auto btn btn-outline-primary w-100 py-2 fw-semibold" onclick="openJoinSidebar('ranked-intermediate', 'Intermediate Lounge', '$25 / $50', '$2,500')">
-                                <i class="bi bi-box-arrow-in-right me-1"></i> Join Table
-                            </button>
                         </div>
-                    </div>
-                </div>
 
-                <!-- Table Card 3 -->
-                <div class="col-md-6 col-lg-3">
-                    <div class="card shadow-sm border-secondary h-100 midnight-card" style="background-color: #0b132b; color: #ffffff;">
-                        <div class="card-body d-flex flex-column p-4">
-                            <div class="mb-3">
-                                <h5 class="card-title fw-bold mb-1 text-white">
-                                    Advanced Lounge
-                                </h5>
-                                <div class="d-flex flex-wrap gap-2">
-                                    <span class="badge bg-warning text-dark">Fast Paced</span>
-                                    <span class="badge bg-primary">Ranked</span>
+                        <!-- Table Card 3 -->
+                        <div class="col-md-6 col-lg-3">
+                            <div class="card shadow-sm border-secondary h-100 midnight-card" style="background-color: #0b132b; color: #ffffff;">
+                                <div class="card-body d-flex flex-column p-4">
+                                    <div class="mb-3">
+                                        <h5 class="card-title fw-bold mb-1 text-white">
+                                            Advanced Lounge
+                                        </h5>
+                                        <div class="d-flex flex-wrap gap-2">
+                                            <span class="badge bg-warning text-dark">Fast Paced</span>
+                                            <span class="badge bg-primary">Ranked</span>
+                                        </div>
+                                    </div>
+                                    <p class="text-white opacity-90 small mb-3">Lightning-fast timer per turn. Quick decisions only!</p>
+                                    <ul class="list-unstyled small mb-4 text-white">
+                                        <li class="mb-2"><i class="bi bi-cash-coin text-primary me-2"></i> Blinds: $5 / $10</li>
+                                        <li class="mb-2"><i class="bi bi-people-fill text-primary me-2"></i> Players: 8 / 9</li>
+                                        <li><i class="bi bi-shield-check text-primary me-2"></i> Min Buy-in: $500</li>
+                                    </ul>
+                                    <button class="mt-auto btn btn-outline-primary w-100 py-2 fw-semibold" onclick="openJoinSidebar('ranked-advanced', 'Advanced Lounge', '$5 / $10', '$500')">
+                                        <i class="bi bi-box-arrow-in-right me-1"></i> Join Table
+                                    </button>
                                 </div>
                             </div>
-                            <p class="text-white opacity-90 small mb-3">Lightning-fast timer per turn. Quick decisions only!</p>
-                            <ul class="list-unstyled small mb-4 text-white">
-                                <li class="mb-2"><i class="bi bi-cash-coin text-primary me-2"></i> Blinds: $5 / $10</li>
-                                <li class="mb-2"><i class="bi bi-people-fill text-primary me-2"></i> Players: 8 / 9</li>
-                                <li><i class="bi bi-shield-check text-primary me-2"></i> Min Buy-in: $500</li>
-                            </ul>
-                            <button class="mt-auto btn btn-outline-primary w-100 py-2 fw-semibold" onclick="openJoinSidebar('ranked-advanced', 'Advanced Lounge', '$5 / $10', '$500')">
-                                <i class="bi bi-box-arrow-in-right me-1"></i> Join Table
-                            </button>
                         </div>
+                        
+                        <!-- Table Card 4: Public Lobbies -->
+                        <div class="col-md-6 col-lg-3">
+                            <div class="card shadow-sm border-secondary h-100 midnight-card"
+                                style="background-color: #0b132b; color: #ffffff;">
+
+                                <div class="card-body d-flex flex-column p-4">
+
+                                    <div class="mb-3">
+                                        <h5 class="card-title fw-bold mb-1 text-white">
+                                            Public Lobbies
+                                        </h5>
+                                        <span class="badge bg-secondary">Unranked</span>
+                                    </div>
+
+                                    <p class="text-white opacity-90 small mb-3">
+                                        Browse player-created tables and play at your own pace.
+                                    </p>
+
+                                    <ul class="list-unstyled small mb-4 text-white">
+                                        <li class="mb-2">
+                                            <i class="bi bi-cash-coin text-primary me-2"></i>
+                                            Blinds: Set by host
+                                        </li>
+
+                                        <li class="mb-2">
+                                            <i class="bi bi-people-fill text-primary me-2"></i>
+                                            Players: Varies by table
+                                        </li>
+
+                                        <li>
+                                            <i class="bi bi-shield-check text-primary me-2"></i>
+                                            Buy-in: Set by host
+                                        </li>
+                                    </ul>
+
+                                    <button type="button"
+                                            class="mt-auto btn btn-outline-primary w-100 py-2 fw-semibold"
+                                            onclick="togglePublicLobbies()">
+
+                                        <i class="bi bi-collection me-1"></i>
+                                        Browse Lobbies
+                                    </button>
+
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Public Lobby Section -->
+                        <div id="publicLobbiesSection" class="col-12 mt-4 d-none">
+
+                            <div class="card shadow-sm border-secondary midnight-card"
+                                style="background-color: #0b132b; color: #ffffff;">
+
+                                <div class="card-body p-4">
+
+                                    <div class="d-flex justify-content-between align-items-center mb-3">
+
+                                        <h4 class="fw-bold mb-0 text-white">
+                                            Public Lobbies
+                                        </h4>
+
+                                        <button type="button"
+                                                class="btn btn-outline-light btn-sm"
+                                                onclick="togglePublicLobbies()">
+                                            Close
+                                        </button>
+
+                                    </div>
+
+                                    <div id="publicLobbyList">
+                                        <p class="text-white opacity-90 mb-0">
+                                            No public tables are displayed yet.
+                                            Player-created tables will appear here
+                                            once the backend is connected.
+                                        </p>
+                                    </div>
+
+                                </div>
+                            </div>
+                        </div>
+
                     </div>
-                </div>
-                
-                <!-- Table Card 4: Public Lobbies -->
-                <div class="col-md-6 col-lg-3">
-                    <div class="card shadow-sm border-secondary h-100 midnight-card"
-                        style="background-color: #0b132b; color: #ffffff;">
 
-                        <div class="card-body d-flex flex-column p-4">
+                    <div id="publicTableLeaderboardsSection" class="mt-5">
+                        <div class="card shadow-sm border-secondary midnight-card" style="background-color: #0b132b; color: #ffffff;">
+                            <div class="card-body p-4">
+                                <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+                                    <div>
+                                        <h3 class="fw-bold mb-1 text-white">
+                                            <i class="bi bi-trophy-fill text-warning me-2"></i> Monthly Public Table Leaderboards
+                                        </h3>
+                                        <p class="text-white opacity-75 small mb-0">
+                                            Ranked by net points gained at each public table. Resets automatically on the 1st of every month (UTC).
+                                        </p>
+                                    </div>
+                                    <span class="badge bg-warning text-dark fw-semibold px-3 py-2" id="leaderboardMonthBadge">
+                                        Current Month
+                                    </span>
+                                </div>
 
-                            <div class="mb-3">
-                                <h5 class="card-title fw-bold mb-1 text-white">
-                                    Public Lobbies
-                                </h5>
-                                <span class="badge bg-secondary">Unranked</span>
-                            </div>
-
-                            <p class="text-white opacity-90 small mb-3">
-                                Browse player-created tables and play at your own pace.
-                            </p>
-
-                            <ul class="list-unstyled small mb-4 text-white">
-                                <li class="mb-2">
-                                    <i class="bi bi-cash-coin text-primary me-2"></i>
-                                    Blinds: Set by host
-                                </li>
-
-                                <li class="mb-2">
-                                    <i class="bi bi-people-fill text-primary me-2"></i>
-                                    Players: Varies by table
-                                </li>
-
-                                <li>
-                                    <i class="bi bi-shield-check text-primary me-2"></i>
-                                    Buy-in: Set by host
-                                </li>
-                            </ul>
-
-                            <button type="button"
-                                    class="mt-auto btn btn-outline-primary w-100 py-2 fw-semibold"
-                                    onclick="togglePublicLobbies()">
-
-                                <i class="bi bi-collection me-1"></i>
-                                Browse Lobbies
-                            </button>
-
-                        </div>
-                    </div>
-                </div>
-                
-                <!-- Public Lobby Section -->
-                <div id="publicLobbiesSection" class="col-12 mt-4 d-none">
-
-                    <div class="card shadow-sm border-secondary midnight-card"
-                        style="background-color: #0b132b; color: #ffffff;">
-
-                        <div class="card-body p-4">
-
-                            <div class="d-flex justify-content-between align-items-center mb-3">
-
-                                <h4 class="fw-bold mb-0 text-white">
-                                    Public Lobbies
-                                </h4>
-
-                                <button type="button"
-                                        class="btn btn-outline-light btn-sm"
-                                        onclick="togglePublicLobbies()">
-                                    Close
-                                </button>
-
-                            </div>
-
-                            <div id="publicLobbyList">
-                                <p class="text-white opacity-90 mb-0">
-                                    No public tables are displayed yet.
-                                    Player-created tables will appear here
-                                    once the backend is connected.
-                                </p>
-                            </div>
-
-                        </div>
-                    </div>
-                </div>
-
-            </div>
-
-            <div id="publicTableLeaderboardsSection" class="mt-5">
-                <div class="card shadow-sm border-secondary midnight-card" style="background-color: #0b132b; color: #ffffff;">
-                    <div class="card-body p-4">
-                        <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
-                            <div>
-                                <h3 class="fw-bold mb-1 text-white">
-                                    <i class="bi bi-trophy-fill text-warning me-2"></i> Monthly Public Table Leaderboards
-                                </h3>
-                                <p class="text-white opacity-75 small mb-0">
-                                    Ranked by net points gained at each public table. Resets automatically on the 1st of every month (UTC).
-                                </p>
-                            </div>
-                            <span class="badge bg-warning text-dark fw-semibold px-3 py-2" id="leaderboardMonthBadge">
-                                Current Month
-                            </span>
-                        </div>
-
-                        <div class="row g-3" id="publicTableLeaderboardsGrid">
-                            <div class="col-12">
-                                <p class="text-white opacity-75 small fst-italic mb-0">
-                                    Loading monthly public table leaderboards...
-                                </p>
+                                <div class="row g-3" id="publicTableLeaderboardsGrid">
+                                    <div class="col-12">
+                                        <p class="text-white opacity-75 small fst-italic mb-0">
+                                            Loading monthly public table leaderboards...
+                                        </p>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>
-                </div>
-            </div>
 
-            <div id="lobbyAchievementsSection" class="mt-5 d-none">
-                <div class="card shadow-sm border-secondary midnight-card" style="background-color: #0b132b; color: #ffffff;">
-                    <div class="card-body p-4">
-                        <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
-                            <div>
-                                <h3 class="fw-bold mb-1 text-white">
-                                    <i class="bi bi-trophy-fill text-warning me-2"></i> Player Achievements
-                                </h3>
-                                <p class="text-white opacity-75 small mb-0">
-                                    Completed achievements are highlighted. Click "More Info" on any achievement for full details.
-                                </p>
+                    <div id="lobbyAchievementsSection" class="mt-5 d-none">
+                        <div class="card shadow-sm border-secondary midnight-card" style="background-color: #0b132b; color: #ffffff;">
+                            <div class="card-body p-4">
+                                <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+                                    <div>
+                                        <h3 class="fw-bold mb-1 text-white">
+                                            <i class="bi bi-trophy-fill text-warning me-2"></i> Player Achievements
+                                        </h3>
+                                        <p class="text-white opacity-75 small mb-0">
+                                            Completed achievements are highlighted. Click "More Info" on any achievement for full details.
+                                        </p>
+                                    </div>
+                                    <span class="badge bg-primary fs-6 px-3 py-2" id="lobbyAchievementSummary">
+                                        0 / 20 Completed
+                                    </span>
+                                </div>
+                                <div class="row g-3" id="lobbyAchievementsGrid"></div>
                             </div>
-                            <span class="badge bg-primary fs-6 px-3 py-2" id="lobbyAchievementSummary">
-                                0 / 20 Completed
-                            </span>
                         </div>
-                        <div class="row g-3" id="lobbyAchievementsGrid"></div>
                     </div>
-                </div>
-            </div>
-        </div> 
+                </div> 
+            </main>
 
+            <aside id="sponsor-side-rail" class="sponsor-side-rail" aria-label="Sponsor Banner">
+                <div id="live-sponsor-banner" class="sponsor-preview-box" style="display: none;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; gap: 6px; margin-bottom: 4px;">
+                        <span class="sponsor-badge-tag">SPONSORED</span>
+                        <span id="live-banner-timer" style="font-size: 11px; color: var(--secondary-text);"></span>
+                    </div>
+                    <div id="live-banner-headline" style="font-weight: 800; font-size: 14px; margin-bottom: 4px;"></div>
+                    <div id="live-banner-subtext" style="font-size: 12px; color: var(--secondary-text); margin-bottom: 8px;"></div>
+                    <a id="live-banner-link" href="#" target="_blank" rel="noopener noreferrer" style="display: none; font-size: 12px; color: #f1c40f; font-weight: 700;">
+                        Visit Sponsor Link →
+                    </a>
+                </div>
+            </aside>
+        </div>
         <!-- Achievement Info Modal -->
         <div class="modal fade" id="achievementInfoModal" tabindex="-1" aria-labelledby="achievementInfoModalLabel" aria-hidden="true">
             <div class="modal-dialog modal-dialog-centered">
@@ -413,6 +429,8 @@
             <p class="mb-0">Powerpuff Girls Inc. -- CS Department</p>
         </div>
 
+        <script src="/socket.io/socket.io.js"></script>
+        <script src="adsView.js"></script>
         <script src="lobby.js"></script>
     </body>
 </html>

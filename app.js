@@ -177,8 +177,13 @@ app.get("/api/tables/public/leaderboards", async (req, res) => {
 });
 
 //Sponsor banner & admin moderation routes
-const sponsorRoutes = require("./routes/sponsorRoutes");
-app.use(sponsorRoutes);
+const sponsorBannerCont = require("./controller/SponsorBannerController");
+
+app.post('/api/sponsors/banner', sponsorBannerCont.submitBanner);
+app.get('/api/sponsors/my-banners', sponsorBannerCont.getMyBanners);
+app.get('/api/sponsors/active', sponsorBannerCont.getApprovedActiveBanners);
+app.get('/api/admin/sponsor-banners', sponsorBannerCont.getModerationQueue);
+app.patch('/api/admin/sponsor-banners/:id/moderate', sponsorBannerCont.moderateBanner);
 
 if (require.main === module) {
     const port = process.env.PORT || 3000;

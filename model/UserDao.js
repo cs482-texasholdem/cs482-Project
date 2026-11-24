@@ -24,6 +24,8 @@ const userSchema = new mongoose.Schema({
     permission: { type: Number, default: 2 },
     creation: { type: Date, default: Date.now },
     points: { type: Number, default: 1000 },
+    sponsorCode: { type: String, trim: true, uppercase: true, default: '' },
+    sponsorName: { type: String, trim: true, default: '' },
 
     // Player's selected poker avatar
     avatar: {
