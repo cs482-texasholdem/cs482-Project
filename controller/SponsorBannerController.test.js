@@ -134,6 +134,178 @@ describe('SponsorBannerController', () => {
         });
     });
 
+    describe('getMyBanners', () => {
+        test('rejects non-sponsors with 403', async () => {
+            userController.sponsorCheck.mockReturnValue(false);
+
+            const res = createRes();
+
+            await sponsorBannerController.getMyBanners({}, res);
+
+            expect(res.status).toHaveBeenCalledWith(403);
+        });
+
+        test('returns banners belonging to the logged-in sponsor', async () => {
+            userController.sponsorCheck.mockReturnValue(true);
+
+            const sponsorBanners = [
+                { _id: 'b1', headline: 'Banner One' },
+                { _id: 'b2', headline: 'Banner Two' }
+            ];
+
+            const sortMock = jest.fn().mockResolvedValue(sponsorBanners);
+            SponsorBanner.find.mockReturnValue({ sort: sortMock });
+
+            const res = createRes();
+
+            await sponsorBannerController.getMyBanners({
+                session: {
+                    user: { username: 'sponsor1' }
+                }
+            }, res);
+
+            expect(SponsorBanner.find).toHaveBeenCalledWith({
+                sponsorUsername: 'sponsor1'
+            });
+
+            expect(res.status).toHaveBeenCalledWith(200);
+            expect(res.json).toHaveBeenCalledWith({
+                banners: sponsorBanners
+            });
+        });
+    });
+
+    describe('sponsorDeleteBanner', () => {
+        test('rejects non-sponsors with 403', async () => {
+            userController.sponsorCheck.mockReturnValue(false);
+
+            const res = createRes();
+
+            await sponsorBannerController.deleteMyBanner({
+                params: { id: 'b1' }
+            }, res);
+
+            expect(res.status).toHaveBeenCalledWith(403);
+            expect(SponsorBanner.findOneAndDelete).not.toHaveBeenCalled();
+        });
+
+        test('returns 404 when banner does not exist or belongs to another sponsor', async () => {
+            userController.sponsorCheck.mockReturnValue(true);
+            SponsorBanner.findOneAndDelete.mockResolvedValue(null);
+
+            const res = createRes();
+
+            await sponsorBannerController.deleteMyBanner({
+                session: {
+                    user: { username: 'sponsor1' }
+                },
+                params: { id: 'b1' }
+            }, res);
+
+            expect(SponsorBanner.findOneAndDelete).toHaveBeenCalledWith({
+                _id: 'b1',
+                sponsorUsername: 'sponsor1'
+            });
+
+            expect(res.status).toHaveBeenCalledWith(404);
+        });
+
+        test('successfully deletes the sponsor own banner and emits socket event', async () => {
+            userController.sponsorCheck.mockReturnValue(true);
+
+            SponsorBanner.findOneAndDelete.mockResolvedValue({
+                _id: 'b1',
+                sponsorUsername: 'sponsor1'
+            });
+
+            const ioEmit = jest.fn();
+
+            const res = createRes();
+
+            await sponsorBannerController.deleteMyBanner({
+                session: {
+                    user: { username: 'sponsor1' }
+                },
+                params: { id: 'b1' },
+                app: {
+                    get: jest.fn().mockReturnValue({ emit: ioEmit })
+                }
+            }, res);
+
+            expect(SponsorBanner.findOneAndDelete).toHaveBeenCalledWith({
+                _id: 'b1',
+                sponsorUsername: 'sponsor1'
+            });
+
+            expect(ioEmit).toHaveBeenCalledWith('SPONSOR_BANNERS_UPDATED');
+
+            expect(res.status).toHaveBeenCalledWith(200);
+            expect(res.json).toHaveBeenCalledWith({
+                message: 'Banner deleted successfully.'
+            });
+        });
+    });
+
+    describe('adminDeleteBanner', () => {
+        test('rejects non-admin users with 403', async () => {
+            userController.adminCheck.mockReturnValue(false);
+
+            const res = createRes();
+
+            await sponsorBannerController.deleteBanner({
+                params: { id: 'b1' }
+            }, res);
+
+            expect(res.status).toHaveBeenCalledWith(403);
+            expect(SponsorBanner.findByIdAndDelete).not.toHaveBeenCalled();
+        });
+
+        test('returns 404 when banner does not exist', async () => {
+            userController.adminCheck.mockReturnValue(true);
+            SponsorBanner.findByIdAndDelete.mockResolvedValue(null);
+
+            const res = createRes();
+
+            await sponsorBannerController.deleteBanner({
+                params: { id: 'missing-id' }
+            }, res);
+
+            expect(SponsorBanner.findByIdAndDelete).toHaveBeenCalledWith(
+                'missing-id'
+            );
+
+            expect(res.status).toHaveBeenCalledWith(404);
+        });
+
+        test('successfully deletes any banner and emits socket event', async () => {
+            userController.adminCheck.mockReturnValue(true);
+
+            SponsorBanner.findByIdAndDelete.mockResolvedValue({
+                _id: 'b1',
+                sponsorUsername: 'sponsor1'
+            });
+
+            const ioEmit = jest.fn();
+            const res = createRes();
+
+            await sponsorBannerController.deleteBanner({
+                params: { id: 'b1' },
+                app: {
+                    get: jest.fn().mockReturnValue({ emit: ioEmit })
+                }
+            }, res);
+
+            expect(SponsorBanner.findByIdAndDelete).toHaveBeenCalledWith('b1');
+
+            expect(ioEmit).toHaveBeenCalledWith('SPONSOR_BANNERS_UPDATED');
+
+            expect(res.status).toHaveBeenCalledWith(200);
+            expect(res.json).toHaveBeenCalledWith({
+                message: 'Banner deleted successfully.'
+            });
+        });
+    });
+
     describe('getApprovedActiveBanners', () => {
         test('returns only approved active banners with sanitized URLs', async () => {
             const sortMock = jest.fn().mockResolvedValue([
