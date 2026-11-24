@@ -53,6 +53,14 @@ class TableManager {
         return Array.from(this.tables.values());
     }
 
+    // Returns all public custom tables
+    getPublicTables() {
+        return this.getAllTables().filter(table =>
+            table.gameMode === "custom" &&
+            table.visibility === "public"
+        );
+    }
+
     // Creates a new ActiveTable
     createTable(skillLevel = "general", timeLimit = 30, gameMode = "custom", maxPlayer = 9, smallBlind = 10, bigBlind = 20) {
         //error checking

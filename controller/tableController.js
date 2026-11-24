@@ -322,6 +322,31 @@ function createTable(req, res) {
 }
 
 // ============================================================================
+// GET PUBLIC CUSTOM TABLES
+// ============================================================================
+
+function getPublicTables(req, res) {
+    const tables = tableManager.getPublicTables();
+
+    const publicTables = tables.map(table => ({
+        tableId: table.tableId,
+        tableName: table.tableName,
+        gameMode: table.gameMode,
+        maxPlayers: table.maxPlayers,
+        playerCount: table.getPlayerCount(),
+        smallBlind: table.smallBlind,
+        bigBlind: table.bigBlind,
+        buyIn: table.buyIn,
+        visibility: table.visibility,
+        gameInProgress: table.gameInProgress,
+        isFull: table.isFull()
+    }));
+
+    return res.status(200).json(publicTables);
+}
+
+
+// ============================================================================
 // TABLE LOGIC & CHAT
 // ============================================================================
 
@@ -783,6 +808,7 @@ module.exports = {
     playerAction,
     nextRound,
     getTableStatus,
+    getPublicTables,
     postChatMessage,
     updateMuckPreference,
     tableManager,
