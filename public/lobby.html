@@ -211,17 +211,49 @@
 
                         <div class="card-body p-4">
 
-                            <div class="d-flex justify-content-between align-items-center mb-3">
+                            <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-3">
 
                                 <h4 class="fw-bold mb-0 text-white">
                                     Public Lobbies
                                 </h4>
 
-                                <button type="button"
-                                        class="btn btn-outline-light btn-sm"
-                                        onclick="togglePublicLobbies()">
-                                    Close
-                                </button>
+                                <div class="d-flex align-items-center gap-2">
+
+                                    <label for="publicTableSort" class="small text-white">
+                                        Sort by:
+                                    </label>
+
+                                    <select id="publicTableSort"
+                                            class="form-select form-select-sm w-auto"
+                                            data-bs-theme="dark"
+                                            onchange="renderPublicTables()">
+
+                                        <option value="tableName">Table Name</option>
+                                        <option value="smallBlind">Small Blind</option>
+                                        <option value="bigBlind">Big Blind</option>
+                                        <option value="playerCount">Players</option>
+                                        <option value="buyIn">Min Buy-in</option>
+
+                                    </select>
+
+                                    <button type="button"
+                                            id="publicSortDirection"
+                                            class="btn btn-outline-light btn-sm"
+                                            onclick="togglePublicSortDirection()"
+                                            title="Ascending order"
+                                            aria-label="Ascending order">
+
+                                        <i class="bi bi-arrow-up"></i>
+
+                                    </button>
+
+                                    <button type="button"
+                                            class="btn btn-outline-light btn-sm"
+                                            onclick="togglePublicLobbies()">
+                                        Close
+                                    </button>
+
+                                </div>
 
                             </div>
 

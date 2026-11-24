@@ -11,6 +11,8 @@
 let joinSidebar;
 let lobbyAchievementsCache = [];
 let publicLeaderboardIntervalId = null;
+let publicTablesCache = [];
+let publicSortAscending = true;
 
 document.addEventListener("DOMContentLoaded", async function () {
     const sidebarElement = document.getElementById("joinGameSidebar");
@@ -331,30 +333,14 @@ async function loadPublicTables() {
             throw new Error("Failed to load public tables.");
         }
 
-        const tables = await response.json();
+        publicTablesCache = await response.json();
 
-        // Clear previously displayed tables
-        container.textContent = "";
-
-        // No custom tables available
-        if (tables.length === 0) {
-            container.innerHTML = `
-                <div class="col-12">
-                    <p class="text-white opacity-75 mb-0">
-                        No public tables are currently available.
-                    </p>
-                </div>
-            `;
-            return;
-        }
-
-        // Display each public table
-        tables.forEach(table => {
-            container.appendChild(createPublicTableCard(table));
-        });
+        renderPublicTables();
 
     } catch (error) {
         console.error("Error loading public tables:", error);
+
+        publicTablesCache = [];
 
         container.innerHTML = `
             <div class="col-12">
@@ -364,6 +350,69 @@ async function loadPublicTables() {
             </div>
         `;
     }
+}
+
+// Sorts and displays public custom tables
+function renderPublicTables() {
+    const container = document.getElementById("publicLobbyList");
+    const sortBy = document.getElementById("publicTableSort").value;
+
+    if (!container) return;
+
+    container.textContent = "";
+
+    // No custom tables available
+    if (publicTablesCache.length === 0) {
+        container.innerHTML = `
+            <div class="col-12">
+                <p class="text-white opacity-75 mb-0">
+                    No public tables are currently available.
+                </p>
+            </div>
+        `;
+        return;
+    }
+
+    // Sort public tables
+    const sortedTables = [...publicTablesCache].sort((a, b) => {
+        let comparison;
+
+        if (sortBy === "tableName") {
+            comparison = a.tableName.localeCompare(
+                b.tableName,
+                undefined,
+                { sensitivity: "base" }
+            );
+        } else {
+            comparison = Number(a[sortBy]) - Number(b[sortBy]);
+        }
+
+        return publicSortAscending ? comparison : -comparison;
+    });
+
+    // Display sorted public tables
+    sortedTables.forEach(table => {
+        container.appendChild(createPublicTableCard(table));
+    });
+}
+
+// Toggles ascending and descending sorting
+function togglePublicSortDirection() {
+    publicSortAscending = !publicSortAscending;
+
+    const button = document.getElementById("publicSortDirection");
+
+    button.innerHTML = publicSortAscending
+        ? '<i class="bi bi-arrow-up"></i>'
+        : '<i class="bi bi-arrow-down"></i>';
+
+    button.title = publicSortAscending
+        ? "Ascending order"
+        : "Descending order";
+
+    button.setAttribute("aria-label", button.title);
+
+    renderPublicTables();
 }
 
 // Creates a card for an individual public table
