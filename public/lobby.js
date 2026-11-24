@@ -15,6 +15,8 @@ let publicTablesCache = [];
 let publicSortAscending = true;
 
 document.addEventListener("DOMContentLoaded", async function () {
+    loadSponsorBanners();
+
     const sidebarElement = document.getElementById("joinGameSidebar");
     if (sidebarElement) {
         joinSidebar = new bootstrap.Offcanvas(sidebarElement);
