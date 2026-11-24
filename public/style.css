@@ -1339,3 +1339,825 @@ body.table-page {
     border: 1px solid rgba(255, 255, 255, 0.15);
     border-radius: 8px;
 }
+
+/* ============================================================================
+   Ads View — Live Sponsor Banner Rotation
+   ============================================================================ */
+
+.ads-page {
+    min-height: 100vh;
+    background: radial-gradient(circle at top, var(--navbar-background) 0%, var(--page-background) 72%);
+    color: var(--main-text);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+}
+
+.ads-wrapper {
+    width: 100%;
+    max-width: 820px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.ads-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.ads-title-group {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.ads-title {
+    font-size: 1.15rem;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    margin: 0;
+}
+
+.ads-badge {
+    font-size: 0.72rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    padding: 3px 9px;
+    border-radius: 999px;
+    background: rgba(169, 199, 245, 0.14);
+    color: var(--secondary-text);
+    border: 1px solid var(--border-blue);
+}
+
+.ads-controls {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.ads-btn {
+    background: var(--panel-background);
+    color: var(--main-text);
+    border: 1px solid var(--border-blue);
+    border-radius: 8px;
+    padding: 7px 12px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.15s ease, border-color 0.15s ease, transform 0.15s ease;
+}
+
+.ads-btn:hover:not(:disabled) {
+    background: var(--button-blue);
+    border-color: var(--button-hover-blue);
+    transform: translateY(-1px);
+}
+
+.ads-btn:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+}
+
+.ads-banner-card {
+    width: 96%;
+    max-width: none;
+    min-height: 420px;
+    margin: 20px auto;
+    border-radius: 18px;
+    overflow: hidden;
+    box-sizing: border-box;
+}
+
+.ads-banner-card.theme-midnight {
+    background: linear-gradient(135deg, var(--panel-background) 0%, var(--page-background) 100%);
+    border-color: var(--button-hover-blue);
+}
+
+.ads-banner-card.theme-gold {
+    background: linear-gradient(135deg, #2b2310 0%, var(--page-background) 100%);
+    border-color: var(--dealer-badge-background);
+}
+
+.ads-banner-card.theme-emerald {
+    background: linear-gradient(135deg, #11342c 0%, var(--page-background) 100%);
+    border-color: var(--success-green);
+}
+
+.ads-banner-meta {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 14px;
+    font-size: 0.82rem;
+    color: var(--secondary-text);
+}
+
+.ads-sponsor-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-weight: 700;
+    color: var(--main-text);
+}
+
+.ads-sponsor-code {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    font-size: 0.75rem;
+    padding: 2px 7px;
+    border-radius: 6px;
+    background: rgba(16, 28, 58, 0.75);
+    border: 1px solid rgba(169, 199, 245, 0.25);
+    color: var(--secondary-text);
+}
+
+.ads-banner-headline {
+    font-size: 1.65rem;
+    font-weight: 800;
+    line-height: 1.25;
+    margin: 0 0 10px;
+    color: var(--main-text);
+    word-break: break-word;
+}
+
+.ads-banner-subtext {
+    font-size: 1rem;
+    line-height: 1.55;
+    color: var(--secondary-text);
+    margin: 0 0 20px;
+    max-width: 66ch;
+    word-break: break-word;
+}
+
+.ads-banner-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.ads-banner-duration {
+    font-size: 0.8rem;
+    color: var(--secondary-text);
+}
+
+.ads-cta-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 9px 16px;
+    border-radius: 10px;
+    font-size: 0.9rem;
+    font-weight: 700;
+    text-decoration: none;
+    background: var(--button-blue);
+    border: 1px solid var(--button-hover-blue);
+    color: var(--main-text);
+    box-shadow: 0 4px 12px var(--shadow);
+    transition: background 0.15s ease, transform 0.15s ease;
+}
+
+.ads-cta-link:hover {
+    background: var(--button-hover-blue);
+    color: var(--main-text);
+    transform: translateY(-1px);
+}
+
+.theme-gold .ads-cta-link {
+    background: var(--dealer-badge-background);
+    border-color: var(--dealer-badge-background);
+    color: var(--dealer-badge-text);
+}
+
+.theme-emerald .ads-cta-link {
+    background: var(--success-green);
+    border-color: var(--success-green);
+    color: var(--main-text);
+}
+
+.ads-progress-track {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: 4px;
+    background: rgba(244, 247, 252, 0.1);
+}
+
+.ads-progress-bar {
+    height: 100%;
+    width: 0%;
+    background: var(--button-hover-blue);
+    transition: width 0.1s linear;
+}
+
+.theme-gold .ads-progress-bar {
+    background: var(--dealer-badge-background);
+}
+
+.theme-emerald .ads-progress-bar {
+    background: var(--success-green);
+}
+
+.ads-dots {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+}
+
+.ads-dot {
+    width: 9px;
+    height: 9px;
+    border-radius: 999px;
+    border: none;
+    background: rgba(169, 199, 245, 0.35);
+    cursor: pointer;
+    padding: 0;
+    transition: width 0.15s ease, background 0.15s ease;
+}
+
+.ads-dot.active {
+    width: 24px;
+    background: var(--button-hover-blue);
+}
+
+.ads-empty-state {
+    text-align: center;
+    padding: 44px 24px;
+    border-radius: 16px;
+    background: var(--panel-background);
+    border: 1px dashed var(--border-blue);
+    color: var(--secondary-text);
+    box-shadow: 0 8px 20px var(--shadow);
+}
+
+.ads-empty-state h2 {
+    color: var(--main-text);
+    font-size: 1.15rem;
+    margin: 0 0 8px;
+}
+
+.ads-empty-state p {
+    margin: 0;
+}
+
+
+/* ============================================================================
+   Premium Featured Sponsor Banner Design
+   ============================================================================ */
+
+.ads-banner-card {
+    position: relative;
+    min-height: 310px;
+    box-sizing: border-box;
+    padding: 36px 40px 32px;
+    border-radius: 18px;
+    overflow: hidden;
+    isolation: isolate;
+    box-shadow: 0 18px 45px rgba(0, 0, 0, 0.4);
+    transition: background 0.3s ease, border-color 0.3s ease;
+}
+
+.ads-banner-card.theme-midnight {
+    background: linear-gradient(125deg, #1B3260 0%, #101C3A 65%, #0b142c 100%);
+    border: 1px solid #527FD1;
+}
+
+.ads-banner-card.theme-gold {
+    background: linear-gradient(125deg, #493916 0%, #25200f 65%, #101C3A 100%);
+    border: 1px solid #F2D27A;
+}
+
+.ads-banner-card.theme-emerald {
+    background: linear-gradient(125deg, #15513f 0%, #12332c 65%, #101C3A 100%);
+    border: 1px solid #3C8D79;
+}
+
+/* Decorative poker suits */
+
+.ads-suit-decoration {
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    overflow: hidden;
+}
+
+.ads-suit-decoration span {
+    position: absolute;
+    font-size: 125px;
+    opacity: 0.055;
+    line-height: 1;
+}
+
+.ads-suit-decoration .suit-spade {
+    top: 10px;
+    right: 45px;
+    color: #A9C7F5;
+    transform: rotate(15deg);
+}
+
+.ads-suit-decoration .suit-heart {
+    bottom: 5px;
+    right: 165px;
+    color: #e66b78;
+    transform: rotate(-15deg);
+}
+
+.ads-suit-decoration .suit-diamond {
+    top: 95px;
+    right: -10px;
+    color: #F2D27A;
+    transform: rotate(15deg);
+}
+
+.ads-suit-decoration .suit-club {
+    bottom: -40px;
+    left: 35%;
+    color: #A9C7F5;
+}
+
+/* Main banner content */
+
+.ads-banner-content {
+    position: relative;
+    z-index: 1;
+}
+
+.ads-banner-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 15px;
+    flex-wrap: wrap;
+    margin-bottom: 36px;
+}
+
+.ads-sponsor-brand {
+    display: flex;
+    align-items: center;
+    gap: 13px;
+}
+
+.ads-crown-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 48px;
+    height: 48px;
+    flex-shrink: 0;
+    border-radius: 12px;
+    background: rgba(242, 210, 122, 0.13);
+    border: 1px solid rgba(242, 210, 122, 0.4);
+    color: #F2D27A;
+    font-size: 30px;
+}
+
+.ads-sponsor-info {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.ads-featured-label {
+    color: #F2D27A;
+    font-size: 0.7rem;
+    font-weight: 800;
+    letter-spacing: 0.14em;
+}
+
+.ads-sponsor-name {
+    margin: 0;
+    color: #F4F7FC;
+    font-size: 1.1rem;
+    font-weight: 800;
+    letter-spacing: 0.04em;
+}
+
+.ads-partner-badge {
+    padding: 7px 15px;
+    border: 1px solid rgba(242, 210, 122, 0.65);
+    border-radius: 999px;
+    background: rgba(242, 210, 122, 0.12);
+    color: #F2D27A;
+    font-size: 0.72rem;
+    font-weight: 800;
+    letter-spacing: 0.1em;
+}
+
+/* Headline and description */
+
+.ads-banner-message {
+    max-width: 600px;
+    margin-bottom: 30px;
+}
+
+.ads-banner-headline {
+    margin: 0 0 12px;
+    color: #F4F7FC;
+    font-size: clamp(1.7rem, 4vw, 2.5rem);
+    font-weight: 850;
+    line-height: 1.2;
+    letter-spacing: -0.025em;
+    overflow-wrap: anywhere;
+}
+
+.ads-banner-subtext {
+    margin: 0;
+    color: #C1D4F2;
+    font-size: 1rem;
+    line-height: 1.7;
+    max-width: 60ch;
+    overflow-wrap: anywhere;
+}
+
+/* Footer and sponsor button */
+
+.ads-banner-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 15px;
+    flex-wrap: wrap;
+}
+
+.ads-cta-link {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    padding: 12px 21px;
+    border: 1px solid #7198E0;
+    border-radius: 9px;
+    background: #315CA8;
+    color: #FFFFFF;
+    font-size: 0.82rem;
+    font-weight: 800;
+    letter-spacing: 0.06em;
+    text-decoration: none;
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.25);
+    transition: all 0.2s ease;
+}
+
+.ads-cta-link:hover {
+    background: #527FD1;
+    color: #FFFFFF;
+    transform: translateY(-2px);
+}
+
+.ads-cta-link span {
+    font-size: 1rem;
+}
+
+.theme-gold .ads-cta-link {
+    background: #F2D27A;
+    border-color: #F2D27A;
+    color: #302A1C;
+}
+
+.theme-gold .ads-cta-link:hover {
+    background: #FFE49A;
+    color: #302A1C;
+}
+
+.theme-emerald .ads-cta-link {
+    background: #3C8D79;
+    border-color: #55B39A;
+    color: #FFFFFF;
+}
+
+.theme-emerald .ads-cta-link:hover {
+    background: #4BA68F;
+    color: #FFFFFF;
+}
+
+.ads-powered-by {
+    color: rgba(196, 215, 245, 0.7);
+    font-size: 0.68rem;
+    font-weight: 800;
+    letter-spacing: 0.13em;
+}
+
+/* Banner counter */
+
+.ads-banner-counter {
+    position: absolute;
+    top: 17px;
+    right: 20px;
+    color: rgba(196, 215, 245, 0.65);
+    font-size: 0.72rem;
+    font-weight: 700;
+}
+
+/* Progress bar */
+
+.ads-progress-track {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: 4px;
+    background: rgba(244, 247, 252, 0.12);
+}
+
+.ads-progress-bar {
+    height: 100%;
+    width: 0%;
+    background: #7198E0;
+    transition: width 0.1s linear;
+}
+
+.theme-gold .ads-progress-bar {
+    background: #F2D27A;
+}
+
+.theme-emerald .ads-progress-bar {
+    background: #3C8D79;
+}
+
+/* Responsive banner */
+
+@media (max-width: 600px) {
+    .ads-banner-card {
+        min-height: 300px;
+        padding: 25px 20px 28px;
+    }
+
+    .ads-banner-top {
+        margin-bottom: 28px;
+    }
+
+    .ads-crown-icon {
+        width: 40px;
+        height: 40px;
+        font-size: 25px;
+    }
+
+    .ads-sponsor-name {
+        font-size: 0.95rem;
+    }
+
+    .ads-banner-message {
+        margin-bottom: 25px;
+    }
+
+    .ads-powered-by {
+        font-size: 0.58rem;
+    }
+
+    .ads-suit-decoration span {
+        font-size: 90px;
+    }
+}
+
+
+/* =========================================
+   Lobby Premium Sponsor Banner
+========================================= */
+
+.lobby-sponsor-card {
+    position: relative;
+    width: 95%;
+    max-width: none;
+    margin: 15px auto;
+    min-height: 430px;
+    padding: 24px 18px;
+    border-radius: 16px;
+    border: 1px solid rgba(212, 177, 92, 0.45);
+    overflow: hidden;
+    color: #f8f5eb;
+    box-shadow: 0 12px 30px rgba(0, 0, 0, 0.35);
+}
+
+.lobby-sponsor-card.theme-midnight {
+    background: linear-gradient(155deg, #17243b, #080e1c 75%);
+}
+
+.lobby-sponsor-card.theme-gold {
+    background: linear-gradient(155deg, #59451f, #21180c 75%);
+}
+
+.lobby-sponsor-card.theme-emerald {
+    background: linear-gradient(155deg, #145b48, #071e19 75%);
+}
+
+.lobby-sponsor-content {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    flex-direction: column;
+    min-height: 380px;
+    gap: 28px;
+}
+
+.lobby-sponsor-top {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.lobby-sponsor-brand {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.lobby-sponsor-crown {
+    color: #e5c477;
+    font-size: 30px;
+}
+
+.lobby-featured-label {
+    display: block;
+    color: #d8bd7c;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 2px;
+}
+
+.lobby-sponsor-name {
+    margin: 4px 0 0;
+    color: #fff;
+    font-size: 19px;
+    font-weight: 800;
+    overflow-wrap: anywhere;
+}
+
+.lobby-partner-badge {
+    align-self: flex-start;
+    padding: 5px 11px;
+    border: 1px solid rgba(229, 196, 119, 0.6);
+    border-radius: 20px;
+    color: #e5c477;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 1.5px;
+}
+
+.lobby-sponsor-message {
+    margin-top: 8px;
+}
+
+.lobby-sponsor-message h4 {
+    color: #fff;
+    font-size: 25px;
+    line-height: 1.25;
+    font-weight: 800;
+    overflow-wrap: anywhere;
+}
+
+.lobby-sponsor-message p {
+    margin-top: 14px;
+    color: #c4cbd6;
+    font-size: 13px;
+    line-height: 1.7;
+    overflow-wrap: anywhere;
+}
+
+.lobby-sponsor-footer {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 18px;
+    margin-top: auto;
+}
+
+.lobby-sponsor-footer a {
+    display: inline-block;
+    padding: 10px 13px;
+    border: 1px solid #d8bd7c;
+    border-radius: 5px;
+    color: #f4dfaa;
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 1px;
+    text-decoration: none;
+    transition: background-color 0.2s ease;
+}
+
+.lobby-sponsor-footer a:hover {
+    background-color: rgba(216, 189, 124, 0.15);
+    color: #fff;
+}
+
+.lobby-sponsor-footer span {
+    color: #9ba7b8;
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 1.5px;
+}
+
+.lobby-sponsor-suits {
+    position: absolute;
+    right: 10px;
+    bottom: 65px;
+    color: rgba(229, 196, 119, 0.12);
+    font-size: 28px;
+    letter-spacing: 5px;
+    pointer-events: none;
+}
+
+/* Theme-specific accents */
+
+.lobby-sponsor-card.theme-gold .lobby-featured-label,
+.lobby-sponsor-card.theme-gold .lobby-sponsor-crown,
+.lobby-sponsor-card.theme-gold .lobby-partner-badge {
+    color: #f2d27a;
+}
+
+.lobby-sponsor-card.theme-emerald .lobby-featured-label,
+.lobby-sponsor-card.theme-emerald .lobby-sponsor-crown,
+.lobby-sponsor-card.theme-emerald .lobby-partner-badge {
+    color: #8bd5ae;
+}
+
+.lobby-sponsor-card.theme-emerald .lobby-partner-badge {
+    border-color: rgba(139, 213, 174, 0.6);
+}
+
+.lobby-sponsor-card.theme-emerald .lobby-sponsor-footer a {
+    border-color: #8bd5ae;
+    color: #b5edcc;
+}
+
+.lobby-sponsor-card.theme-gold .lobby-partner-badge {
+    border-color: rgba(242, 210, 122, 0.6);
+}
+
+.lobby-sponsor-card.theme-gold .lobby-sponsor-footer a {
+    border-color: #f2d27a;
+    color: #f2d27a;
+}
+
+/* Sponsor Dashboard Preview */
+
+.sponsor-dashboard-preview {
+    width: 100%;
+    min-height: 380px;
+    box-sizing: border-box;
+}
+
+.sponsor-dashboard-preview .ads-banner-content {
+    min-height: 330px;
+}
+
+.sponsor-dashboard-preview .ads-preview-no-link {
+    display: inline-block;
+    cursor: default;
+    opacity: 0.65;
+}
+
+/* =========================================
+   Sponsor Dashboard Preview Button
+========================================= */
+
+.sponsor-preview-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    padding: 8px 14px;
+    min-width: 95px;
+
+    background: linear-gradient(135deg, #263650, #111c30);
+    border: 1px solid rgba(216, 189, 124, 0.65);
+    border-radius: 6px;
+
+    color: #e5c477;
+    font-size: 12px;
+    font-weight: 800;
+    letter-spacing: 0.7px;
+
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.sponsor-preview-btn i {
+    font-size: 14px;
+}
+
+.sponsor-preview-btn:hover {
+    background: linear-gradient(135deg, #3a4b65, #1b2b43);
+    border-color: #f2d27a;
+    color: #fff0bd;
+    box-shadow: 0 0 12px rgba(216, 189, 124, 0.2);
+    transform: translateY(-1px);
+}
+
+.sponsor-preview-btn:active {
+    transform: translateY(0);
+}
+
+.sponsor-preview-btn:focus-visible {
+    outline: 2px solid #e5c477;
+    outline-offset: 3px;
+}
