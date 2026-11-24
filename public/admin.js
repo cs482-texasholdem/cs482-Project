@@ -13,11 +13,20 @@ let editModal;
 let viewReportModal;
 let currentReportData = null;
 
+
 // Initialize the dashboard components once the DOM is fully loaded
 document.addEventListener("DOMContentLoaded", async function() {
     // Instantiate Bootstrap modals
     editModal = new bootstrap.Modal(document.getElementById('editUserModal'));
     viewReportModal = new bootstrap.Modal(document.getElementById('viewReportModal'));
+
+    // Connect to Socket.IO for live sponsor banner updates
+    const socket = io();
+
+    socket.on("SPONSOR_BANNERS_UPDATED", () => {
+        console.log("Sponsor banner update received. Refreshing admin dashboard...");
+        loadAdminBanners();
+    });
     
     // Fetch and render users, player reports, and game history concurrently
     await Promise.all([
