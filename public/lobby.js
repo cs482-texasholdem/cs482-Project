@@ -235,14 +235,8 @@ function setupCommonLobbyListeners(playerId) {
 }
 
 function openJoinSidebar(tableId, tableName, blinds, minBuyin) {
-    const rankedTables = [
-        "ranked-beginner",
-        "ranked-intermediate",
-        "ranked-advanced"
-    ];
-
-    if (!rankedTables.includes(tableId)) {
-        console.error("Invalid ranked table:", tableId);
+    if (!tableId) {
+        console.error("Invalid table ID.");
         return;
     }
 
@@ -411,6 +405,18 @@ function createPublicTableCard(table) {
     // Safely display the user-created table name
     col.querySelector(".card-title").textContent = table.tableName;
 
+    // Connect the custom table join button
+    const joinButton = col.querySelector("button");
+
+    joinButton.addEventListener("click", () => {
+        openJoinSidebar(
+            table.tableId,
+            table.tableName,
+            `$${table.smallBlind} / $${table.bigBlind}`,
+            `$${table.buyIn.toLocaleString()}`
+        );
+    });
+
     return col;
 }
 
@@ -466,33 +472,58 @@ if (joinTableForm) {
 
         const selectedTableId = this.querySelector('input[name="tableId"]')?.value;
 
-        const skillLevel = selectedTableId?.replace("ranked-", "");
+        if (!selectedTableId) {
+            alert("No table selected.");
+            return;
+        }
+
+        // Determine whether the selected table is ranked
+        const rankedTables = [
+            "ranked-beginner",
+            "ranked-intermediate",
+            "ranked-advanced"
+        ];
+
+        const isRanked = rankedTables.includes(selectedTableId);
+
+        // Determine which endpoint to use
+        const endpoint = isRanked
+            ? "/api/table/ranked/join"
+            : "/api/table/join";
+
+        // Prepare the request depending on the game mode
+        const requestBody = isRanked
+            ? {
+                playerId: resolvedPlayerId,
+                skillLevel: selectedTableId.replace("ranked-", "")
+            }
+            : {
+                playerId: resolvedPlayerId,
+                tableId: selectedTableId
+            };
 
         try {
-            const response = await fetch("/api/table/ranked/join", {
+            const response = await fetch(endpoint, {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json"
                 },
-                body: JSON.stringify({
-                    playerId: resolvedPlayerId,
-                    skillLevel
-                })
+                body: JSON.stringify(requestBody)
             });
 
             const data = await response.json();
 
             if (!response.ok) {
-                throw new Error(data.error || "Failed to join ranked table.");
+                throw new Error(data.error || "Failed to join table.");
             }
 
-            // Redirect using the ACTUAL dynamically assigned table ID
+            // Redirect to the correct table
             window.location.href =
                 `tableDisplay.html?tableId=${encodeURIComponent(data.tableId)}` +
                 `&playerId=${encodeURIComponent(resolvedPlayerId)}`;
 
         } catch (error) {
-            console.error("Ranked matchmaking failed:", error);
+            console.error("Table joining failed:", error);
             alert(error.message);
         }
     });
