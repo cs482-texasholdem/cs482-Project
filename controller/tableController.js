@@ -630,6 +630,15 @@ function leaveTable(req, res) {
     });
 }
 
+// Returns total player counts for ranked queues
+function getRankedPlayerCounts(req, res) {
+    return res.status(200).json({
+        beginner: tableManager.getRankedPlayerCount("beginner"),
+        intermediate: tableManager.getRankedPlayerCount("intermediate"),
+        advanced: tableManager.getRankedPlayerCount("advanced")
+    });
+}
+
 function startGame(req, res) {
     const table = getRequestedTable(req);
 
@@ -816,6 +825,7 @@ module.exports = {
     nextRound,
     getTableStatus,
     getPublicTables,
+    getRankedPlayerCounts,
     postChatMessage,
     updateMuckPreference,
     tableManager,

@@ -61,6 +61,18 @@ class TableManager {
         );
     }
 
+    // Returns the total number of players for a ranked skill level
+    getRankedPlayerCount(skillLevel) {
+        return this.getAllTables()
+            .filter(table =>
+                table.gameMode === "ranked" &&
+                table.skillLevel === skillLevel
+            )
+            .reduce((total, table) =>
+                total + table.getPlayerCount(), 0
+            );
+    }
+
     // Creates a new ActiveTable
     createTable(skillLevel = "general", timeLimit = 30, gameMode = "custom", maxPlayer = 9, smallBlind = 10, bigBlind = 20) {
         //error checking

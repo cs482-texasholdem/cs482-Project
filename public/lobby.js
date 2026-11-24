@@ -24,6 +24,11 @@ document.addEventListener("DOMContentLoaded", async function () {
         publicLeaderboardIntervalId = setInterval(loadPublicTableLeaderboards, 15000);
     }
 
+    loadRankedPlayerCounts();
+
+    // Refresh player counts every 5 seconds
+    setInterval(loadRankedPlayerCounts, 5000);
+
     const urlParams = new URLSearchParams(window.location.search);
     let playerId = urlParams.get("playerId");
 
@@ -153,6 +158,32 @@ function openAchievementInfo(achievementId) {
     if (modalEl && typeof bootstrap !== "undefined") {
         const modal = bootstrap.Modal.getOrCreateInstance(modalEl);
         modal.show();
+    }
+}
+
+async function loadRankedPlayerCounts() {
+    try {
+        const response = await fetch("/api/tables/ranked/counts", {
+            cache: "no-store"
+        });
+
+        if (!response.ok) {
+            throw new Error("Failed to load ranked player counts.");
+        }
+
+        const counts = await response.json();
+
+        document.getElementById("beginnerPlayerCount").textContent =
+            counts.beginner;
+
+        document.getElementById("intermediatePlayerCount").textContent =
+            counts.intermediate;
+
+        document.getElementById("advancedPlayerCount").textContent =
+            counts.advanced;
+
+    } catch (error) {
+        console.error("Error loading ranked player counts:", error);
     }
 }
 
